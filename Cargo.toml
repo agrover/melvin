@@ -1,0 +1,4 @@
+[package]
+name = "gromp"
+version = "0.1.0"
+authors = ["Andy Grover <agrover@redhat.com>"]

@@ -1,16 +1,21 @@
-
 extern crate byteorder;
+extern crate crc;
 
 use std::fs::File;
-use std::io::Read;
-use std::io::{Result, Error};
+use std::io::{Read, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 
 use byteorder::{LittleEndian, ByteOrder};
 
+use crc::{crc32, Hasher32};
+
 const LABEL_SCAN_SECTORS: usize = 4;
 const MYPATH: &'static str = "/dev/mapper/luks-291e9250-200e-4c36-8e5e-66aa257669ed";
 const ID_LEN: usize = 32;
+const MDA_MAGIC: &'static str = "\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
+const INITIAL_CRC: u32 = 0xf597a6cf;
+const SECTOR_SIZE: usize = 512;
+
 
 #[derive(Debug)]
 struct Label {
@@ -18,23 +23,11 @@ struct Label {
     sector: u64,
     crc: u32,
     offset: u32,
-    type_: String,
+    label: String,
 }
 
 #[derive(Debug)]
-struct DataArea {
-    offset: u64,
-    size: u64,
-}
-
-#[derive(Debug)]
-struct MetadataArea {
-    offset: u64,
-    size: u64,
-}
-
-#[derive(Debug)]
-struct BootloaderArea {
+struct PvArea {
     offset: u64,
     size: u64,
 }
@@ -45,23 +38,30 @@ struct PvHeader {
     size: u64, // in bytes
     ext_version: u32,
     ext_flags: u32,
-    data_areas: Vec<DataArea>,
-    metadata_areas: Vec<MetadataArea>,
-    bootloader_areas: Vec<BootloaderArea>,
+    data_areas: Vec<PvArea>,
+    metadata_areas: Vec<PvArea>,
+    bootloader_areas: Vec<PvArea>,
 }
 
 
 fn get_label(buf: &[u8]) -> Result<Label> {
     for x in 0..LABEL_SCAN_SECTORS {
-        if &buf[x*512..x*512+8] == b"LABELONE" {
-            let start = x*512;
+        let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
+        if &sec_buf[..8] == b"LABELONE" {
+            let crc = LittleEndian::read_u32(&sec_buf[16..20]);
+            crc32_ok(crc, &sec_buf[20..SECTOR_SIZE]);
+
+            let sector = LittleEndian::read_u64(&sec_buf[8..16]);
+            if sector != x as u64 {
+                println!("sector field is {} in sector {}", sector, x);
+            }
 
             return Ok(Label{
-                id: String::from_utf8_lossy(&buf[start..start+8]).into_owned(),
-                sector: LittleEndian::read_u64(&buf[start+8..start+16]),
-                crc: LittleEndian::read_u32(&buf[start+16..start+20]),
-                offset: LittleEndian::read_u32(&buf[start+20..start+24]) + start as u32,
-                type_: String::from_utf8_lossy(&buf[start+24..start+32]).into_owned(),
+                id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
+                sector: sector,
+                crc: crc,
+                offset: LittleEndian::read_u32(&sec_buf[20..24]) + (x*SECTOR_SIZE as usize) as u32,
+                label: String::from_utf8_lossy(&sec_buf[24..32]).into_owned(),
             })
         }
     }
@@ -78,7 +78,7 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
         let da_off = LittleEndian::read_u64(&da_buf[..8]);
         if da_off == 0 { break; }
 
-        da_vec.push(DataArea {
+        da_vec.push(PvArea {
             offset: da_off,
             size: LittleEndian::read_u64(&da_buf[8..16]),
         });
@@ -95,7 +95,7 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
         let da_off = LittleEndian::read_u64(&da_buf[..8]);
         if da_off == 0 { break; }
 
-        md_vec.push(MetadataArea {
+        md_vec.push(PvArea {
             offset: da_off,
             size: LittleEndian::read_u64(&da_buf[8..16]),
         });
@@ -119,7 +119,7 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
             let da_off = LittleEndian::read_u64(&da_buf[..8]);
             if da_off == 0 { break; }
 
-            ba_vec.push(BootloaderArea {
+            ba_vec.push(PvArea {
                 offset: da_off,
                 size: LittleEndian::read_u64(&da_buf[8..16]),
             });
@@ -139,6 +139,25 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
     })
 }
 
+fn crc32_ok(val: u32, buf: &[u8]) -> bool {
+    let mut digest = crc32::Digest::new(INITIAL_CRC);
+    digest.write(&buf);
+    let crc32 = digest.sum32();
+    if val != crc32 {
+        println!("CRC32: input {:x} != calculated {:x}", val, crc32);
+    }
+    val == crc32
+}
+
+
+fn parse_mda_header(buf: &[u8]) -> () {
+
+    let crc1 = LittleEndian::read_u32(&buf[..4]);
+
+    // TODO: why is this failing?
+    crc32_ok(crc1, &buf[4..512]);
+}
+
 fn find_stuff(path: &str) -> Result<Label> {
 
     let mut f = try!(File::open(path));
@@ -151,6 +170,18 @@ fn find_stuff(path: &str) -> Result<Label> {
 
     let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
 
+    for md in &pvheader.metadata_areas {
+        try!(f.seek(SeekFrom::Start(md.offset)));
+
+        println!("AA {} {}", md.offset, md.size);
+
+        let mut buf = vec![0; md.size as usize];
+
+        try!(f.read(&mut buf));
+
+        parse_mda_header(&buf);
+    }
+
     println!("pvheader {:?}", pvheader);
 
     return Ok(label);
@@ -161,5 +192,4 @@ fn main() {
     let label = find_stuff(MYPATH).unwrap();
 
     println!("{:?}", label);
-
 }

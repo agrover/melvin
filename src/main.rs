@@ -69,6 +69,7 @@ fn get_label(buf: &[u8]) -> Result<Label> {
     Err(Error::new(Other, "bad"))
 }
 
+#[derive(Debug)]
 struct PvAreaIter<'a> {
     area: &'a[u8],
 }
@@ -149,23 +150,80 @@ fn crc32_ok(val: u32, buf: &[u8]) -> bool {
     let mut digest = crc32::Digest::new(INITIAL_CRC);
     digest.write(&buf);
     let crc32 = digest.sum32();
+
+    // TODO: all our crcs are failing, how come?
     if val != crc32 {
         println!("CRC32: input {:x} != calculated {:x}", val, crc32);
     }
     val == crc32
 }
 
+#[derive(Debug)]
+struct RawLocn {
+    offset: u64,
+    size: u64,
+    checksum: u32,
+    flags: u32,
+}
+
+#[derive(Debug)]
+struct RawLocnIter<'a> {
+    area: &'a[u8],
+}
+
+fn iter_raw_locn<'a>(buf: &'a[u8]) -> RawLocnIter<'a> {
+    RawLocnIter { area: buf }
+}
+
+impl<'a> Iterator for RawLocnIter<'a> {
+    type Item = RawLocn;
+
+    fn next (&mut self) -> Option<RawLocn> {
+        let off = LittleEndian::read_u64(&self.area[..8]);
+        let size = LittleEndian::read_u64(&self.area[8..16]);
+        let checksum = LittleEndian::read_u32(&self.area[16..20]);
+        let flags = LittleEndian::read_u32(&self.area[20..24]);
+
+        if off == 0 {
+            None
+        }
+        else {
+            self.area = &self.area[24..];
+            Some(RawLocn {
+                offset: off,
+                size: size,
+                checksum: checksum,
+                flags: flags,
+            })
+        }
+    }
+}
+
 
 fn parse_mda_header(buf: &[u8]) -> () {
 
-    let crc1 = LittleEndian::read_u32(&buf[..4]);
-
-    // TODO: why is this failing?
-    crc32_ok(crc1, &buf[4..512]);
+    crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..512]);
 
     if &buf[4..20] != MDA_MAGIC {
         println!("'{}' doesn't match '{}'", String::from_utf8_lossy(&buf[4..20]),
                  String::from_utf8_lossy(MDA_MAGIC));
+    }
+
+    let ver = LittleEndian::read_u32(&buf[20..24]);
+    if ver != 1 {
+        println!("bad version {}", ver);
+    }
+
+    println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
+    println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
+
+    for x in iter_raw_locn(&buf[40..]) {
+        println!("rawlocn {:?}", x);
+        let start: usize = x.offset as usize;
+        let end = start + x.size as usize;
+        let s = String::from_utf8_lossy(&buf[start..end]).into_owned();
+        let t: String  = s.chars().take_while(|c| *c != ' ' && *c != '{').collect();
+        println!("vgname {}", t);
     }
 }
 
@@ -182,6 +240,9 @@ fn find_stuff(path: &str) -> Result<Label> {
     let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
 
     for md in &pvheader.metadata_areas {
+
+        println!("mda {:?}", md);
+
         try!(f.seek(SeekFrom::Start(md.offset)));
 
         let mut buf = vec![0; md.size as usize];

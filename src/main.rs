@@ -12,7 +12,7 @@ use crc::{crc32, Hasher32};
 const LABEL_SCAN_SECTORS: usize = 4;
 const MYPATH: &'static str = "/dev/mapper/luks-291e9250-200e-4c36-8e5e-66aa257669ed";
 const ID_LEN: usize = 32;
-const MDA_MAGIC: &'static str = "\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
+const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
 const INITIAL_CRC: u32 = 0xf597a6cf;
 const SECTOR_SIZE: usize = 512;
 
@@ -162,6 +162,11 @@ fn parse_mda_header(buf: &[u8]) -> () {
 
     // TODO: why is this failing?
     crc32_ok(crc1, &buf[4..512]);
+
+    if &buf[4..20] != MDA_MAGIC {
+        println!("'{}' doesn't match '{}'", String::from_utf8_lossy(&buf[4..20]),
+                 String::from_utf8_lossy(MDA_MAGIC));
+    }
 }
 
 fn find_stuff(path: &str) -> Result<Label> {
@@ -176,12 +181,8 @@ fn find_stuff(path: &str) -> Result<Label> {
 
     let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
 
-    println!("pvheader {:?}", pvheader);
-
     for md in &pvheader.metadata_areas {
         try!(f.seek(SeekFrom::Start(md.offset)));
-
-        println!("AA {} {}", md.offset, md.size);
 
         let mut buf = vec![0; md.size as usize];
 
@@ -197,5 +198,5 @@ fn main() {
 
     let label = find_stuff(MYPATH).unwrap();
 
-    println!("{:?}", label);
+    println!("{}", label.id);
 }

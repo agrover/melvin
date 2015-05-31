@@ -69,42 +69,58 @@ fn get_label(buf: &[u8]) -> Result<Label> {
     Err(Error::new(Other, "bad"))
 }
 
+struct PvAreaIter<'a> {
+    area: &'a[u8],
+}
+
+fn iter_pv_area<'a>(buf: &'a[u8]) -> PvAreaIter<'a> {
+    PvAreaIter { area: buf }
+}
+
+impl<'a> Iterator for PvAreaIter<'a> {
+    type Item = PvArea;
+
+    fn next (&mut self) -> Option<PvArea> {
+        let off = LittleEndian::read_u64(&self.area[..8]);
+        let size = LittleEndian::read_u64(&self.area[8..16]);
+
+        if off == 0 {
+            None
+        }
+        else {
+            self.area = &self.area[16..];
+            Some(PvArea {
+                offset: off,
+                size: size,
+            })
+        }
+    }
+}
+
+//
+// PV HEADER LAYOUT:
+// - static header (uuid and size)
+// - 0+ data areas
+// - blank entry
+// - 0+ metadata areas
+// - blank entry
+// - 8 bytes of pvextension header
+// - if version > 0
+//   - list of bootloader areas
+//
 fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
 
     let mut da_buf = &buf[ID_LEN+8..];
-    let mut da_vec = Vec::new();
 
-    loop {
-        let da_off = LittleEndian::read_u64(&da_buf[..8]);
-        if da_off == 0 { break; }
+    let da_vec: Vec<_> = iter_pv_area(da_buf).collect();
 
-        da_vec.push(PvArea {
-            offset: da_off,
-            size: LittleEndian::read_u64(&da_buf[8..16]),
-        });
+    // move slice past any actual entries plus blank
+    // terminating entry
+    da_buf = &da_buf[(da_vec.len()+1)*16..];
 
-        da_buf = &da_buf[16..];
-    }
+    let md_vec: Vec<_> = iter_pv_area(da_buf).collect();
 
-    let mut md_vec = Vec::new();
-
-    // metadata list is after a null entry for the data areas
-    da_buf = &da_buf[16..];
-
-    loop {
-        let da_off = LittleEndian::read_u64(&da_buf[..8]);
-        if da_off == 0 { break; }
-
-        md_vec.push(PvArea {
-            offset: da_off,
-            size: LittleEndian::read_u64(&da_buf[8..16]),
-        });
-
-        da_buf = &da_buf[16..];
-    }
-
-    // pv extension is after a null entry for the metadata areas
-    da_buf = &da_buf[16..];
+    da_buf = &da_buf[(md_vec.len()+1)*16..];
 
     let ext_version = LittleEndian::read_u32(&da_buf[..4]);
     let mut ext_flags = 0;
@@ -115,17 +131,7 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
 
         da_buf = &da_buf[8..];
 
-        loop {
-            let da_off = LittleEndian::read_u64(&da_buf[..8]);
-            if da_off == 0 { break; }
-
-            ba_vec.push(PvArea {
-                offset: da_off,
-                size: LittleEndian::read_u64(&da_buf[8..16]),
-            });
-
-            da_buf = &da_buf[16..];
-        }
+        ba_vec = iter_pv_area(da_buf).collect();
     }
 
     Ok(PvHeader{
@@ -170,6 +176,8 @@ fn find_stuff(path: &str) -> Result<Label> {
 
     let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
 
+    println!("pvheader {:?}", pvheader);
+
     for md in &pvheader.metadata_areas {
         try!(f.seek(SeekFrom::Start(md.offset)));
 
@@ -181,8 +189,6 @@ fn find_stuff(path: &str) -> Result<Label> {
 
         parse_mda_header(&buf);
     }
-
-    println!("pvheader {:?}", pvheader);
 
     return Ok(label);
 }

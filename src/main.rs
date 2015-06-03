@@ -16,6 +16,7 @@ const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\
 const INITIAL_CRC: u32 = 0xf597a6cf;
 const SECTOR_SIZE: usize = 512;
 
+mod lexer;
 
 #[derive(Debug)]
 struct Label {

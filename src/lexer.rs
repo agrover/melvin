@@ -27,7 +27,6 @@ pub struct Lexer<I: IntoIterator<Item=u8>> {
     chars: I::IntoIter,
     next_byte: Option<u8>,
     cursor: u64,
-    buffer_type: BufferType,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,8 +46,7 @@ pub enum TokenType {
     /// `,`
     Comma,
 
-
-    /// A string , like `"foo"`
+/// A string , like `"foo"`
     String,
 
     Ident,
@@ -95,42 +93,16 @@ pub struct Token {
     pub kind: TokenType,
 
     /// A buffer representing the bytes of this Token. 
-    pub buf: Buffer
-}
-
-/// Representation of a buffer containing items making up a `Token`.
-///
-/// It's either always `Span`, or one of the `*Byte` variants.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Buffer {
-    /// Multiple bytes making up a token. Only set for `TokenType::String` and 
-    /// `TokenType::Number`.
-    MultiByte(Vec<u8>),
-    /// The span allows to reference back into the source byte stream 
-    /// to obtain the string making up the token.
-    /// Please note that for control characters, booleans and null (i.e
-    /// anything that is not `Buffer::MultiByte` you should use 
-    /// `<TokenType as AsRef<str>>::as_ref()`)
-    Span(Span),
-}
-
-/// The type of `Buffer` you want in each `Token`
-#[derive(Debug, PartialEq, Clone)]
-pub enum BufferType {
-    /// Use a `Buffer::MultiByte` were appropriate. Initialize it with the 
-    /// given capacity (to obtain higher performance when pushing charcters)
-    Bytes(usize),
-    Span,
+    pub buf: Span
 }
 
 impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
     /// Returns a new Lexer from a given byte iterator.
-    pub fn new(chars: I, buffer_type: BufferType) -> Lexer<I> {
+    pub fn new(chars: I) -> Lexer<I> {
         Lexer {
             chars: chars.into_iter(),
             next_byte: None,
             cursor: 0,
-            buffer_type: buffer_type,
         }
     }
 
@@ -184,11 +156,6 @@ impl<I> Iterator for Lexer<I>
         let mut first = 0;
         let mut state = Mode::SlowPath;
         let last_cursor = self.cursor;
-        let mut buf = 
-            match self.buffer_type {
-                BufferType::Bytes(capacity) => Some(Vec::<u8>::with_capacity(capacity)),
-                BufferType::Span => None,
-            };
 
         while let Some(c) = self.next_byte() {
             let mut set_cursor = |cursor| {
@@ -197,9 +164,6 @@ impl<I> Iterator for Lexer<I>
 
             match state {
                 Mode::String(ref mut ign_next) => {
-                    if let Some(ref mut v) = buf {
-                        v.push(c);
-                    }
                     if *ign_next && (c == b'"' || c == b'\\') {
                         *ign_next = false;
                         continue;
@@ -219,9 +183,6 @@ impl<I> Iterator for Lexer<I>
                     }
                 },
                 Mode::Ident => {
-                    if let Some(ref mut v) = buf {
-                        v.push(c);
-                    }
                     match c {
                         b'a' ... b'z' | b'_' => {
                             continue;
@@ -237,9 +198,6 @@ impl<I> Iterator for Lexer<I>
                          b'0' ... b'9'
                         |b'-'
                         |b'.' => {
-                            if let Some(ref mut v) = buf {
-                                v.push(c);
-                            }
                             continue;
                         },
                         _ => {
@@ -255,29 +213,17 @@ impl<I> Iterator for Lexer<I>
                         b'}' => { t = Some(TokenType::CurlyClose); set_cursor(self.cursor); break; },
                         b'"' => {
                             state = Mode::String(false);
-                            if let Some(ref mut v) = buf {
-                                v.push(c);
-                            } else {
-                                set_cursor(self.cursor);
-                                // it starts at invalid, and once we know it closes, it's a string
-                                t = Some(TokenType::Invalid);
-                            }
+                            set_cursor(self.cursor);
+                            // it starts at invalid, and once we know it closes, it's a string
+                            t = Some(TokenType::Invalid);
                         },
                         b'a' ... b'z' | b'_' => {
                             state = Mode::Ident;
-                            if let Some(ref mut v) = buf {
-                                v.push(c);
-                            } else {
-                                set_cursor(self.cursor);
-                            }
+                            set_cursor(self.cursor);
                         },
                         b'0' ... b'9' => {
                             state = Mode::Number;
-                            if let Some(ref mut v) = buf {
-                                v.push(c);
-                            } else {
-                                set_cursor(self.cursor);
-                            }
+                            set_cursor(self.cursor);
                         },
                         b'[' => { t = Some(TokenType::BracketOpen); set_cursor(self.cursor); break; },
                         b']' => { t = Some(TokenType::BracketClose); set_cursor(self.cursor); break; },
@@ -303,20 +249,9 @@ impl<I> Iterator for Lexer<I>
                 if self.cursor == last_cursor {
                     None
                 } else {
-                    let buf = 
-                        match (&t, buf) {
-                              (&TokenType::String, Some(b))
-                             |(&TokenType::Number, Some(b)) => Buffer::MultiByte(b),
-                            _ => {
-                                Buffer::Span(Span {
-                                            first: first,
-                                            end: self.cursor
-                                        })
-                            }
-                        };
                     Some(Token {
                         kind: t,
-                        buf: buf,
+                        buf : Span {first: first, end: self.cursor }
                     })
                 }
             }

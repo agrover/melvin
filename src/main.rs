@@ -21,7 +21,7 @@ const SECTOR_SIZE: usize = 512;
 mod lexer;
 
 use lexer::Lexer;
-use lexer::{BufferType, Buffer};
+use lexer::{Span};
 
 #[derive(Debug)]
 struct Label {
@@ -270,9 +270,8 @@ fn main() {
 }
 
 fn do_some_stuff(s: &str) -> () {
-    for token in Lexer::new(s.bytes(), BufferType::Span) {
-        if let &Buffer::Span(ref x) = &token.buf {
-            println!("{:?}, {}", token, s.slice_chars(x.first as usize, x.end as usize));
-        }
+    for token in Lexer::new(s.bytes()) {
+        let x = &token.buf;
+        println!("{:?}, {}", token, s.slice_chars(x.first as usize, x.end as usize));
     }
 }

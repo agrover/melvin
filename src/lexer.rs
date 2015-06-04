@@ -24,14 +24,14 @@
 // This code is based on https://github.com/Byron/json-tools.
 
 /// A lexer for utf-8 encoded json data
-pub struct Lexer<I: IntoIterator<Item=u8>> {
-    chars: I::IntoIter,
+pub struct Lexer<'a> {
+    chars: &'a[u8],
     next_byte: Option<u8>,
     cursor: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub enum Token<'a> {
     /// `{`
     CurlyOpen,
     /// `}`
@@ -48,21 +48,21 @@ pub enum Token {
     Comma,
 
     /// A string , like `"foo"`
-    String(Span),
+    String(&'a[u8]),
 
-    Ident(Span),
+    Ident(&'a[u8]),
 
     /// An unsigned integer number
-    Number(Span),
+    Number(u64),
 
-    Comment(Span),
+    Comment(&'a[u8]),
 
     /// The type of the token could not be identified.
     /// Should be removed if this lexer is ever to be feature complete
     Invalid(u8),
 }
 
-impl AsRef<str> for Token {
+impl<'a> AsRef<str> for Token<'a> {
     fn as_ref(&self) -> &str {
         match *self {
             Token::CurlyOpen => "{",
@@ -78,22 +78,11 @@ impl AsRef<str> for Token {
     }
 }
 
-/// A pair of indices into the byte stream returned by our source 
-/// iterator.
-/// It is an exclusive range.
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct Span {
-    /// Index of the first the byte
-    pub begin: usize,
-    /// Index one past the last byte
-    pub end: usize,
-}
-
-impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
+impl<'a> Lexer<'a> {
     /// Returns a new Lexer from a given byte iterator.
-    pub fn new(chars: I) -> Lexer<I> {
+    pub fn new(chars: &'a[u8]) -> Lexer<'a> {
         Lexer {
-            chars: chars.into_iter(),
+            chars: chars,
             next_byte: None,
             cursor: 0,
         }
@@ -112,13 +101,13 @@ impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
                 Some(c)
             },
             None => {
-                let res = self.chars.next();
-                match res {
-                    None => None,
-                    Some(_) => {
-                        self.cursor += 1;
-                        res
-                    }
+                if self.cursor >= self.chars.len() {
+                    None
+                }
+                else {
+                    let res = self.chars[self.cursor];
+                    self.cursor += 1;
+                    Some(res)
                 }
             }
         }
@@ -135,12 +124,11 @@ enum Mode {
     Main,
 }
 
-impl<I> Iterator for Lexer<I> 
-    where I: IntoIterator<Item=u8> {
-        type Item = Token;
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token<'a>;
 
-        /// Lex the underlying byte stream to generate tokens
-        fn next(&mut self) -> Option<Token> {
+    /// Lex the underlying byte stream to generate tokens
+    fn next(&mut self) -> Option<Token<'a>> {
 
             let mut state = Mode::Main;
 
@@ -150,7 +138,8 @@ impl<I> Iterator for Lexer<I>
                     Mode::String(first) => {
                         match c {
                             b'"' => {
-                                return Some(Token::String({Span {begin: first + 1, end: self.cursor - 1 }}));
+                                return Some(Token::String(
+                                    &self.chars[first+1..self.cursor-1]));
                             },
                             _ => {
                                 continue;
@@ -163,7 +152,8 @@ impl<I> Iterator for Lexer<I>
                                 continue;
                             }
                             _ => {
-                                return Some(Token::Ident({Span {begin: first, end: self.cursor }}));
+                                return Some(Token::Ident(
+                                    &self.chars[first..self.cursor]));
                             }
                         }
                     },
@@ -174,7 +164,9 @@ impl<I> Iterator for Lexer<I>
                             },
                             _ => {
                                 self.put_back(c);
-                                return Some(Token::Number({Span {begin: first, end: self.cursor}}));
+                                let s = String::from_utf8_lossy(
+                                    &self.chars[first..self.cursor]).into_owned();
+                                return Some(Token::Number(s.parse().unwrap()));
                             }
                         }
                     }
@@ -182,7 +174,8 @@ impl<I> Iterator for Lexer<I>
                         match c {
                             b'\n' => {
                                 self.put_back(c);
-                                return Some(Token::Comment({Span {begin: first, end: self.cursor}}));
+                                return Some(Token::Comment(
+                                    &self.chars[first..self.cursor]));
                             }
                             _ => {
                                 continue;

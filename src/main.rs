@@ -227,7 +227,7 @@ fn parse_mda_header(buf: &[u8]) -> () {
         let s = String::from_utf8_lossy(&buf[start..end]).into_owned();
         let t: String  = s.chars().take_while(|c| *c != ' ' && *c != '{').collect();
         println!("vgname {}", t);
-        do_some_stuff(&s);
+        do_some_stuff(&buf[start..end]);
     }
 }
 
@@ -266,13 +266,13 @@ fn main() {
     println!("{}", label.id);
 }
 
-fn do_some_stuff(s: &str) -> () {
-    for token in Lexer::new(s.bytes()) {
+fn do_some_stuff(s: &[u8]) -> () {
+    for token in Lexer::new(&s) {
         match token {
-            Token::String(x) => { println!("string {}", &s[x.begin..x.end]) },
-            Token::Comment(x) => { println!("comment {}", &s[x.begin..x.end]) },
-            Token::Number(x) => { println!("number {}", &s[x.begin..x.end]) },
-            Token::Ident(x) => { println!("ident {}", &s[x.begin..x.end]) },
+            Token::String(x) => { println!("string {}", String::from_utf8_lossy(x)) },
+            Token::Comment(x) => { println!("comment {}", String::from_utf8_lossy(x)) },
+            Token::Number(x) => { println!("number {}", x) },
+            Token::Ident(x) => { println!("ident {}", String::from_utf8_lossy(x)) },
             _ => { println!("{:?}", token); },
         };
     }

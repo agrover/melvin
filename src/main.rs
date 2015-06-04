@@ -1,5 +1,3 @@
-#![feature(collections)]
-
 extern crate byteorder;
 extern crate crc;
 
@@ -20,8 +18,7 @@ const SECTOR_SIZE: usize = 512;
 
 mod lexer;
 
-use lexer::Lexer;
-use lexer::{Span};
+use lexer::{Lexer, Token};
 
 #[derive(Debug)]
 struct Label {
@@ -271,7 +268,12 @@ fn main() {
 
 fn do_some_stuff(s: &str) -> () {
     for token in Lexer::new(s.bytes()) {
-        let x = &token.buf;
-        println!("{:?}, {}", token, s.slice_chars(x.first as usize, x.end as usize));
+        match token {
+            Token::String(x) => { println!("string {}", &s[x.begin..x.end]) },
+            Token::Comment(x) => { println!("comment {}", &s[x.begin..x.end]) },
+            Token::Number(x) => { println!("number {}", &s[x.begin..x.end]) },
+            Token::Ident(x) => { println!("ident {}", &s[x.begin..x.end]) },
+            _ => { println!("{:?}", token); },
+        };
     }
 }

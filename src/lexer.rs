@@ -1,4 +1,5 @@
 // Copyright © 2015 Sebastian Thiel
+// Copyright © 2015 Andy Grover
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -26,11 +27,11 @@
 pub struct Lexer<I: IntoIterator<Item=u8>> {
     chars: I::IntoIter,
     next_byte: Option<u8>,
-    cursor: u64,
+    cursor: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum TokenType {
+pub enum Token {
     /// `{`
     CurlyOpen,
     /// `}`
@@ -46,31 +47,33 @@ pub enum TokenType {
     /// `,`
     Comma,
 
-/// A string , like `"foo"`
-    String,
+    /// A string , like `"foo"`
+    String(Span),
 
-    Ident,
+    Ident(Span),
 
     /// An unsigned integer number
-    Number,
+    Number(Span),
+
+    Comment(Span),
 
     /// The type of the token could not be identified.
     /// Should be removed if this lexer is ever to be feature complete
-    Invalid,
+    Invalid(u8),
 }
 
-impl AsRef<str> for TokenType {
+impl AsRef<str> for Token {
     fn as_ref(&self) -> &str {
         match *self {
-            TokenType::CurlyOpen => "{",
-            TokenType::CurlyClose => "}",
-            TokenType::BracketOpen => "[",
-            TokenType::BracketClose => "]",
-            TokenType::Equals => "=",
-            TokenType::Comma => ",",
+            Token::CurlyOpen => "{",
+            Token::CurlyClose => "}",
+            Token::BracketOpen => "[",
+            Token::BracketClose => "]",
+            Token::Equals => "=",
+            Token::Comma => ",",
 
-            TokenType::Invalid => panic!("Cannot convert invalid TokenType"),
-            _ => panic!("Cannot convert variant TokenTypes"),
+            Token::Invalid(c) => panic!("Cannot convert invalid Token {}", c),
+            _ => panic!("Cannot convert variant Tokens"),
         }
     }
 }
@@ -81,19 +84,9 @@ impl AsRef<str> for TokenType {
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Span {
     /// Index of the first the byte
-    pub first: u64,
+    pub begin: usize,
     /// Index one past the last byte
-    pub end: u64,
-}
-
-/// A lexical token, identifying its kind and span.
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    /// The exact type of the token
-    pub kind: TokenType,
-
-    /// A buffer representing the bytes of this Token. 
-    pub buf: Span
+    pub end: usize,
 }
 
 impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
@@ -104,10 +97,6 @@ impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
             next_byte: None,
             cursor: 0,
         }
-    }
-
-    pub fn into_inner(self) -> I::IntoIter {
-        self.chars
     }
 
     fn put_back(&mut self, c: u8) {
@@ -138,123 +127,111 @@ impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
 
 // Identifies the state of the lexer
 enum Mode {
-    // String parse mode: bool = ignore_next
-    String(bool),
-    Ident,
-    Number,
-    SlowPath,
+    // tells position where these modes were started
+    String(usize),
+    Ident(usize),
+    Number(usize),
+    Comment(usize),
+    Main,
 }
 
 impl<I> Iterator for Lexer<I> 
-                    where I: IntoIterator<Item=u8> {
-    type Item = Token;
+    where I: IntoIterator<Item=u8> {
+        type Item = Token;
 
-    /// Lex the underlying byte stream to generate tokens
-    fn next(&mut self) -> Option<Token> {
-        let mut t: Option<TokenType> = None;
+        /// Lex the underlying byte stream to generate tokens
+        fn next(&mut self) -> Option<Token> {
 
-        let mut first = 0;
-        let mut state = Mode::SlowPath;
-        let last_cursor = self.cursor;
+            let mut state = Mode::Main;
 
-        while let Some(c) = self.next_byte() {
-            let mut set_cursor = |cursor| {
-                first = cursor - 1;
-            };
+            while let Some(c) = self.next_byte() {
 
-            match state {
-                Mode::String(ref mut ign_next) => {
-                    if *ign_next && (c == b'"' || c == b'\\') {
-                        *ign_next = false;
-                        continue;
-                    }
-                    match c {
-                        b'"' => {
-                            t = Some(TokenType::String);
-                            break;
-                        },
-                        b'\\' => {
-                            *ign_next = true;
-                            continue;
-                        },
-                        _ => {
-                            continue;
+                match state {
+                    Mode::String(first) => {
+                        match c {
+                            b'"' => {
+                                return Some(Token::String({Span {begin: first + 1, end: self.cursor - 1 }}));
+                            },
+                            _ => {
+                                continue;
+                            }
+                        }
+                    },
+                    Mode::Ident(first) => {
+                        match c {
+                            b'a' ... b'z' | b'_' => {
+                                continue;
+                            }
+                            _ => {
+                                return Some(Token::Ident({Span {begin: first, end: self.cursor }}));
+                            }
+                        }
+                    },
+                    Mode::Number(first) => {
+                        match c {
+                            b'0' ... b'9' => {
+                                continue;
+                            },
+                            _ => {
+                                self.put_back(c);
+                                return Some(Token::Number({Span {begin: first, end: self.cursor}}));
+                            }
                         }
                     }
-                },
-                Mode::Ident => {
-                    match c {
-                        b'a' ... b'z' | b'_' => {
-                            continue;
+                    Mode::Comment(first) => {
+                        match c {
+                            b'\n' => {
+                                self.put_back(c);
+                                return Some(Token::Comment({Span {begin: first, end: self.cursor}}));
+                            }
+                            _ => {
+                                continue;
+                            }
                         }
-                        _ => {
-                            t = Some(TokenType::Ident);
-                            break;
+                    },
+                    Mode::Main => {
+                        match c {
+                            b'{' => {
+                                return Some(Token::CurlyOpen);
+                            },
+                            b'}' => {
+                                return Some(Token::CurlyClose);
+                            },
+                            b'"' => {
+                                state = Mode::String(self.cursor - 1);
+                            },
+                            b'a' ... b'z' | b'_' => {
+                                state = Mode::Ident(self.cursor - 1);
+                            },
+                            b'0' ... b'9' => {
+                                state = Mode::Number(self.cursor - 1);
+                            },
+                            b'#' => {
+                                state = Mode::Comment(self.cursor - 1);
+                            },
+                            b'[' => {
+                                return Some(Token::BracketOpen);
+                            },
+                            b']' => {
+                                return Some(Token::BracketClose);
+                            },
+                            b'=' => {
+                                return Some(Token::Equals);
+                            },
+                            b',' => {
+                                return Some(Token::Comma);
+                            },
+                            b' ' | b'\n' | b'\t' | b'\0' => {
+                                // ignore whitespace
+                            }
+                            _ => {
+                                return Some(Token::Invalid(c));
+                            },
                         }
                     }
-                },
-                Mode::Number => {
-                    match c {
-                         b'0' ... b'9'
-                        |b'-'
-                        |b'.' => {
-                            continue;
-                        },
-                        _ => {
-                            t = Some(TokenType::Number);
-                            self.put_back(c);
-                            break;
-                        }
-                    }
-                }
-                Mode::SlowPath => {
-                    match c {
-                        b'{' => { t = Some(TokenType::CurlyOpen); set_cursor(self.cursor); break; },
-                        b'}' => { t = Some(TokenType::CurlyClose); set_cursor(self.cursor); break; },
-                        b'"' => {
-                            state = Mode::String(false);
-                            set_cursor(self.cursor);
-                            // it starts at invalid, and once we know it closes, it's a string
-                            t = Some(TokenType::Invalid);
-                        },
-                        b'a' ... b'z' | b'_' => {
-                            state = Mode::Ident;
-                            set_cursor(self.cursor);
-                        },
-                        b'0' ... b'9' => {
-                            state = Mode::Number;
-                            set_cursor(self.cursor);
-                        },
-                        b'[' => { t = Some(TokenType::BracketOpen); set_cursor(self.cursor); break; },
-                        b']' => { t = Some(TokenType::BracketClose); set_cursor(self.cursor); break; },
-                        b'=' => { t = Some(TokenType::Equals); set_cursor(self.cursor); break; },
-                        b',' => { t = Some(TokenType::Comma); set_cursor(self.cursor); break; },
-                        b'\\' => {
-                            // invalid
-                            t = Some(TokenType::Invalid);
-                            set_cursor(self.cursor);
-                            break
-                        }
-                        _ => {
-
-                        },
-                    }// end single byte match
-                }// end case SlowPath
-            }// end match state
-        }// end for each byte
-
-        match t {
-            None => None,
-            Some(t) => {
-                if self.cursor == last_cursor {
-                    None
-                } else {
-                    Some(Token {
-                        kind: t,
-                        buf : Span {first: first, end: self.cursor }
-                    })
                 }
             }
+
+            None
         }
     }
-}

@@ -42,30 +42,20 @@ pub enum TokenType {
     /// `]`
     BracketClose,
 
-    /// `:`
-    Colon,
+    /// `=`
+    Equals,
     /// `,`
     Comma,
 
 
-    /// A json string , like `"foo"`
+    /// A string , like `"foo"`
     String,
-    /// `true`
-    BooleanTrue,
-    /// `false`
-    BooleanFalse,
-    /// A Number, like `1.1234` or `123` or `-0.0` or `-1` or `.0` or `.`
+
+    Ident,
+
+    /// An unsigned integer number
     Number,
 
-    /// any json number, like `1.24123` or `123`
-    // NOTE: We can't do numbers with our simplified lexer as it would require
-    // us to read a byte just to see that it's not a number and thus the previous
-    // tokens are to be returned. But we cannot peek without drastically complicating
-    // our so far quite speedy implementation.
-    // Number,
-    /// `null`
-    Null,
-    
     /// The type of the token could not be identified.
     /// Should be removed if this lexer is ever to be feature complete
     Invalid,
@@ -78,11 +68,8 @@ impl AsRef<str> for TokenType {
             TokenType::CurlyClose => "}",
             TokenType::BracketOpen => "[",
             TokenType::BracketClose => "]",
-            TokenType::Colon => ":",
+            TokenType::Equals => "=",
             TokenType::Comma => ",",
-            TokenType::BooleanTrue => "true",
-            TokenType::BooleanFalse => "false",
-            TokenType::Null => "null",
 
             TokenType::Invalid => panic!("Cannot convert invalid TokenType"),
             _ => panic!("Cannot convert variant TokenTypes"),
@@ -131,7 +118,7 @@ pub enum Buffer {
 #[derive(Debug, PartialEq, Clone)]
 pub enum BufferType {
     /// Use a `Buffer::MultiByte` were appropriate. Initialize it with the 
-    /// given capcity (to obtain higher performance when pushing charcters)
+    /// given capacity (to obtain higher performance when pushing charcters)
     Bytes(usize),
     Span,
 }
@@ -181,13 +168,7 @@ impl<I> Lexer<I> where I: IntoIterator<Item=u8> {
 enum Mode {
     // String parse mode: bool = ignore_next
     String(bool),
-    // `null` parse mode: buf, buf-index
-    Null([u8; 4], usize),
-    // `true` parse mode
-    True([u8; 4], usize),
-    // `false` parse mode
-    False([u8; 5], usize),
-    // `Number` parse mode
+    Ident,
     Number,
     SlowPath,
 }
@@ -196,7 +177,7 @@ impl<I> Iterator for Lexer<I>
                     where I: IntoIterator<Item=u8> {
     type Item = Token;
 
-    /// Lex the underlying bytte stream to generate tokens
+    /// Lex the underlying byte stream to generate tokens
     fn next(&mut self) -> Option<Token> {
         let mut t: Option<TokenType> = None;
 
@@ -237,19 +218,18 @@ impl<I> Iterator for Lexer<I>
                         }
                     }
                 },
-                Mode::Null(ref mut b, ref mut i) => {
-                    b[*i] = c;
-                    if *i == 3 {
-                        // we know b[0] is b'n'
-                        if b[1] == b'u' && b[2] == b'l' && b[3] == b'l' {
-                            t = Some(TokenType::Null);
-                        } else {
-                            t = Some(TokenType::Invalid);
+                Mode::Ident => {
+                    if let Some(ref mut v) = buf {
+                        v.push(c);
+                    }
+                    match c {
+                        b'a' ... b'z' | b'_' => {
+                            continue;
                         }
-                        break;
-                    } else {
-                        *i += 1;
-                        continue;
+                        _ => {
+                            t = Some(TokenType::Ident);
+                            break;
+                        }
                     }
                 },
                 Mode::Number => {
@@ -269,36 +249,6 @@ impl<I> Iterator for Lexer<I>
                         }
                     }
                 }
-                Mode::True(ref mut b, ref mut i) => {
-                    b[*i] = c;
-                    if *i == 3 {
-                        // we know b[0] is b't'
-                        if b[1] == b'r' && b[2] == b'u' && b[3] == b'e' {
-                            t = Some(TokenType::BooleanTrue);
-                        } else {
-                            t = Some(TokenType::Invalid);
-                        }
-                        break;
-                    } else {
-                        *i += 1;
-                        continue;
-                    }
-                },
-                Mode::False(ref mut b, ref mut i) => {
-                    b[*i] = c;
-                    if *i == 4 {
-                        // we know b[0] is b'f'
-                        if b[1] == b'a' && b[2] == b'l' && b[3] == b's' && b[4] == b'e' {
-                            t = Some(TokenType::BooleanFalse);
-                        } else {
-                            t = Some(TokenType::Invalid);
-                        }
-                        break;
-                    } else {
-                        *i += 1;
-                        continue;
-                    }
-                },
                 Mode::SlowPath => {
                     match c {
                         b'{' => { t = Some(TokenType::CurlyOpen); set_cursor(self.cursor); break; },
@@ -313,13 +263,15 @@ impl<I> Iterator for Lexer<I>
                                 t = Some(TokenType::Invalid);
                             }
                         },
-                        b'n' => {
-                            state = Mode::Null([c, b'x', b'x', b'x'], 1);
-                            set_cursor(self.cursor);
+                        b'a' ... b'z' | b'_' => {
+                            state = Mode::Ident;
+                            if let Some(ref mut v) = buf {
+                                v.push(c);
+                            } else {
+                                set_cursor(self.cursor);
+                            }
                         },
-                         b'0' ... b'9'
-                        |b'-'
-                        |b'.'=> {
+                        b'0' ... b'9' => {
                             state = Mode::Number;
                             if let Some(ref mut v) = buf {
                                 v.push(c);
@@ -327,21 +279,13 @@ impl<I> Iterator for Lexer<I>
                                 set_cursor(self.cursor);
                             }
                         },
-                        b't' => {
-                            state = Mode::True([c, b'x', b'x', b'x'], 1);
-                            set_cursor(self.cursor);
-                        },
-                        b'f' => {
-                            state = Mode::False([c, b'x', b'x', b'x', b'x'], 1);
-                            set_cursor(self.cursor);
-                        },
                         b'[' => { t = Some(TokenType::BracketOpen); set_cursor(self.cursor); break; },
                         b']' => { t = Some(TokenType::BracketClose); set_cursor(self.cursor); break; },
-                        b':' => { t = Some(TokenType::Colon); set_cursor(self.cursor); break; },
+                        b'=' => { t = Some(TokenType::Equals); set_cursor(self.cursor); break; },
                         b',' => { t = Some(TokenType::Comma); set_cursor(self.cursor); break; },
                         b'\\' => {
                             // invalid
-                            t = Some(TokenType::Invalid);                            
+                            t = Some(TokenType::Invalid);
                             set_cursor(self.cursor);
                             break
                         }

@@ -1,3 +1,5 @@
+#![feature(collections)]
+
 extern crate byteorder;
 extern crate crc;
 
@@ -17,6 +19,9 @@ const INITIAL_CRC: u32 = 0xf597a6cf;
 const SECTOR_SIZE: usize = 512;
 
 mod lexer;
+
+use lexer::Lexer;
+use lexer::{BufferType, Buffer};
 
 #[derive(Debug)]
 struct Label {
@@ -225,6 +230,7 @@ fn parse_mda_header(buf: &[u8]) -> () {
         let s = String::from_utf8_lossy(&buf[start..end]).into_owned();
         let t: String  = s.chars().take_while(|c| *c != ' ' && *c != '{').collect();
         println!("vgname {}", t);
+        do_some_stuff(&s);
     }
 }
 
@@ -261,4 +267,12 @@ fn main() {
     let label = find_stuff(MYPATH).unwrap();
 
     println!("{}", label.id);
+}
+
+fn do_some_stuff(s: &str) -> () {
+    for token in Lexer::new(s.bytes(), BufferType::Span) {
+        if let &Buffer::Span(ref x) = &token.buf {
+            println!("{:?}, {}", token, s.slice_chars(x.first as usize, x.end as usize));
+        }
+    }
 }

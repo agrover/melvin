@@ -20,6 +20,8 @@ mod lexer;
 
 use lexer::{Lexer, Token};
 
+mod socket;
+
 #[derive(Debug)]
 struct Label {
     id: String,
@@ -202,7 +204,6 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-
 fn parse_mda_header(buf: &[u8]) -> () {
 
     crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..512]);
@@ -222,11 +223,8 @@ fn parse_mda_header(buf: &[u8]) -> () {
 
     for x in iter_raw_locn(&buf[40..]) {
         println!("rawlocn {:?}", x);
-        let start: usize = x.offset as usize;
+        let start = x.offset as usize;
         let end = start + x.size as usize;
-        let s = String::from_utf8_lossy(&buf[start..end]).into_owned();
-        let t: String  = s.chars().take_while(|c| *c != ' ' && *c != '{').collect();
-        println!("vgname {}", t);
         do_some_stuff(&buf[start..end]);
     }
 }
@@ -264,6 +262,8 @@ fn main() {
     let label = find_stuff(MYPATH).unwrap();
 
     println!("{}", label.id);
+
+    open_lvmetad();
 }
 
 fn do_some_stuff(s: &[u8]) -> () {
@@ -276,4 +276,12 @@ fn do_some_stuff(s: &[u8]) -> () {
             _ => { println!("{:?}", token); },
         };
     }
+}
+
+fn open_lvmetad() {
+
+    let path = "/run/lvm/lvmetad.socket";
+
+//    let sa = SocketAddr::new(
+
 }

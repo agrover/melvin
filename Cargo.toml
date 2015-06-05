@@ -6,3 +6,5 @@ authors = ["Andy Grover <agrover@redhat.com>"]
 [dependencies]
 byteorder = "0.3.10"
 crc = "^0.3.1"
+errno = "*"
+libc = "*"

@@ -1,5 +1,6 @@
 extern crate byteorder;
 extern crate crc;
+extern crate af_unix;
 
 use std::fs::File;
 use std::io::{Read, Result, Error, Seek, SeekFrom};
@@ -19,8 +20,6 @@ const SECTOR_SIZE: usize = 512;
 mod lexer;
 
 use lexer::{Lexer, Token};
-
-mod socket;
 
 #[derive(Debug)]
 struct Label {
@@ -282,6 +281,16 @@ fn open_lvmetad() {
 
     let path = "/run/lvm/lvmetad.socket";
 
-//    let sa = SocketAddr::new(
+    let mut sa = af_unix::UnixDatagram::connect(path, af_unix::SockType::Stream).unwrap();
+
+    println!("asg {:?}", sa);
+
+    sa.send(b"hello");
+
+    let mut buf = [0; 1];
+
+    let got_bytes = sa.recv(&mut buf[..]).unwrap();
+
+    println!("got bytes {}", got_bytes);
 
 }

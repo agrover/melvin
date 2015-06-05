@@ -23,7 +23,6 @@
 // Base a lexer for LVM2's text format on the more complex (hah) json format.
 // This code is based on https://github.com/Byron/json-tools.
 
-/// A lexer for utf-8 encoded json data
 pub struct Lexer<'a> {
     chars: &'a[u8],
     next_byte: Option<u8>,
@@ -133,8 +132,47 @@ impl<'a> Iterator for Lexer<'a> {
             let mut state = Mode::Main;
 
             while let Some(c) = self.next_byte() {
-
                 match state {
+                    Mode::Main => {
+                        match c {
+                            b'{' => {
+                                return Some(Token::CurlyOpen);
+                            },
+                            b'}' => {
+                                return Some(Token::CurlyClose);
+                            },
+                            b'"' => {
+                                state = Mode::String(self.cursor - 1);
+                            },
+                            b'a' ... b'z' | b'_' => {
+                                state = Mode::Ident(self.cursor - 1);
+                            },
+                            b'0' ... b'9' => {
+                                state = Mode::Number(self.cursor - 1);
+                            },
+                            b'#' => {
+                                state = Mode::Comment(self.cursor - 1);
+                            },
+                            b'[' => {
+                                return Some(Token::BracketOpen);
+                            },
+                            b']' => {
+                                return Some(Token::BracketClose);
+                            },
+                            b'=' => {
+                                return Some(Token::Equals);
+                            },
+                            b',' => {
+                                return Some(Token::Comma);
+                            },
+                            b' ' | b'\n' | b'\t' | b'\0' => {
+                                // ignore whitespace
+                            }
+                            _ => {
+                                return Some(Token::Invalid(c));
+                            },
+                        }
+                    }
                     Mode::String(first) => {
                         match c {
                             b'"' => {
@@ -182,46 +220,6 @@ impl<'a> Iterator for Lexer<'a> {
                             }
                         }
                     },
-                    Mode::Main => {
-                        match c {
-                            b'{' => {
-                                return Some(Token::CurlyOpen);
-                            },
-                            b'}' => {
-                                return Some(Token::CurlyClose);
-                            },
-                            b'"' => {
-                                state = Mode::String(self.cursor - 1);
-                            },
-                            b'a' ... b'z' | b'_' => {
-                                state = Mode::Ident(self.cursor - 1);
-                            },
-                            b'0' ... b'9' => {
-                                state = Mode::Number(self.cursor - 1);
-                            },
-                            b'#' => {
-                                state = Mode::Comment(self.cursor - 1);
-                            },
-                            b'[' => {
-                                return Some(Token::BracketOpen);
-                            },
-                            b']' => {
-                                return Some(Token::BracketClose);
-                            },
-                            b'=' => {
-                                return Some(Token::Equals);
-                            },
-                            b',' => {
-                                return Some(Token::Comma);
-                            },
-                            b' ' | b'\n' | b'\t' | b'\0' => {
-                                // ignore whitespace
-                            }
-                            _ => {
-                                return Some(Token::Invalid(c));
-                            },
-                        }
-                    }
                 }
             }
 

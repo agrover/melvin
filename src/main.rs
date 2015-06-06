@@ -1,6 +1,8 @@
+#![feature(collections)]
+
 extern crate byteorder;
 extern crate crc;
-extern crate af_unix;
+extern crate unix_socket;
 
 use std::fs::File;
 use std::io::{Read, Result, Error, Seek, SeekFrom};
@@ -20,6 +22,9 @@ const SECTOR_SIZE: usize = 512;
 mod lexer;
 
 use lexer::{Lexer, Token};
+
+use unix_socket::UnixStream;
+use std::io::Write;
 
 #[derive(Debug)]
 struct Label {
@@ -258,9 +263,9 @@ fn find_stuff(path: &str) -> Result<Label> {
 
 fn main() {
 
-    let label = find_stuff(MYPATH).unwrap();
+//    let label = find_stuff(MYPATH).unwrap();
 
-    println!("{}", label.id);
+//    println!("{}", label.id);
 
     open_lvmetad();
 }
@@ -277,20 +282,48 @@ fn do_some_stuff(s: &[u8]) -> () {
     }
 }
 
+fn read_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
+    let mut response = [0; 32];
+    let mut v = Vec::new();
+
+    loop {
+        let bytes_read = try!(stream.read(&mut response));
+
+        v.push_all(&response[..bytes_read]);
+
+        if v.ends_with(b"\n##\n") {
+            // drop the end marker
+            let len = v.len() - 4;
+            v.truncate(len);
+            return Ok(v);
+        }
+    }
+}
+
+
 fn open_lvmetad() {
+
+    lvmetad_request(b"hello", false);
+    lvmetad_request(b"vg_list", true);
+    lvmetad_request(b"pv_list", true);
+
+}
+
+fn lvmetad_request(s: &[u8], token: bool) {
 
     let path = "/run/lvm/lvmetad.socket";
 
-    let mut sa = af_unix::UnixDatagram::connect(path, af_unix::SockType::Stream).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
+    stream.write_all(b"request = \"").unwrap();
+    stream.write_all(s).unwrap();
+    stream.write_all(b"\"\n").unwrap();
+    if token {
+        stream.write_all(b"token = \"filter:0\"").unwrap();
+        stream.write_all(b"\n").unwrap();
+    }
+    stream.write_all(b"\n##\n").unwrap();
 
-    println!("asg {:?}", sa);
+    let r = read_response(&mut stream).unwrap();
 
-    sa.send(b"hello");
-
-    let mut buf = [0; 1];
-
-    let got_bytes = sa.recv(&mut buf[..]).unwrap();
-
-    println!("got bytes {}", got_bytes);
-
+    do_some_stuff(&r);
 }

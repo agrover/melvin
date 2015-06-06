@@ -144,7 +144,7 @@ impl<'a> Iterator for Lexer<'a> {
                             b'"' => {
                                 state = Mode::String(self.cursor - 1);
                             },
-                            b'a' ... b'z' | b'_' => {
+                            b'a' ... b'z' | b'A' ... b'Z' | b'_' | b'.' => {
                                 state = Mode::Ident(self.cursor - 1);
                             },
                             b'0' ... b'9' => {
@@ -186,10 +186,12 @@ impl<'a> Iterator for Lexer<'a> {
                     },
                     Mode::Ident(first) => {
                         match c {
-                            b'a' ... b'z' | b'_' => {
+                            b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9'
+                                | b'_' | b'.' | b'-' => {
                                 continue;
                             }
                             _ => {
+                                self.put_back(c);
                                 return Some(Token::Ident(
                                     &self.chars[first..self.cursor]));
                             }

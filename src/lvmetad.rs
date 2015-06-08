@@ -3,6 +3,8 @@ use unix_socket::UnixStream;
 use std::io;
 use std::io::{Read, Write};
 
+const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
+
 fn response(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
     let mut response = [0; 32];
     let mut v = Vec::new();
@@ -32,9 +34,7 @@ fn open_lvmetad() {
 
 fn request(s: &[u8], token: bool) -> io::Result<Vec<u8>>{
 
-    let path = "/run/lvm/lvmetad.socket";
-
-    let mut stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(LVMETAD_PATH).unwrap();
     stream.write_all(b"request = \"").unwrap();
     stream.write_all(s).unwrap();
     stream.write_all(b"\"\n").unwrap();

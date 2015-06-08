@@ -115,12 +115,13 @@ impl<'a> Lexer<'a> {
 
 // Identifies the state of the lexer
 enum Mode {
+    Main,
+
     // tells position where these modes were started
     String(usize),
     Ident(usize),
     Number(usize),
     Comment(usize),
-    Main,
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -129,102 +130,102 @@ impl<'a> Iterator for Lexer<'a> {
     /// Lex the underlying byte stream to generate tokens
     fn next(&mut self) -> Option<Token<'a>> {
 
-            let mut state = Mode::Main;
+        let mut state = Mode::Main;
 
-            while let Some(c) = self.next_byte() {
-                match state {
-                    Mode::Main => {
-                        match c {
-                            b'{' => {
-                                return Some(Token::CurlyOpen);
-                            },
-                            b'}' => {
-                                return Some(Token::CurlyClose);
-                            },
-                            b'"' => {
-                                state = Mode::String(self.cursor - 1);
-                            },
-                            b'a' ... b'z' | b'A' ... b'Z' | b'_' | b'.' => {
-                                state = Mode::Ident(self.cursor - 1);
-                            },
-                            b'0' ... b'9' => {
-                                state = Mode::Number(self.cursor - 1);
-                            },
-                            b'#' => {
-                                state = Mode::Comment(self.cursor - 1);
-                            },
-                            b'[' => {
-                                return Some(Token::BracketOpen);
-                            },
-                            b']' => {
-                                return Some(Token::BracketClose);
-                            },
-                            b'=' => {
-                                return Some(Token::Equals);
-                            },
-                            b',' => {
-                                return Some(Token::Comma);
-                            },
-                            b' ' | b'\n' | b'\t' | b'\0' => {
-                                // ignore whitespace
-                            }
-                            _ => {
-                                return Some(Token::Invalid(c));
-                            },
+        while let Some(c) = self.next_byte() {
+            match state {
+                Mode::Main => {
+                    match c {
+                        b'{' => {
+                            return Some(Token::CurlyOpen);
+                        },
+                        b'}' => {
+                            return Some(Token::CurlyClose);
+                        },
+                        b'"' => {
+                            state = Mode::String(self.cursor - 1);
+                        },
+                        b'a' ... b'z' | b'A' ... b'Z' | b'_' | b'.' => {
+                            state = Mode::Ident(self.cursor - 1);
+                        },
+                        b'0' ... b'9' => {
+                            state = Mode::Number(self.cursor - 1);
+                        },
+                        b'#' => {
+                            state = Mode::Comment(self.cursor - 1);
+                        },
+                        b'[' => {
+                            return Some(Token::BracketOpen);
+                        },
+                        b']' => {
+                            return Some(Token::BracketClose);
+                        },
+                        b'=' => {
+                            return Some(Token::Equals);
+                        },
+                        b',' => {
+                            return Some(Token::Comma);
+                        },
+                        b' ' | b'\n' | b'\t' | b'\0' => {
+                            // ignore whitespace
                         }
+                        _ => {
+                            return Some(Token::Invalid(c));
+                        },
                     }
-                    Mode::String(first) => {
-                        match c {
-                            b'"' => {
-                                return Some(Token::String(
-                                    &self.chars[first+1..self.cursor-1]));
-                            },
-                            _ => {
-                                continue;
-                            }
-                        }
-                    },
-                    Mode::Ident(first) => {
-                        match c {
-                            b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9'
-                                | b'_' | b'.' | b'-' => {
-                                continue;
-                            }
-                            _ => {
-                                self.put_back(c);
-                                return Some(Token::Ident(
-                                    &self.chars[first..self.cursor]));
-                            }
-                        }
-                    },
-                    Mode::Number(first) => {
-                        match c {
-                            b'0' ... b'9' => {
-                                continue;
-                            },
-                            _ => {
-                                self.put_back(c);
-                                let s = String::from_utf8_lossy(
-                                    &self.chars[first..self.cursor]).into_owned();
-                                return Some(Token::Number(s.parse().unwrap()));
-                            }
-                        }
-                    }
-                    Mode::Comment(first) => {
-                        match c {
-                            b'\n' => {
-                                self.put_back(c);
-                                return Some(Token::Comment(
-                                    &self.chars[first..self.cursor]));
-                            }
-                            _ => {
-                                continue;
-                            }
-                        }
-                    },
                 }
+                Mode::String(first) => {
+                    match c {
+                        b'"' => {
+                            return Some(Token::String(
+                                &self.chars[first+1..self.cursor-1]));
+                        },
+                        _ => {
+                            continue;
+                        }
+                    }
+                },
+                Mode::Ident(first) => {
+                    match c {
+                        b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9'
+                            | b'_' | b'.' | b'-' => {
+                                continue;
+                            }
+                        _ => {
+                            self.put_back(c);
+                            return Some(Token::Ident(
+                                &self.chars[first..self.cursor]));
+                        }
+                    }
+                },
+                Mode::Number(first) => {
+                    match c {
+                        b'0' ... b'9' => {
+                            continue;
+                        },
+                        _ => {
+                            self.put_back(c);
+                            let s = String::from_utf8_lossy(
+                                &self.chars[first..self.cursor]).into_owned();
+                            return Some(Token::Number(s.parse().unwrap()));
+                        }
+                    }
+                }
+                Mode::Comment(first) => {
+                    match c {
+                        b'\n' => {
+                            self.put_back(c);
+                            return Some(Token::Comment(
+                                &self.chars[first..self.cursor]));
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                },
             }
-
-            None
         }
+
+        None
     }
+}

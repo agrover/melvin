@@ -7,7 +7,4 @@ authors = ["Andy Grover <agrover@redhat.com>"]
 byteorder = "0.3.10"
 crc = "^0.3.1"
 unix_socket = "*"
-# nix = "*"
-
-[dependencies.nix]
-git = "https://github.com/carllerche/nix-rust.git"
+nix = "*"

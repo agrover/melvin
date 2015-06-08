@@ -3,10 +3,16 @@
 extern crate byteorder;
 extern crate crc;
 extern crate unix_socket;
+extern crate nix;
 
 use std::fs::File;
 use std::io::{Read, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
+use std::path::{Path, PathBuf};
+use std::fs;
+//use std::fs::PathExt;
+
+use nix::sys::stat;
 
 use byteorder::{LittleEndian, ByteOrder};
 
@@ -25,6 +31,32 @@ use lexer::{Lexer, Token};
 
 use unix_socket::UnixStream;
 use std::io::Write;
+
+// TODO: Replace once PathExt is stable
+trait MyPathExt {
+    fn exists(&self) -> bool;
+    fn is_file(&self) -> bool;
+    fn is_dir(&self) -> bool;
+}
+
+impl MyPathExt for Path {
+    fn exists(&self) -> bool {
+        self.is_dir() || self.is_file()
+    }
+    fn is_file(&self) -> bool {
+        match fs::metadata(self) {
+            Ok(m) => m.is_file(),
+            Err(_) => false
+        }
+    }
+    fn is_dir(&self) -> bool {
+        match fs::metadata(self) {
+            Ok(m) => m.is_dir(),
+            Err(_) => false
+        }
+    }
+}
+
 
 #[derive(Debug)]
 struct Label {
@@ -233,7 +265,7 @@ fn parse_mda_header(buf: &[u8]) -> () {
     }
 }
 
-fn find_stuff(path: &str) -> Result<Label> {
+fn find_label_in_dev(path: &Path) -> Result<Label> {
 
     let mut f = try!(File::open(path));
 
@@ -255,19 +287,48 @@ fn find_stuff(path: &str) -> Result<Label> {
 
         try!(f.read(&mut buf));
 
-        parse_mda_header(&buf);
+//        parse_mda_header(&buf);
     }
 
     return Ok(label);
 }
 
+fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
+
+    let mut ret_vec = Vec::new();
+
+    for dir in dirs {
+        for path in try!(fs::read_dir(dir)) {
+            if let Ok(path) = path {
+                let pathbuf = path.path();
+                let s = stat::stat(&pathbuf);
+                if let Ok(s) = s {
+                    if (s.st_mode & 0x6000) == 0x6000 { // S_IFBLK
+                        if find_label_in_dev(&pathbuf).is_ok() {
+                            ret_vec.push(pathbuf);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ret_vec)
+}
+
 fn main() {
 
-//    let label = find_stuff(MYPATH).unwrap();
+    let dirs = vec![Path::new("/dev")];
+
+    let pv_devs = scan_for_pvs(&dirs);
+
+    println!("asdas {:?}", pv_devs);
+
+ //   let label = find_label_in_dev(&PathBuf::from(MYPATH)).unwrap();
 
 //    println!("{}", label.id);
 
-    open_lvmetad();
+    //open_lvmetad();
 }
 
 fn do_some_stuff(s: &[u8]) -> () {
@@ -304,8 +365,9 @@ fn read_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
 fn open_lvmetad() {
 
     lvmetad_request(b"hello", false);
-    lvmetad_request(b"vg_list", true);
-    lvmetad_request(b"pv_list", true);
+//    lvmetad_request(b"vg_list", true);
+//    lvmetad_request(b"pv_list", true);
+//    lvmetad_request(b"dump", false);
 
 }
 

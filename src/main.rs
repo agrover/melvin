@@ -24,11 +24,12 @@ const INITIAL_CRC: u32 = 0xf597a6cf;
 const SECTOR_SIZE: usize = 512;
 
 mod lexer;
+mod lvmetad;
 
 use lexer::{Lexer, Token};
 
-use unix_socket::UnixStream;
-use std::io::Write;
+
+
 
 // TODO: Replace once PathExt is stable
 trait MyPathExt {
@@ -57,7 +58,7 @@ impl MyPathExt for Path {
 
 
 #[derive(Debug)]
-struct Label {
+struct LabelHeader {
     id: String,
     sector: u64,
     crc: u32,
@@ -83,7 +84,7 @@ struct PvHeader {
 }
 
 
-fn get_label(buf: &[u8]) -> Result<Label> {
+fn get_label_header(buf: &[u8]) -> Result<LabelHeader> {
 
     for x in 0..LABEL_SCAN_SECTORS {
         let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
@@ -96,7 +97,7 @@ fn get_label(buf: &[u8]) -> Result<Label> {
                 return Err(Error::new(Other, "Sector field should equal sector count"));
             }
 
-            return Ok(Label{
+            return Ok(LabelHeader{
                 id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
                 sector: sector,
                 crc: crc,
@@ -268,7 +269,7 @@ fn parse_mda_header(buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn find_label_in_dev(path: &Path) -> Result<Label> {
+fn find_label_in_dev(path: &Path) -> Result<LabelHeader> {
 
     let mut f = try!(File::open(path));
 
@@ -276,11 +277,9 @@ fn find_label_in_dev(path: &Path) -> Result<Label> {
 
     try!(f.read(&mut buf));
 
-    let label = try!(get_label(&buf));
+    let label_header = try!(get_label_header(&buf));
 
-    let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
-
-    println!("{:?}", &pvheader);
+    let pvheader = try!(get_pv_header(&buf[label_header.offset as usize..]));
 
     for md in &pvheader.metadata_areas {
 
@@ -293,7 +292,7 @@ fn find_label_in_dev(path: &Path) -> Result<Label> {
         parse_mda_header(&buf);
     }
 
-    return Ok(label);
+    return Ok(label_header);
 }
 
 fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
@@ -322,8 +321,6 @@ fn main() {
 
     let pv_devs = scan_for_pvs(&dirs);
 
-    //    println!("{}", label.id);
-
     //open_lvmetad();
 }
 
@@ -337,51 +334,4 @@ fn lex_and_print(s: &[u8]) -> () {
             _ => { println!("{:?}", token); },
         };
     }
-}
-
-fn read_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
-    let mut response = [0; 32];
-    let mut v = Vec::new();
-
-    loop {
-        let bytes_read = try!(stream.read(&mut response));
-
-        v.push_all(&response[..bytes_read]);
-
-        if v.ends_with(b"\n##\n") {
-            // drop the end marker
-            let len = v.len() - 4;
-            v.truncate(len);
-            return Ok(v);
-        }
-    }
-}
-
-
-fn open_lvmetad() {
-
-    lvmetad_request(b"hello", false);
-//    lvmetad_request(b"vg_list", true);
-//    lvmetad_request(b"pv_list", true);
-//    lvmetad_request(b"dump", false);
-
-}
-
-fn lvmetad_request(s: &[u8], token: bool) {
-
-    let path = "/run/lvm/lvmetad.socket";
-
-    let mut stream = UnixStream::connect(path).unwrap();
-    stream.write_all(b"request = \"").unwrap();
-    stream.write_all(s).unwrap();
-    stream.write_all(b"\"\n").unwrap();
-    if token {
-        stream.write_all(b"token = \"filter:0\"").unwrap();
-        stream.write_all(b"\n").unwrap();
-    }
-    stream.write_all(b"\n##\n").unwrap();
-
-    let r = read_response(&mut stream).unwrap();
-
-    lex_and_print(&r);
 }

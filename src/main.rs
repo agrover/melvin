@@ -10,7 +10,6 @@ use std::io::{Read, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
 use std::fs;
-//use std::fs::PathExt;
 
 use nix::sys::stat;
 
@@ -19,7 +18,6 @@ use byteorder::{LittleEndian, ByteOrder};
 use crc::{crc32, Hasher32};
 
 const LABEL_SCAN_SECTORS: usize = 4;
-const MYPATH: &'static str = "/dev/mapper/luks-291e9250-200e-4c36-8e5e-66aa257669ed";
 const ID_LEN: usize = 32;
 const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
 const INITIAL_CRC: u32 = 0xf597a6cf;
@@ -86,6 +84,7 @@ struct PvHeader {
 
 
 fn get_label(buf: &[u8]) -> Result<Label> {
+
     for x in 0..LABEL_SCAN_SECTORS {
         let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
         if &sec_buf[..8] == b"LABELONE" {
@@ -94,7 +93,7 @@ fn get_label(buf: &[u8]) -> Result<Label> {
 
             let sector = LittleEndian::read_u64(&sec_buf[8..16]);
             if sector != x as u64 {
-                println!("sector field is {} in sector {}", sector, x);
+                return Err(Error::new(Other, "Sector field should equal sector count"));
             }
 
             return Ok(Label{
@@ -107,7 +106,7 @@ fn get_label(buf: &[u8]) -> Result<Label> {
         }
     }
 
-    Err(Error::new(Other, "bad"))
+    Err(Error::new(Other, "Label not found"))
 }
 
 #[derive(Debug)]
@@ -142,13 +141,13 @@ impl<'a> Iterator for PvAreaIter<'a> {
 //
 // PV HEADER LAYOUT:
 // - static header (uuid and size)
-// - 0+ data areas
+// - 0+ data areas (actually max 1, usually 1; size 0 == "rest of blkdev")
 // - blank entry
-// - 0+ metadata areas
+// - 0+ metadata areas (max 1, usually 1)
 // - blank entry
 // - 8 bytes of pvextension header
 // - if version > 0
-//   - list of bootloader areas
+//   - 0+ bootloader areas (usually 0)
 //
 fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
 
@@ -240,29 +239,33 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-fn parse_mda_header(buf: &[u8]) -> () {
+fn parse_mda_header(buf: &[u8]) -> Result<()> {
 
     crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..512]);
 
     if &buf[4..20] != MDA_MAGIC {
-        println!("'{}' doesn't match '{}'", String::from_utf8_lossy(&buf[4..20]),
-                 String::from_utf8_lossy(MDA_MAGIC));
+        return Err(Error::new(
+            Other, format!("'{}' doesn't match MDA_MAGIC",
+                           String::from_utf8_lossy(&buf[4..20]))));
     }
 
     let ver = LittleEndian::read_u32(&buf[20..24]);
     if ver != 1 {
-        println!("bad version {}", ver);
+        return Err(Error::new(Other, format!("Bad version, expected 1")));
     }
 
-    println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
-    println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
+    // TODO: validate these somehow
+    //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
+    //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
 
     for x in iter_raw_locn(&buf[40..]) {
         println!("rawlocn {:?}", x);
         let start = x.offset as usize;
         let end = start + x.size as usize;
-        do_some_stuff(&buf[start..end]);
+        //lex_and_print(&buf[start..end]);
     }
+
+    Ok(())
 }
 
 fn find_label_in_dev(path: &Path) -> Result<Label> {
@@ -277,9 +280,9 @@ fn find_label_in_dev(path: &Path) -> Result<Label> {
 
     let pvheader = try!(get_pv_header(&buf[label.offset as usize..]));
 
-    for md in &pvheader.metadata_areas {
+    println!("{:?}", &pvheader);
 
-        println!("mda {:?}", md);
+    for md in &pvheader.metadata_areas {
 
         try!(f.seek(SeekFrom::Start(md.offset)));
 
@@ -287,7 +290,7 @@ fn find_label_in_dev(path: &Path) -> Result<Label> {
 
         try!(f.read(&mut buf));
 
-//        parse_mda_header(&buf);
+        parse_mda_header(&buf);
     }
 
     return Ok(label);
@@ -298,16 +301,13 @@ fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
     let mut ret_vec = Vec::new();
 
     for dir in dirs {
-        for path in try!(fs::read_dir(dir)) {
-            if let Ok(path) = path {
-                let pathbuf = path.path();
-                let s = stat::stat(&pathbuf);
-                if let Ok(s) = s {
-                    if (s.st_mode & 0x6000) == 0x6000 { // S_IFBLK
-                        if find_label_in_dev(&pathbuf).is_ok() {
-                            ret_vec.push(pathbuf);
-                        }
-                    }
+        for direntry in try!(fs::read_dir(dir)) {
+            let path = direntry.unwrap().path();
+            let s = stat::stat(&path).unwrap();
+
+            if (s.st_mode & 0x6000) == 0x6000 { // S_IFBLK
+                if find_label_in_dev(&path).is_ok() {
+                    ret_vec.push(path);
                 }
             }
         }
@@ -322,16 +322,12 @@ fn main() {
 
     let pv_devs = scan_for_pvs(&dirs);
 
-    println!("asdas {:?}", pv_devs);
-
- //   let label = find_label_in_dev(&PathBuf::from(MYPATH)).unwrap();
-
-//    println!("{}", label.id);
+    //    println!("{}", label.id);
 
     //open_lvmetad();
 }
 
-fn do_some_stuff(s: &[u8]) -> () {
+fn lex_and_print(s: &[u8]) -> () {
     for token in Lexer::new(&s) {
         match token {
             Token::String(x) => { println!("string {}", String::from_utf8_lossy(x)) },
@@ -387,5 +383,5 @@ fn lvmetad_request(s: &[u8], token: bool) {
 
     let r = read_response(&mut stream).unwrap();
 
-    do_some_stuff(&r);
+    lex_and_print(&r);
 }

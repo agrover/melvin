@@ -315,7 +315,7 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
                 continue
             },
             _ => return Err(Error::new(
-                Other, format!("Unexpected {:?}", tokens[cur])))
+                Other, format!("Unexpected {:?} when seeking ident", tokens[cur])))
         };
 
         cur += 1;
@@ -340,7 +340,7 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
                         cur += slc.len();
                     }
                     _ => return Err(Error::new(
-                        Other, format!("Unexpected {:?}", tokens[cur])))
+                        Other, format!("Unexpected {:?} as rvalue", tokens[cur])))
                 }
             },
             Token::CurlyOpen => {
@@ -351,7 +351,7 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
                 cur += slc.len();
             }
             _ => return Err(Error::new(
-                Other, format!("Unexpected {:?}", tokens[cur])))
+                Other, format!("Unexpected {:?} after an ident", tokens[cur])))
         };
     }
 

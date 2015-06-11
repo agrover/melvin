@@ -11,26 +11,29 @@ mod lexer;
 mod lvmetad;
 mod pvlabel;
 
-use lexer::{Lexer, Token};
-
-
 fn main() {
 
     let dirs = vec![path::Path::new("/dev")];
 
-    let pvs = pvlabel::scan_for_pvs(&dirs);
+    let pvs = pvlabel::scan_for_pvs(&dirs).unwrap();
 
-    //open_lvmetad();
-}
+    let x = lvmetad::request(b"token_update", true).unwrap();
 
-fn lex_and_print(s: &[u8]) -> () {
-    for token in Lexer::new(&s) {
-        match token {
-            Token::String(x) => { println!("string {}", String::from_utf8_lossy(x)) },
-            Token::Comment(x) => { println!("comment {}", String::from_utf8_lossy(x)) },
-            Token::Number(x) => { println!("number {}", x) },
-            Token::Ident(x) => { println!("ident {}", String::from_utf8_lossy(x)) },
-            _ => { println!("{:?}", token); },
-        };
-    }
+    println!("pv_list {}", String::from_utf8_lossy(&x));
+
+    lexer::lex_and_structize(&x);
+
+    let x = lvmetad::request(b"pv_list", true).unwrap();
+
+    println!("pv_list {}", String::from_utf8_lossy(&x));
+
+//    let x = lvmetad::request(b"vg_list", true).unwrap();
+
+//    println!("vg_list {}", String::from_utf8_lossy(&x));
+
+//    let x = lvmetad::request(b"dump", false).unwrap();
+
+//    println!("dump {}", String::from_utf8_lossy(&x));
+
+    println!("{:?}", pvlabel::metadata_from_dev(&pvs[0]));
 }

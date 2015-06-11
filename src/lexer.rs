@@ -23,11 +23,11 @@
 // Base a lexer for LVM2's text format on the more complex (hah) json format.
 // This code is based on https://github.com/Byron/json-tools.
 
-pub struct Lexer<'a> {
-    chars: &'a[u8],
-    next_byte: Option<u8>,
-    cursor: usize,
-}
+use std::io;
+use std::io::Error;
+use std::io::ErrorKind::Other;
+
+use std::collections::btree_map::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
@@ -75,6 +75,12 @@ impl<'a> AsRef<str> for Token<'a> {
             _ => panic!("Cannot convert variant Tokens"),
         }
     }
+}
+
+pub struct Lexer<'a> {
+    chars: &'a[u8],
+    next_byte: Option<u8>,
+    cursor: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -228,4 +234,128 @@ impl<'a> Iterator for Lexer<'a> {
 
         None
     }
+}
+
+
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Entry {
+    Number(u64),
+    String(String),
+    Dict(Box<BTreeMap<String, Entry>>),
+    List(Box<Vec<Entry>>),
+}
+
+fn find_matching_token<'a>(buf: &[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> io::Result<usize> {
+    let mut brace_count = 0;
+
+    for (i, x) in buf.iter().enumerate() {
+        match x {
+            x if x == begin => {
+                brace_count += 1;
+            },
+            x if x == end => {
+                brace_count -= 1;
+                if brace_count == 0 {
+                    return Ok(i+1);
+                }
+            },
+            _ => {},
+        }
+    }
+    Err(Error::new(Other, "token mismatch"))
+}
+
+// lists can only contain strings and numbers, yay
+pub fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
+    let mut v = Vec::new();
+
+    assert_eq!(*tokens.first().unwrap(), Token::BracketOpen);
+    assert_eq!(*tokens.last().unwrap(), Token::BracketClose);
+
+    // Omit enclosing brackets
+    for tok in &tokens[1..tokens.len()-1] {
+        match *tok {
+            Token::Number(x) => v.push(Entry::Number(x)),
+            Token::String(x) => v.push(Entry::String(String::from_utf8_lossy(x).into_owned())),
+            Token::Comma => { },
+            _ => return Err(Error::new(
+                Other, format!("Unexpected {:?}", *tok)))
+        }
+    }
+
+    Ok(v)
+}
+
+fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
+    let mut ret: BTreeMap<String, Entry> = BTreeMap::new();
+
+    assert_eq!(*tokens.first().unwrap(), Token::CurlyOpen);
+    assert_eq!(*tokens.last().unwrap(), Token::CurlyClose);
+
+    let mut cur = 1;
+
+    while tokens[cur] != Token::CurlyClose {
+
+        let ident = match tokens[cur] {
+            Token::Ident(x) => String::from_utf8_lossy(x).into_owned(),
+            Token::Comment(_) => {
+                cur += 1;
+                continue
+            },
+            _ => return Err(Error::new(
+                Other, format!("Unexpected {:?}", tokens[cur])))
+        };
+
+        cur += 1;
+        match tokens[cur] {
+            Token::Equals => {
+                cur += 1;
+                match tokens[cur] {
+                    Token::Number(x) => {
+                        cur += 1;
+                        ret.insert(ident, Entry::Number(x));
+                    },
+                    Token::String(x) => {
+                        cur += 1;
+                        ret.insert(ident, Entry::String(
+                            String::from_utf8_lossy(x).into_owned()));
+                    },
+                    Token::BracketOpen => {
+                        let sz = try!(find_matching_token(
+                            &tokens[cur..], &Token::BracketOpen, &Token::BracketClose));
+                        ret.insert(ident, Entry::List(
+                            Box::new(try!(get_list(&tokens[cur..cur+sz])))));
+                        cur += sz;
+                    }
+                    _ => return Err(Error::new(
+                        Other, format!("Unexpected {:?}", tokens[cur])))
+                }
+            },
+            Token::CurlyOpen => {
+                let sz = try!(find_matching_token(
+                    &tokens[cur..], &Token::CurlyOpen, &Token::CurlyClose));
+                ret.insert(ident, Entry::Dict(
+                    Box::new(try!(get_hash(&tokens[cur..cur+sz])))));
+                cur += sz;
+            }
+            _ => return Err(Error::new(
+                Other, format!("Unexpected {:?}", tokens[cur])))
+        };
+    }
+
+    Ok(ret)
+}
+
+pub fn lex_and_structize(buf: &[u8]) -> io::Result<BTreeMap<String, Entry>> {
+
+    let mut tokens: Vec<Token> = Vec::new();
+
+    // LVM vsn1 is implicitly a map at the top level, so add
+    // the appropriate tokens
+    tokens.push(Token::CurlyOpen);
+    tokens.append(&mut Lexer::new(&buf).collect());
+    tokens.push(Token::CurlyClose);
+
+    get_hash(&tokens)
 }

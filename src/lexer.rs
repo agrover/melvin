@@ -211,9 +211,20 @@ impl<'a> Iterator for Lexer<'a> {
                         },
                         _ => {
                             self.put_back(c);
-                            let s = String::from_utf8_lossy(
-                                &self.chars[first..self.cursor]).into_owned();
-                            return Some(Token::Number(s.parse().unwrap()));
+                            // HACK
+                            // If followed by =, we're not a number we're an ident.
+                            // Only time this should be needed is
+                            // dump() device_to_pvid section. Otherwise idents
+                            // never start with 0..9
+                            if self.chars[self.cursor..self.cursor+2].contains(&b'=') {
+                                return Some(
+                                    Token::Ident(&self.chars[first..self.cursor]));
+                            } else {
+                                let s = String::from_utf8_lossy(
+                                    &self.chars[first..self.cursor]).into_owned();
+                                return Some(
+                                    Token::Number(s.parse().unwrap()));
+                            }
                         }
                     }
                 }

@@ -2,10 +2,13 @@ use std::io::{Read, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::collections::btree_map::BTreeMap;
 
 use byteorder::{LittleEndian, ByteOrder};
 use crc::{crc32, Hasher32};
 use nix::sys::stat;
+
+use lexer;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -196,7 +199,35 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-fn parse_mda_header(buf: &[u8]) -> Result<()> {
+fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
+
+    let mut f = try!(fs::File::open(path));
+
+    let mut buf = vec![0; LABEL_SCAN_SECTORS * 512];
+
+    try!(f.read(&mut buf));
+
+    let label_header = try!(get_label_header(&buf));
+    let pvheader = try!(get_pv_header(&buf[label_header.offset as usize..]));
+
+    return Ok(pvheader);
+}
+
+pub fn metadata_from_dev(path: &Path) -> Result<BTreeMap<String, lexer::Entry>> {
+
+    let pvheader = try!(find_pv_in_dev(&path));
+
+    let mut f = try!(fs::File::open(path));
+
+    let mda_areas = pvheader.metadata_areas.len();
+    if mda_areas != 1 {
+        return Err(Error::new(Other, format!("Expecting 1 mda, found {}", mda_areas)));
+    }
+
+    let md = &pvheader.metadata_areas[0];
+    try!(f.seek(SeekFrom::Start(md.offset)));
+    let mut buf = vec![0; md.size as usize];
+    try!(f.read(&mut buf));
 
     crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..512]);
 
@@ -208,47 +239,23 @@ fn parse_mda_header(buf: &[u8]) -> Result<()> {
 
     let ver = LittleEndian::read_u32(&buf[20..24]);
     if ver != 1 {
-        return Err(Error::new(Other, format!("Bad version, expected 1")));
+        return Err(Error::new(Other, "Bad version, expected 1"));
     }
 
     // TODO: validate these somehow
     //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
     //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
 
-    for x in iter_raw_locn(&buf[40..]) {
-        println!("rawlocn {:?}", x);
-        let start = x.offset as usize;
-        let end = start + x.size as usize;
-        //lex_and_print(&buf[start..end]);
+    let raw_locns: Vec<_> = iter_raw_locn(&buf[40..]).collect();
+    let rlocn_len = raw_locns.len();
+    if rlocn_len != 1 {
+        return Err(Error::new(Other, format!("Expecting 1 rlocn, found {}", rlocn_len)));
     }
 
-    Ok(())
-}
-
-fn find_label_in_dev(path: &Path) -> Result<LabelHeader> {
-
-    let mut f = try!(fs::File::open(path));
-
-    let mut buf = vec![0; LABEL_SCAN_SECTORS * 512];
-
-    try!(f.read(&mut buf));
-
-    let label_header = try!(get_label_header(&buf));
-
-    let pvheader = try!(get_pv_header(&buf[label_header.offset as usize..]));
-
-    for md in &pvheader.metadata_areas {
-
-        try!(f.seek(SeekFrom::Start(md.offset)));
-
-        let mut buf = vec![0; md.size as usize];
-
-        try!(f.read(&mut buf));
-
-        parse_mda_header(&buf);
-    }
-
-    return Ok(label_header);
+    let rl = &raw_locns[0];
+    let rl_start = rl.offset as usize;
+    let rl_end = rl_start + rl.size as usize;
+    lexer::lex_and_structize(&buf[rl_start..rl_end])
 }
 
 pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
@@ -261,7 +268,7 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
             let s = stat::stat(&path).unwrap();
 
             if (s.st_mode & 0x6000) == 0x6000 { // S_IFBLK
-                if find_label_in_dev(&path).is_ok() {
+                if find_pv_in_dev(&path).is_ok() {
                     ret_vec.push(path);
                 }
             }

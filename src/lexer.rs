@@ -246,10 +246,10 @@ pub enum Entry {
     List(Box<Vec<Entry>>),
 }
 
-fn find_matching_token<'a>(buf: &[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> io::Result<usize> {
+fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> io::Result<&'b[Token<'a>]> {
     let mut brace_count = 0;
 
-    for (i, x) in buf.iter().enumerate() {
+    for (i, x) in tokens.iter().enumerate() {
         match x {
             x if x == begin => {
                 brace_count += 1;
@@ -257,7 +257,7 @@ fn find_matching_token<'a>(buf: &[Token<'a>], begin: &Token<'a>, end: &Token<'a>
             x if x == end => {
                 brace_count -= 1;
                 if brace_count == 0 {
-                    return Ok(i+1);
+                    return Ok(&tokens[..i+1]);
                 }
             },
             _ => {},
@@ -322,22 +322,22 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
                             String::from_utf8_lossy(x).into_owned()));
                     },
                     Token::BracketOpen => {
-                        let sz = try!(find_matching_token(
+                        let slc = try!(find_matching_token(
                             &tokens[cur..], &Token::BracketOpen, &Token::BracketClose));
                         ret.insert(ident, Entry::List(
-                            Box::new(try!(get_list(&tokens[cur..cur+sz])))));
-                        cur += sz;
+                            Box::new(try!(get_list(&slc)))));
+                        cur += slc.len();
                     }
                     _ => return Err(Error::new(
                         Other, format!("Unexpected {:?}", tokens[cur])))
                 }
             },
             Token::CurlyOpen => {
-                let sz = try!(find_matching_token(
+                let slc = try!(find_matching_token(
                     &tokens[cur..], &Token::CurlyOpen, &Token::CurlyClose));
                 ret.insert(ident, Entry::Dict(
-                    Box::new(try!(get_hash(&tokens[cur..cur+sz])))));
-                cur += sz;
+                    Box::new(try!(get_hash(&slc)))));
+                cur += slc.len();
             }
             _ => return Err(Error::new(
                 Other, format!("Unexpected {:?}", tokens[cur])))

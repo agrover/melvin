@@ -32,7 +32,7 @@ fn open_lvmetad() {
 
 }
 
-fn request(s: &[u8], token: bool) -> io::Result<Vec<u8>>{
+pub fn request(s: &[u8], token: bool) -> io::Result<Vec<u8>>{
 
     let mut stream = UnixStream::connect(LVMETAD_PATH).unwrap();
     stream.write_all(b"request = \"").unwrap();

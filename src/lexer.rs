@@ -247,14 +247,48 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
-
+pub type LvmTextMap = BTreeMap<String, Entry>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Entry {
     Number(u64),
     String(String),
-    Dict(Box<BTreeMap<String, Entry>>),
+    Dict(Box<LvmTextMap>),
     List(Box<Vec<Entry>>),
+}
+
+pub trait MapFromMeta {
+    fn u64_from_meta(&mut self, name: &str) -> Option<u64>;
+    fn string_from_meta(&mut self, name: &str) -> Option<String>;
+    fn dict_from_meta(&mut self, name: &str) -> Option<BTreeMap<String, Entry>>;
+    fn list_from_meta(&mut self, name: &str) -> Option<Vec<Entry>>;
+}
+
+impl MapFromMeta for LvmTextMap {
+    fn u64_from_meta(&mut self, name: &str) -> Option<u64> {
+        match self.remove(name) {
+            Some(Entry::Number(x)) => Some(x),
+            _ => None
+        }
+    }
+    fn string_from_meta(&mut self, name: &str) -> Option<String> {
+        match self.remove(name) {
+            Some(Entry::String(x)) => Some(x),
+            _ => None
+        }
+    }
+    fn dict_from_meta(&mut self, name: &str) -> Option<LvmTextMap> {
+        match self.remove(name) {
+            Some(Entry::Dict(x)) => Some(*x),
+            _ => None
+        }
+    }
+    fn list_from_meta(&mut self, name: &str) -> Option<Vec<Entry>> {
+        match self.remove(name) {
+            Some(Entry::List(x)) => Some(*x),
+            _ => None
+        }
+    }
 }
 
 fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> io::Result<&'b[Token<'a>]> {

@@ -147,8 +147,6 @@ fn vg_from_meta(name: &str, map: &mut LvmTextMap) -> Result<VG> {
 
     let err = || Error::new(Other, "dude");
 
-    println!("D");
-
     let id = try!(map.string_from_meta("id").ok_or(err()));
     let seqno = try!(map.u64_from_meta("seqno").ok_or(err()));
     let format = try!(map.string_from_meta("format").ok_or(err()));
@@ -157,28 +155,29 @@ fn vg_from_meta(name: &str, map: &mut LvmTextMap) -> Result<VG> {
     let max_pv = try!(map.u64_from_meta("max_pv").ok_or(err()));
     let metadata_copies = try!(map.u64_from_meta("metadata_copies").ok_or(err()));
 
-    let raw_status = try!(map.list_from_meta("status").ok_or(err()));
-    let flags = try!(map.list_from_meta("flags").ok_or(err()));
+    let status_list = try!(map.list_from_meta("status").ok_or(err()));
+    let status: Vec<_> = status_list.into_iter()
+        .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+        .collect();
 
+    let flags_list = try!(map.list_from_meta("flags").ok_or(err()));
+    let flags: Vec<_> = flags_list.into_iter()
+        .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+        .collect();
 
-    println!("E");
     let mut pv_meta = try!(map.dict_from_meta("physical_volumes").ok_or(err()));
-    println!("E1");
     let pvs = try!(pvs_from_meta(pv_meta));
-    println!("F");
 
     let mut lv_meta = try!(map.dict_from_meta("logical_volumes").ok_or(err()));
     let lvs = try!(lvs_from_meta(lv_meta));
-
-    println!("G");
 
     let vg = VG {
         name: name.to_string(),
         id: id,
         seqno: seqno,
         format: format,
-        status: Vec::new(),
-        flags: Vec::new(),
+        status: status,
+        flags: flags,
         extent_size: extent_size,
         max_lv: max_lv,
         max_pv: max_pv,

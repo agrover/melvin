@@ -23,6 +23,14 @@
 // Base a lexer for LVM2's text format on the more complex (hah) json format.
 // This code is based on https://github.com/Byron/json-tools.
 
+//
+// Given a &[u8], the lexer produces a stream of tokens.
+// get_textmap takes tokens and produces a TextMap nested
+// structure. Finally vg_from_textmap converts into an actual
+// VG struct, with associated LVs and PVs.
+//
+
+
 use std::io;
 use std::io::Error;
 use std::io::ErrorKind::Other;
@@ -253,37 +261,37 @@ pub type LvmTextMap = BTreeMap<String, Entry>;
 pub enum Entry {
     Number(u64),
     String(String),
-    Dict(Box<LvmTextMap>),
+    TextMap(Box<LvmTextMap>),
     List(Box<Vec<Entry>>),
 }
 
 pub trait MapFromMeta {
-    fn u64_from_meta(&mut self, name: &str) -> Option<u64>;
-    fn string_from_meta(&mut self, name: &str) -> Option<String>;
-    fn dict_from_meta(&mut self, name: &str) -> Option<BTreeMap<String, Entry>>;
-    fn list_from_meta(&mut self, name: &str) -> Option<Vec<Entry>>;
+    fn u64_from_textmap(&mut self, name: &str) -> Option<u64>;
+    fn string_from_textmap(&mut self, name: &str) -> Option<String>;
+    fn textmap_from_textmap(&mut self, name: &str) -> Option<LvmTextMap>;
+    fn list_from_textmap(&mut self, name: &str) -> Option<Vec<Entry>>;
 }
 
 impl MapFromMeta for LvmTextMap {
-    fn u64_from_meta(&mut self, name: &str) -> Option<u64> {
+    fn u64_from_textmap(&mut self, name: &str) -> Option<u64> {
         match self.remove(name) {
             Some(Entry::Number(x)) => Some(x),
             _ => None
         }
     }
-    fn string_from_meta(&mut self, name: &str) -> Option<String> {
+    fn string_from_textmap(&mut self, name: &str) -> Option<String> {
         match self.remove(name) {
             Some(Entry::String(x)) => Some(x),
             _ => None
         }
     }
-    fn dict_from_meta(&mut self, name: &str) -> Option<LvmTextMap> {
+    fn textmap_from_textmap(&mut self, name: &str) -> Option<LvmTextMap> {
         match self.remove(name) {
-            Some(Entry::Dict(x)) => Some(*x),
+            Some(Entry::TextMap(x)) => Some(*x),
             _ => None
         }
     }
-    fn list_from_meta(&mut self, name: &str) -> Option<Vec<Entry>> {
+    fn list_from_textmap(&mut self, name: &str) -> Option<Vec<Entry>> {
         match self.remove(name) {
             Some(Entry::List(x)) => Some(*x),
             _ => None
@@ -332,8 +340,8 @@ pub fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
     Ok(v)
 }
 
-fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
-    let mut ret: BTreeMap<String, Entry> = BTreeMap::new();
+fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
+    let mut ret: LvmTextMap = BTreeMap::new();
 
     assert_eq!(*tokens.first().unwrap(), Token::CurlyOpen);
     assert_eq!(*tokens.last().unwrap(), Token::CurlyClose);
@@ -380,8 +388,8 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
             Token::CurlyOpen => {
                 let slc = try!(find_matching_token(
                     &tokens[cur..], &Token::CurlyOpen, &Token::CurlyClose));
-                ret.insert(ident, Entry::Dict(
-                    Box::new(try!(get_hash(&slc)))));
+                ret.insert(ident, Entry::TextMap(
+                    Box::new(try!(get_textmap(&slc)))));
                 cur += slc.len();
             }
             _ => return Err(Error::new(
@@ -392,7 +400,7 @@ fn get_hash<'a>(tokens: &[Token<'a>]) -> io::Result<BTreeMap<String, Entry>> {
     Ok(ret)
 }
 
-pub fn lex_and_structize(buf: &[u8]) -> io::Result<BTreeMap<String, Entry>> {
+pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 
     let mut tokens: Vec<Token> = Vec::new();
 
@@ -402,5 +410,5 @@ pub fn lex_and_structize(buf: &[u8]) -> io::Result<BTreeMap<String, Entry>> {
     tokens.append(&mut Lexer::new(&buf).collect());
     tokens.push(Token::CurlyClose);
 
-    get_hash(&tokens)
+    get_textmap(&tokens)
 }

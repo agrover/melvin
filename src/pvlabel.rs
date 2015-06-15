@@ -2,7 +2,6 @@ use std::io::{Read, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::collections::btree_map::BTreeMap;
 
 use byteorder::{LittleEndian, ByteOrder};
 use crc::{crc32, Hasher32};
@@ -213,7 +212,7 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
     return Ok(pvheader);
 }
 
-pub fn metadata_from_dev(path: &Path) -> Result<BTreeMap<String, lexer::Entry>> {
+pub fn textmap_from_dev(path: &Path) -> Result<lexer::LvmTextMap> {
 
     let pvheader = try!(find_pv_in_dev(&path));
 
@@ -255,7 +254,8 @@ pub fn metadata_from_dev(path: &Path) -> Result<BTreeMap<String, lexer::Entry>> 
     let rl = &raw_locns[0];
     let rl_start = rl.offset as usize;
     let rl_end = rl_start + rl.size as usize;
-    lexer::lex_and_structize(&buf[rl_start..rl_end])
+
+    lexer::into_textmap(&buf[rl_start..rl_end])
 }
 
 pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {

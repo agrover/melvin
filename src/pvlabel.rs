@@ -7,7 +7,9 @@ use byteorder::{LittleEndian, ByteOrder};
 use crc::{crc32, Hasher32};
 use nix::sys::stat;
 
-use lexer;
+use parser;
+
+use parser::{LvmTextMap, into_textmap};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -212,7 +214,7 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
     return Ok(pvheader);
 }
 
-pub fn textmap_from_dev(path: &Path) -> Result<lexer::LvmTextMap> {
+pub fn textmap_from_dev(path: &Path) -> Result<LvmTextMap> {
 
     let pvheader = try!(find_pv_in_dev(&path));
 
@@ -255,7 +257,7 @@ pub fn textmap_from_dev(path: &Path) -> Result<lexer::LvmTextMap> {
     let rl_start = rl.offset as usize;
     let rl_end = rl_start + rl.size as usize;
 
-    lexer::into_textmap(&buf[rl_start..rl_end])
+    parser::into_textmap(&buf[rl_start..rl_end])
 }
 
 pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {

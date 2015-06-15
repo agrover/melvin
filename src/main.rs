@@ -10,11 +10,11 @@ use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
-mod lexer;
+mod parser;
 mod lvmetad;
 mod pvlabel;
 
-use lexer::LvmTextMap;
+use parser::LvmTextMap;
 
 fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
@@ -24,7 +24,7 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
 
         for (key, value) in map {
             match value {
-                lexer::Entry::TextMap(x) => return Ok((key, *x)),
+                parser::Entry::TextMap(x) => return Ok((key, *x)),
                 _ => {}
             }
         }
@@ -37,6 +37,6 @@ fn main() {
     println!("A");
     let (name, mut map) = get_first_vg_meta().unwrap();
     println!("B");
-    let vg = lexer::vg_from_textmap(&name, &mut map);
+    let vg = parser::vg_from_textmap(&name, &mut map);
     println!("output {:?}", vg);
 }

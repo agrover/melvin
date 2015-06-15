@@ -9,7 +9,6 @@ use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-use std::collections::btree_map::BTreeMap;
 
 mod lexer;
 mod lvmetad;
@@ -38,10 +37,20 @@ struct PV {
     name: String,
     id: String,
     status: Vec<String>,
-    //flags
+    flags: Vec<String>,
     dev_size: u64,
     pe_start: u64,
     pe_count: u64,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct Segment {
+    name: String,
+    start_extent: u64,
+    extent_count: u64,
+    ty: String,
+    stripe_count: u64,
+    stripes: Vec<(String, u64)>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -49,11 +58,11 @@ struct LV {
     name: String,
     id: String,
     status: Vec<String>,
-    //flags
+    flags: Vec<String>,
     creation_host: String,
     creation_time: u64,
     segment_count: u64,
-    //segments
+    segments: Vec<Segment>,
 }
 
 
@@ -69,7 +78,6 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
                 _ => {}
             }
         }
-
     }
 
     Err(Error::new(Other, "dude"))
@@ -91,8 +99,13 @@ fn pvs_from_meta(map: LvmTextMap) -> Result<Vec<PV>> {
         let pe_start = try!(pv_dict.u64_from_meta("pe_start").ok_or(err()));
         let pe_count = try!(pv_dict.u64_from_meta("pe_count").ok_or(err()));
 
-        let status_list = try!(pv_dict.list_from_meta("status").ok_or(err()));
-        let status: Vec<_> = status_list.into_iter()
+        let status: Vec<_> = try!(pv_dict.list_from_meta("status").ok_or(err()))
+            .into_iter()
+            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .collect();
+
+        let flags: Vec<_> = try!(pv_dict.list_from_meta("flags").ok_or(err()))
+            .into_iter()
             .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
             .collect();
 
@@ -100,6 +113,7 @@ fn pvs_from_meta(map: LvmTextMap) -> Result<Vec<PV>> {
             name: key,
             id: id,
             status: status,
+            flags: flags,
             dev_size: dev_size,
             pe_start: pe_start,
             pe_count: pe_count,
@@ -107,6 +121,40 @@ fn pvs_from_meta(map: LvmTextMap) -> Result<Vec<PV>> {
     }
 
     Ok(ret_vec)
+}
+
+fn segments_from_meta(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<Segment>> {
+    let err = || Error::new(Other, "dude");
+
+    let mut segments = Vec::new();
+    for i in 0..segment_count {
+        let name = format!("segment{}", i+1);
+        let mut seg_dict = try!(map.dict_from_meta(&name).ok_or(err()));
+
+        let mut stripes: Vec<_> = Vec::new();
+        let mut stripe_list = try!(seg_dict.list_from_meta("stripes").ok_or(err()));
+
+        while stripe_list.len()/2 != 0 {
+            let name = match stripe_list.remove(0) {
+                Entry::String(x) => x, _ => return Err(err())
+            };
+            let val = match stripe_list.remove(0) {
+                Entry::Number(x) => x, _ => return Err(err())
+            };
+            stripes.push((name, val));
+        }
+
+        segments.push(Segment{
+            name: name,
+            start_extent: try!(seg_dict.u64_from_meta("start_extent").ok_or(err())),
+            extent_count: try!(seg_dict.u64_from_meta("extent_count").ok_or(err())),
+            ty: try!(seg_dict.string_from_meta("type").ok_or(err())),
+            stripe_count: try!(seg_dict.u64_from_meta("stripe_count").ok_or(err())),
+            stripes: stripes,
+        });
+    }
+
+    Ok(segments)
 }
 
 fn lvs_from_meta(map: LvmTextMap) -> Result<Vec<LV>> {
@@ -125,8 +173,15 @@ fn lvs_from_meta(map: LvmTextMap) -> Result<Vec<LV>> {
         let creation_time = try!(lv_dict.u64_from_meta("creation_time").ok_or(err()));
         let segment_count = try!(lv_dict.u64_from_meta("segment_count").ok_or(err()));
 
-        let status_list = try!(lv_dict.list_from_meta("status").ok_or(err()));
-        let status: Vec<_> = status_list.into_iter()
+        let segments = try!(segments_from_meta(segment_count, &mut lv_dict));
+
+        let status: Vec<_> = try!(lv_dict.list_from_meta("status").ok_or(err()))
+            .into_iter()
+            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .collect();
+
+        let flags: Vec<_> = try!(lv_dict.list_from_meta("flags").ok_or(err()))
+            .into_iter()
             .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
             .collect();
 
@@ -134,9 +189,11 @@ fn lvs_from_meta(map: LvmTextMap) -> Result<Vec<LV>> {
             name: key,
             id: id,
             status: status,
+            flags: flags,
             creation_host: creation_host,
             creation_time: creation_time,
             segment_count: segment_count,
+            segments: segments,
             });
     }
 
@@ -155,20 +212,20 @@ fn vg_from_meta(name: &str, map: &mut LvmTextMap) -> Result<VG> {
     let max_pv = try!(map.u64_from_meta("max_pv").ok_or(err()));
     let metadata_copies = try!(map.u64_from_meta("metadata_copies").ok_or(err()));
 
-    let status_list = try!(map.list_from_meta("status").ok_or(err()));
-    let status: Vec<_> = status_list.into_iter()
+    let status: Vec<_> = try!(map.list_from_meta("status").ok_or(err()))
+        .into_iter()
         .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
         .collect();
 
-    let flags_list = try!(map.list_from_meta("flags").ok_or(err()));
-    let flags: Vec<_> = flags_list.into_iter()
+    let flags: Vec<_> = try!(map.list_from_meta("flags").ok_or(err()))
+        .into_iter()
         .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
         .collect();
 
-    let mut pv_meta = try!(map.dict_from_meta("physical_volumes").ok_or(err()));
+    let pv_meta = try!(map.dict_from_meta("physical_volumes").ok_or(err()));
     let pvs = try!(pvs_from_meta(pv_meta));
 
-    let mut lv_meta = try!(map.dict_from_meta("logical_volumes").ok_or(err()));
+    let lv_meta = try!(map.dict_from_meta("logical_volumes").ok_or(err()));
     let lvs = try!(lvs_from_meta(lv_meta));
 
     let vg = VG {
@@ -186,8 +243,6 @@ fn vg_from_meta(name: &str, map: &mut LvmTextMap) -> Result<VG> {
         lvs: lvs,
     };
 
-    println!("VG is {:?}", vg);
-
     Ok(vg)
 }
 
@@ -196,5 +251,5 @@ fn main() {
     let (name, mut map) = get_first_vg_meta().unwrap();
     println!("B");
     let vg = vg_from_meta(&name, &mut map);
-    println!("C");
+    println!("output {:?}", vg);
 }

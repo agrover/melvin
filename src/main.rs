@@ -9,10 +9,12 @@ use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::path::Path;
 
 mod parser;
 mod lvmetad;
 mod pvlabel;
+mod dm;
 
 use parser::LvmTextMap;
 
@@ -34,9 +36,11 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
 }
 
 fn main() {
-    println!("A");
-    let (name, mut map) = get_first_vg_meta().unwrap();
-    println!("B");
-    let vg = parser::vg_from_textmap(&name, &mut map);
-    println!("output {:?}", vg);
+    // println!("A");
+    // let (name, mut map) = get_first_vg_meta().unwrap();
+    // println!("B");
+    // let vg = parser::vg_from_textmap(&name, &mut map);
+    // println!("output {:?}", vg);
+
+    dm::dostuff();
 }

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Andy Grover <agrover@redhat.com>"]
 
 [dependencies]
+libc = "*"
 byteorder = "0.3.10"
 crc = "^0.3.1"
 unix_socket = "*"

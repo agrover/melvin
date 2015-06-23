@@ -12,7 +12,7 @@ fn response(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
     loop {
         let bytes_read = try!(stream.read(&mut response));
 
-        v.push_all(&response[..bytes_read]);
+        v.extend(&response[..bytes_read]);
 
         if v.ends_with(b"\n##\n") {
             // drop the end marker

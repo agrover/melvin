@@ -408,7 +408,7 @@ pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
     // LVM vsn1 is implicitly a map at the top level, so add
     // the appropriate tokens
     tokens.push(Token::CurlyOpen);
-    tokens.append(&mut Lexer::new(&buf).collect());
+    tokens.extend(&mut Lexer::new(&buf));
     tokens.push(Token::CurlyClose);
 
     get_textmap(&tokens)

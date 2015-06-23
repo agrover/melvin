@@ -265,18 +265,13 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
     let mut ret_vec = Vec::new();
 
     for dir in dirs {
-        for direntry in try!(fs::read_dir(dir)) {
-            let path = direntry.unwrap().path();
-            let s = stat::stat(&path).unwrap();
-
-            if (s.st_mode & 0x6000) == 0x6000 { // S_IFBLK
-                if find_pv_in_dev(&path).is_ok() {
-                    ret_vec.push(path);
-                }
-            }
-        }
+        ret_vec.extend(try!(fs::read_dir(dir))
+            .into_iter()
+            .filter_map(|dir_e| if dir_e.is_ok() {Some(dir_e.unwrap().path())} else {None})
+            .filter(|path| { (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
+            .filter(|path| { find_pv_in_dev(&path).is_ok() })
+            .collect::<Vec<_>>());
     }
 
     Ok(ret_vec)
 }
-

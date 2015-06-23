@@ -20,20 +20,20 @@ pub fn get_version() -> io::Result<(u32, u32, u32)> {
 
     let f = try!(fs::File::open(DM_CTL_PATH));
 
-    let mut x: dmi::Struct_dm_ioctl = Default::default();
-    x.version[0] = DM_VERSION_MAJOR;
-    x.version[1] = DM_VERSION_MINOR;
-    x.version[2] = DM_VERSION_PATCHLEVEL;
+    let mut hdr: dmi::Struct_dm_ioctl = Default::default();
+    hdr.version[0] = DM_VERSION_MAJOR;
+    hdr.version[1] = DM_VERSION_MINOR;
+    hdr.version[2] = DM_VERSION_PATCHLEVEL;
 
     let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_VERSION_CMD as u8,
                             mem::size_of::<dmi::Struct_dm_ioctl>());
 
-    match unsafe { ioctl::read_into(f.as_raw_fd(), op, &mut x) } {
+    match unsafe { ioctl::read_into(f.as_raw_fd(), op, &mut hdr) } {
         Err(_) => return Err((io::Error::last_os_error())),
         _ => {},
     };
 
-    Ok((x.version[0], x.version[1], x.version[2]))
+    Ok((hdr.version[0], hdr.version[1], hdr.version[2]))
 }
 
 //

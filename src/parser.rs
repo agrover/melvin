@@ -266,35 +266,35 @@ pub enum Entry {
     List(Box<Vec<Entry>>),
 }
 
-pub trait MapFromMeta {
-    fn i64_from_textmap(&mut self, name: &str) -> Option<i64>;
-    fn string_from_textmap(&mut self, name: &str) -> Option<String>;
-    fn textmap_from_textmap(&mut self, name: &str) -> Option<LvmTextMap>;
-    fn list_from_textmap(&mut self, name: &str) -> Option<Vec<Entry>>;
+pub trait TextMapOps {
+    fn i64_from_textmap(&self, name: &str) -> Option<i64>;
+    fn string_from_textmap(&self, name: &str) -> Option<String>;
+    fn textmap_from_textmap(&self, name: &str) -> Option<LvmTextMap>;
+    fn list_from_textmap(&self, name: &str) -> Option<Vec<Entry>>;
 }
 
-impl MapFromMeta for LvmTextMap {
-    fn i64_from_textmap(&mut self, name: &str) -> Option<i64> {
-        match self.remove(name) {
-            Some(Entry::Number(x)) => Some(x),
+impl TextMapOps for LvmTextMap {
+    fn i64_from_textmap(&self, name: &str) -> Option<i64> {
+        match self.get(name) {
+            Some(&Entry::Number(ref x)) => Some(x.clone()),
             _ => None
         }
     }
-    fn string_from_textmap(&mut self, name: &str) -> Option<String> {
-        match self.remove(name) {
-            Some(Entry::String(x)) => Some(x),
+    fn string_from_textmap(&self, name: &str) -> Option<String> {
+        match self.get(name) {
+            Some(&Entry::String(ref x)) => Some(x.clone()),
             _ => None
         }
     }
-    fn textmap_from_textmap(&mut self, name: &str) -> Option<LvmTextMap> {
-        match self.remove(name) {
-            Some(Entry::TextMap(x)) => Some(*x),
+    fn textmap_from_textmap(&self, name: &str) -> Option<LvmTextMap> {
+        match self.get(name) {
+            Some(&Entry::TextMap(ref x)) => Some(*x.clone()),
             _ => None
         }
     }
-    fn list_from_textmap(&mut self, name: &str) -> Option<Vec<Entry>> {
-        match self.remove(name) {
-            Some(Entry::List(x)) => Some(*x),
+    fn list_from_textmap(&self, name: &str) -> Option<Vec<Entry>> {
+        match self.get(name) {
+            Some(&Entry::List(ref x)) => Some(*x.clone()),
             _ => None
         }
     }
@@ -469,7 +469,7 @@ fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
     let mut ret_vec = Vec::new();
 
     for (key, value) in map {
-        let mut pv_dict = match value {
+        let pv_dict = match value {
             Entry::TextMap(x) => *x,
             _ => return Err(Error::new(Other, "dude")),
         };
@@ -509,7 +509,7 @@ fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<
     let mut segments = Vec::new();
     for i in 0..segment_count {
         let name = format!("segment{}", i+1);
-        let mut seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
+        let seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
 
         let mut stripes: Vec<_> = Vec::new();
         let mut stripe_list = try!(seg_dict.list_from_textmap("stripes").ok_or(err()));

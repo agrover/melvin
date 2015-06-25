@@ -605,11 +605,11 @@ pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
         .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
         .collect();
 
-    let pv_meta = try!(map.textmap_from_textmap("physical_volumes").ok_or(err()));
-    let pvs = try!(pvs_from_textmap(pv_meta));
+    let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
+                   .and_then(|tm| pvs_from_textmap(tm)));
 
-    let lv_meta = try!(map.textmap_from_textmap("logical_volumes").ok_or(err()));
-    let lvs = try!(lvs_from_textmap(lv_meta));
+    let lvs = try!(map.textmap_from_textmap("logical_volumes").ok_or(err())
+                   .and_then(|tm| lvs_from_textmap(tm)));
 
     let vg = VG {
         name: name.to_string(),

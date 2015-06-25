@@ -268,9 +268,9 @@ pub enum Entry {
 
 pub trait TextMapOps {
     fn i64_from_textmap(&self, name: &str) -> Option<i64>;
-    fn string_from_textmap(&self, name: &str) -> Option<String>;
-    fn textmap_from_textmap(&self, name: &str) -> Option<LvmTextMap>;
-    fn list_from_textmap(&self, name: &str) -> Option<Vec<Entry>>;
+    fn string_from_textmap(&self, name: &str) -> Option<&str>;
+    fn textmap_from_textmap(&self, name: &str) -> Option<&LvmTextMap>;
+    fn list_from_textmap(&self, name: &str) -> Option<&Vec<Entry>>;
 }
 
 impl TextMapOps for LvmTextMap {
@@ -280,21 +280,21 @@ impl TextMapOps for LvmTextMap {
             _ => None
         }
     }
-    fn string_from_textmap(&self, name: &str) -> Option<String> {
+    fn string_from_textmap(&self, name: &str) -> Option<&str> {
         match self.get(name) {
-            Some(&Entry::String(ref x)) => Some(x.clone()),
+            Some(&Entry::String(ref x)) => Some(x),
             _ => None
         }
     }
-    fn textmap_from_textmap(&self, name: &str) -> Option<LvmTextMap> {
+    fn textmap_from_textmap(&self, name: &str) -> Option<&LvmTextMap> {
         match self.get(name) {
-            Some(&Entry::TextMap(ref x)) => Some(*x.clone()),
+            Some(&Entry::TextMap(ref x)) => Some(x),
             _ => None
         }
     }
-    fn list_from_textmap(&self, name: &str) -> Option<Vec<Entry>> {
+    fn list_from_textmap(&self, name: &str) -> Option<&Vec<Entry>> {
         match self.get(name) {
-            Some(&Entry::List(ref x)) => Some(*x.clone()),
+            Some(&Entry::List(ref x)) => Some(x),
             _ => None
         }
     }
@@ -463,14 +463,14 @@ pub struct LV {
     segments: Vec<Segment>,
 }
 
-fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
+fn pvs_from_textmap(map: &LvmTextMap) -> Result<Vec<PV>> {
     let err = || Error::new(Other, "dude");
 
     let mut ret_vec = Vec::new();
 
     for (key, value) in map {
         let pv_dict = match value {
-            Entry::TextMap(x) => *x,
+            &Entry::TextMap(ref x) => x,
             _ => return Err(Error::new(Other, "dude")),
         };
 
@@ -481,17 +481,17 @@ fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
 
         let status: Vec<_> = try!(pv_dict.list_from_textmap("status").ok_or(err()))
             .into_iter()
-            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
         let flags: Vec<_> = try!(pv_dict.list_from_textmap("flags").ok_or(err()))
             .into_iter()
-            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
         ret_vec.push(PV {
-            name: key,
-            id: id,
+            name: key.clone(),
+            id: id.to_string(),
             status: status,
             flags: flags,
             dev_size: dev_size as u64,
@@ -503,7 +503,7 @@ fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
     Ok(ret_vec)
 }
 
-fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<Segment>> {
+fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segment>> {
     let err = || Error::new(Other, "dude");
 
     let mut segments = Vec::new();
@@ -512,13 +512,13 @@ fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<
         let seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
 
         let mut stripes: Vec<_> = Vec::new();
-        let mut stripe_list = try!(seg_dict.list_from_textmap("stripes").ok_or(err()));
+        let stripe_list = try!(seg_dict.list_from_textmap("stripes").ok_or(err()));
 
-        while stripe_list.len()/2 != 0 {
-            let name = match stripe_list.remove(0) {
-                Entry::String(x) => x, _ => return Err(err())
+        for slc in stripe_list.chunks(2) {
+            let name = match &slc[0] {
+                &Entry::String(ref x) => x.clone(), _ => return Err(err())
             };
-            let val = match stripe_list.remove(0) {
+            let val = match slc[1] {
                 Entry::Number(x) => x, _ => return Err(err())
             };
             stripes.push((name, val as u64));
@@ -528,7 +528,7 @@ fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<
             name: name,
             start_extent: try!(seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
             extent_count: try!(seg_dict.i64_from_textmap("extent_count").ok_or(err())) as u64,
-            ty: try!(seg_dict.string_from_textmap("type").ok_or(err())),
+            ty: try!(seg_dict.string_from_textmap("type").ok_or(err())).to_string(),
             stripe_count: try!(seg_dict.i64_from_textmap("stripe_count").ok_or(err())) as u64,
             stripes: stripes,
         });
@@ -537,14 +537,14 @@ fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<
     Ok(segments)
 }
 
-fn lvs_from_textmap(map: LvmTextMap) -> Result<Vec<LV>> {
+fn lvs_from_textmap(map: &LvmTextMap) -> Result<Vec<LV>> {
     let err = || Error::new(Other, "dude");
 
     let mut ret_vec = Vec::new();
 
     for (key, value) in map {
-        let mut lv_dict = match value {
-            Entry::TextMap(x) => *x,
+        let lv_dict = match value {
+            &Entry::TextMap(ref x) => x,
             _ => return Err(Error::new(Other, "dude")),
         };
 
@@ -556,24 +556,24 @@ fn lvs_from_textmap(map: LvmTextMap) -> Result<Vec<LV>> {
         let segment_count = try!(lv_dict.i64_from_textmap("segment_count")
                                  .ok_or(err()));
 
-        let segments = try!(segments_from_textmap(segment_count as u64, &mut lv_dict));
+        let segments = try!(segments_from_textmap(segment_count as u64, &lv_dict));
 
         let status: Vec<_> = try!(lv_dict.list_from_textmap("status").ok_or(err()))
             .into_iter()
-            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
         let flags: Vec<_> = try!(lv_dict.list_from_textmap("flags").ok_or(err()))
             .into_iter()
-            .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
         ret_vec.push(LV {
-            name: key,
-            id: id,
+            name: key.clone(),
+            id: id.to_string(),
             status: status,
             flags: flags,
-            creation_host: creation_host,
+            creation_host: creation_host.to_string(),
             creation_time: creation_time as u64,
             segment_count: segment_count as u64,
             segments: segments,
@@ -597,12 +597,12 @@ pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
 
     let status: Vec<_> = try!(map.list_from_textmap("status").ok_or(err()))
         .into_iter()
-        .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
         .collect();
 
     let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
         .into_iter()
-        .filter_map(|item| match item { Entry::String(x) => Some(x), _ => {None}})
+        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
         .collect();
 
     let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
@@ -613,9 +613,9 @@ pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
 
     let vg = VG {
         name: name.to_string(),
-        id: id,
+        id: id.to_string(),
         seqno: seqno as u64,
-        format: format,
+        format: format.to_string(),
         status: status,
         flags: flags,
         extent_size: extent_size as u64,

@@ -61,7 +61,7 @@ pub enum Token<'a> {
     Ident(&'a[u8]),
 
     /// An unsigned integer number
-    Number(u64),
+    Number(i64),
 
     Comment(&'a[u8]),
 
@@ -163,7 +163,7 @@ impl<'a> Iterator for Lexer<'a> {
                         b'a' ... b'z' | b'A' ... b'Z' | b'_' | b'.' => {
                             state = Mode::Ident(self.cursor - 1);
                         },
-                        b'0' ... b'9' => {
+                        b'0' ... b'9' | b'-' => {
                             state = Mode::Number(self.cursor - 1);
                         },
                         b'#' => {
@@ -260,21 +260,21 @@ pub type LvmTextMap = BTreeMap<String, Entry>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Entry {
-    Number(u64),
+    Number(i64),
     String(String),
     TextMap(Box<LvmTextMap>),
     List(Box<Vec<Entry>>),
 }
 
 pub trait MapFromMeta {
-    fn u64_from_textmap(&mut self, name: &str) -> Option<u64>;
+    fn i64_from_textmap(&mut self, name: &str) -> Option<i64>;
     fn string_from_textmap(&mut self, name: &str) -> Option<String>;
     fn textmap_from_textmap(&mut self, name: &str) -> Option<LvmTextMap>;
     fn list_from_textmap(&mut self, name: &str) -> Option<Vec<Entry>>;
 }
 
 impl MapFromMeta for LvmTextMap {
-    fn u64_from_textmap(&mut self, name: &str) -> Option<u64> {
+    fn i64_from_textmap(&mut self, name: &str) -> Option<i64> {
         match self.remove(name) {
             Some(Entry::Number(x)) => Some(x),
             _ => None
@@ -475,9 +475,9 @@ fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
         };
 
         let id = try!(pv_dict.string_from_textmap("id").ok_or(err()));
-        let dev_size = try!(pv_dict.u64_from_textmap("dev_size").ok_or(err()));
-        let pe_start = try!(pv_dict.u64_from_textmap("pe_start").ok_or(err()));
-        let pe_count = try!(pv_dict.u64_from_textmap("pe_count").ok_or(err()));
+        let dev_size = try!(pv_dict.i64_from_textmap("dev_size").ok_or(err()));
+        let pe_start = try!(pv_dict.i64_from_textmap("pe_start").ok_or(err()));
+        let pe_count = try!(pv_dict.i64_from_textmap("pe_count").ok_or(err()));
 
         let status: Vec<_> = try!(pv_dict.list_from_textmap("status").ok_or(err()))
             .into_iter()
@@ -494,9 +494,9 @@ fn pvs_from_textmap(map: LvmTextMap) -> Result<Vec<PV>> {
             id: id,
             status: status,
             flags: flags,
-            dev_size: dev_size,
-            pe_start: pe_start,
-            pe_count: pe_count,
+            dev_size: dev_size as u64,
+            pe_start: pe_start as u64,
+            pe_count: pe_count as u64,
             });
     }
 
@@ -521,15 +521,15 @@ fn segments_from_textmap(segment_count: u64, map: &mut LvmTextMap) ->Result<Vec<
             let val = match stripe_list.remove(0) {
                 Entry::Number(x) => x, _ => return Err(err())
             };
-            stripes.push((name, val));
+            stripes.push((name, val as u64));
         }
 
         segments.push(Segment{
             name: name,
-            start_extent: try!(seg_dict.u64_from_textmap("start_extent").ok_or(err())),
-            extent_count: try!(seg_dict.u64_from_textmap("extent_count").ok_or(err())),
+            start_extent: try!(seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
+            extent_count: try!(seg_dict.i64_from_textmap("extent_count").ok_or(err())) as u64,
             ty: try!(seg_dict.string_from_textmap("type").ok_or(err())),
-            stripe_count: try!(seg_dict.u64_from_textmap("stripe_count").ok_or(err())),
+            stripe_count: try!(seg_dict.i64_from_textmap("stripe_count").ok_or(err())) as u64,
             stripes: stripes,
         });
     }
@@ -551,12 +551,12 @@ fn lvs_from_textmap(map: LvmTextMap) -> Result<Vec<LV>> {
         let id = try!(lv_dict.string_from_textmap("id").ok_or(err()));
         let creation_host = try!(lv_dict.string_from_textmap("creation_host")
                                  .ok_or(err()));
-        let creation_time = try!(lv_dict.u64_from_textmap("creation_time")
+        let creation_time = try!(lv_dict.i64_from_textmap("creation_time")
                                  .ok_or(err()));
-        let segment_count = try!(lv_dict.u64_from_textmap("segment_count")
+        let segment_count = try!(lv_dict.i64_from_textmap("segment_count")
                                  .ok_or(err()));
 
-        let segments = try!(segments_from_textmap(segment_count, &mut lv_dict));
+        let segments = try!(segments_from_textmap(segment_count as u64, &mut lv_dict));
 
         let status: Vec<_> = try!(lv_dict.list_from_textmap("status").ok_or(err()))
             .into_iter()
@@ -574,8 +574,8 @@ fn lvs_from_textmap(map: LvmTextMap) -> Result<Vec<LV>> {
             status: status,
             flags: flags,
             creation_host: creation_host,
-            creation_time: creation_time,
-            segment_count: segment_count,
+            creation_time: creation_time as u64,
+            segment_count: segment_count as u64,
             segments: segments,
             });
     }
@@ -588,12 +588,12 @@ pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
     let err = || Error::new(Other, "dude");
 
     let id = try!(map.string_from_textmap("id").ok_or(err()));
-    let seqno = try!(map.u64_from_textmap("seqno").ok_or(err()));
+    let seqno = try!(map.i64_from_textmap("seqno").ok_or(err()));
     let format = try!(map.string_from_textmap("format").ok_or(err()));
-    let extent_size = try!(map.u64_from_textmap("extent_size").ok_or(err()));
-    let max_lv = try!(map.u64_from_textmap("max_lv").ok_or(err()));
-    let max_pv = try!(map.u64_from_textmap("max_pv").ok_or(err()));
-    let metadata_copies = try!(map.u64_from_textmap("metadata_copies").ok_or(err()));
+    let extent_size = try!(map.i64_from_textmap("extent_size").ok_or(err()));
+    let max_lv = try!(map.i64_from_textmap("max_lv").ok_or(err()));
+    let max_pv = try!(map.i64_from_textmap("max_pv").ok_or(err()));
+    let metadata_copies = try!(map.i64_from_textmap("metadata_copies").ok_or(err()));
 
     let status: Vec<_> = try!(map.list_from_textmap("status").ok_or(err()))
         .into_iter()
@@ -614,14 +614,14 @@ pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
     let vg = VG {
         name: name.to_string(),
         id: id,
-        seqno: seqno,
+        seqno: seqno as u64,
         format: format,
         status: status,
         flags: flags,
-        extent_size: extent_size,
-        max_lv: max_lv,
-        max_pv: max_pv,
-        metadata_copies: metadata_copies,
+        extent_size: extent_size as u64,
+        max_lv: max_lv as u64,
+        max_pv: max_pv as u64,
+        metadata_copies: metadata_copies as u64,
         pvs: pvs,
         lvs: lvs,
     };

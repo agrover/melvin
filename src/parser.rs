@@ -466,10 +466,9 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segm
     for i in 0..segment_count {
         let name = format!("segment{}", i+1);
         let seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
-
-        let mut stripes: Vec<_> = Vec::new();
         let stripe_list = try!(seg_dict.list_from_textmap("stripes").ok_or(err()));
 
+        let mut stripes: Vec<_> = Vec::new();
         for slc in stripe_list.chunks(2) {
             let name = match &slc[0] {
                 &Entry::String(ref x) => x.clone(), _ => return Err(err())

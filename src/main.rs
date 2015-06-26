@@ -1,3 +1,4 @@
+#![feature(iter_arith)]
 #![feature(collections)]
 
 extern crate byteorder;
@@ -15,6 +16,9 @@ mod parser;
 mod lvmetad;
 mod pvlabel;
 mod dm;
+mod lv;
+mod vg;
+mod pv;
 
 #[allow(dead_code, non_camel_case_types)]
 mod dm_ioctl;

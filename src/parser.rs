@@ -38,6 +38,10 @@ use std::io::ErrorKind::Other;
 
 use std::collections::btree_map::BTreeMap;
 
+use lv::{LV, Segment};
+use vg::VG;
+use pv::PV;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     /// `{`
@@ -414,59 +418,10 @@ pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
     get_textmap(&tokens)
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct VG {
-    name: String,
-    id: String,
-    seqno: u64,
-    format: String,
-    status: Vec<String>,
-    flags: Vec<String>,
-    extent_size: u64,
-    max_lv: u64,
-    max_pv: u64,
-    metadata_copies: u64,
-    pvs: Vec<PV>,
-    lvs: Vec<LV>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct PV {
-    name: String,
-    id: String,
-    status: Vec<String>,
-    flags: Vec<String>,
-    dev_size: u64,
-    pe_start: u64,
-    pe_count: u64,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Segment {
-    name: String,
-    start_extent: u64,
-    extent_count: u64,
-    ty: String,
-    stripe_count: u64,
-    stripes: Vec<(String, u64)>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct LV {
-    name: String,
-    id: String,
-    status: Vec<String>,
-    flags: Vec<String>,
-    creation_host: String,
-    creation_time: u64,
-    segment_count: u64,
-    segments: Vec<Segment>,
-}
-
-fn pvs_from_textmap(map: &LvmTextMap) -> Result<Vec<PV>> {
+fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
     let err = || Error::new(Other, "dude");
 
-    let mut ret_vec = Vec::new();
+    let mut ret_vec = BTreeMap::new();
 
     for (key, value) in map {
         let pv_dict = match value {
@@ -489,7 +444,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<Vec<PV>> {
             .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
-        ret_vec.push(PV {
+        ret_vec.insert(key.clone(), PV {
             name: key.clone(),
             id: id.to_string(),
             status: status,
@@ -537,10 +492,10 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segm
     Ok(segments)
 }
 
-fn lvs_from_textmap(map: &LvmTextMap) -> Result<Vec<LV>> {
+fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
     let err = || Error::new(Other, "dude");
 
-    let mut ret_vec = Vec::new();
+    let mut ret_vec = BTreeMap::new();
 
     for (key, value) in map {
         let lv_dict = match value {
@@ -568,7 +523,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<Vec<LV>> {
             .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
             .collect();
 
-        ret_vec.push(LV {
+        ret_vec.insert(key.clone(), LV {
             name: key.clone(),
             id: id.to_string(),
             status: status,

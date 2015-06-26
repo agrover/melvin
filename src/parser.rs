@@ -419,14 +419,15 @@ pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 }
 
 fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
-    let err = || Error::new(Other, "dude");
+    let err = || Error::new(Other, "pv textmap parsing error");
 
     let mut ret_vec = BTreeMap::new();
 
     for (key, value) in map {
         let pv_dict = match value {
             &Entry::TextMap(ref x) => x,
-            _ => return Err(Error::new(Other, "dude")),
+            _ => return Err(
+                Error::new(Other, "expected textmap when parsing PV")),
         };
 
         let id = try!(pv_dict.string_from_textmap("id").ok_or(err()));
@@ -459,7 +460,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
 }
 
 fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segment>> {
-    let err = || Error::new(Other, "dude");
+    let err = || Error::new(Other, "segment textmap parsing error");
 
     let mut segments = Vec::new();
     for i in 0..segment_count {
@@ -493,14 +494,15 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segm
 }
 
 fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
-    let err = || Error::new(Other, "dude");
+    let err = || Error::new(Other, "lv textmap parsing error");
 
     let mut ret_vec = BTreeMap::new();
 
     for (key, value) in map {
         let lv_dict = match value {
             &Entry::TextMap(ref x) => x,
-            _ => return Err(Error::new(Other, "dude")),
+            _ => return Err(
+                Error::new(Other,"expected textmap when parsing LV")),
         };
 
         let id = try!(lv_dict.string_from_textmap("id").ok_or(err()));
@@ -540,7 +542,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
 
 pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
 
-    let err = || Error::new(Other, "dude");
+    let err = || Error::new(Other, "vg textmap parsing error");
 
     let id = try!(map.string_from_textmap("id").ok_or(err()));
     let seqno = try!(map.i64_from_textmap("seqno").ok_or(err()));

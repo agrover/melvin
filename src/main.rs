@@ -61,7 +61,7 @@ fn main() {
     // println!("A");
     let (name, mut map) = get_first_vg_meta().unwrap();
     // println!("B");
-    let vg = parser::vg_from_textmap(&name, &mut map).expect("didn't get vg!");
+    let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
     println!("heyo {}", vg.extents_in_use());
     // println!("output {:?}", vg);
 

@@ -539,7 +539,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
     Ok(ret_vec)
 }
 
-pub fn vg_from_textmap(name: &str, map: &mut LvmTextMap) -> Result<VG> {
+pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
 
     let err = || Error::new(Other, "vg textmap parsing error");
 

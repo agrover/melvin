@@ -27,9 +27,13 @@ impl VG {
     }
 
     pub fn extents_free(&self) -> u64 {
+        self.extents() - self.extents_in_use()
+    }
+
+    pub fn extents(&self) -> u64 {
         self.pvs
             .values()
             .map(|x| x.pe_count)
-            .sum::<u64>() - self.extents_in_use()
+            .sum()
     }
 }

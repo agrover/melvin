@@ -5,14 +5,12 @@ extern crate crc;
 extern crate unix_socket;
 extern crate nix;
 extern crate libc;
+extern crate regex;
 
 use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-
-use nix::fcntl;
-use std::os::unix::io::AsRawFd;
 
 mod parser;
 mod lvmetad;
@@ -45,24 +43,12 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     Err(Error::new(Other, "dude"))
 }
 
-fn get_conf() -> Result<LvmTextMap> {
-    use std::fs;
-    use std::io::Read;
-
-    let mut f = try!(fs::File::open("/etc/lvm/lvm.conf"));
-
-    let mut buf = Vec::new();
-    try!(f.read_to_end(&mut buf));
-
-    parser::into_textmap(&buf)
-}
-
 fn main() {
     // println!("A");
-    let (name, mut map) = get_first_vg_meta().unwrap();
-    // println!("B");
-    let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
-    println!("heyo {}", vg.extents_in_use());
+    // let (name, map) = get_first_vg_meta().unwrap();
+    // println!("B {}", name);
+    // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
+    // println!("heyo {} {}", vg.extents(), vg.extent_size);
     // println!("output {:?}", vg);
 
     // match dm::list_devices() {
@@ -70,8 +56,18 @@ fn main() {
     //     Err(x) => println!("error {}", x),
     // }
 
-    let tm = get_conf().unwrap();
-    let global = tm.textmap_from_textmap("global").unwrap();
+    let vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
+    for vg in &vgs {
+        println!("{} tot {} alloc {} free {}",
+                 vg.name, vg.extents(), vg.extents_in_use(), vg.extents_free());
+        for lv in vg.lvs.keys() {
+            println!("lv {}", lv);
+        }
+    }
 
-    println!("config = {:?}", global.i64_from_textmap("locking_type").unwrap());
+    let tm = pvlabel::get_conf().expect("could not read lvm.conf");
+    let locking_type = tm.textmap_from_textmap("global")
+        .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
+
+    println!("locking_type = {}", locking_type);
 }

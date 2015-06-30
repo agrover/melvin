@@ -5,6 +5,8 @@ use std::io::Error;
 use std::io::ErrorKind::Other;
 
 use parser::{LvmTextMap, TextMapOps, into_textmap};
+use vg;
+use parser;
 
 const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
 
@@ -74,4 +76,33 @@ pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
     response.remove("response");
 
     Ok(response)
+}
+
+pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
+let err = || Error::new(Other, "response parsing error");
+    let mut v = Vec::new();
+
+    let vg_list = try!(request(b"vg_list", None));
+    let vgs = try!(vg_list.textmap_from_textmap("volume_groups").ok_or(err()));
+
+    for id in vgs.keys() {
+        let name = try!(vgs.textmap_from_textmap(id)
+                        .and_then(|val| val.string_from_textmap("name"))
+                        .ok_or(err()));
+
+        let mut option: Vec<u8> = Vec::new();
+        option.extend(b"uuid = \"");
+        option.extend(id.as_bytes());
+        option.extend(b"\"");
+        let options = vec!(&option[..]);
+
+        let vg_info = try!(request(b"vg_lookup", Some(&options[..])));
+        let md = try!(vg_info.textmap_from_textmap("metadata").ok_or(err()));
+
+        let vg = parser::vg_from_textmap(&name, md).expect("didn't get vg!");
+
+        v.push(vg);
+    }
+
+    Ok(v)
 }

@@ -418,6 +418,22 @@ pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
     get_textmap(&tokens)
 }
 
+// status may be either a string or a list of strings
+fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
+    match map.get("status") {
+        Some(&Entry::String(ref x)) => Ok(vec!(x.clone())),
+        Some(&Entry::List(ref x)) =>
+            Ok({x.iter()
+                .filter_map(|item| match item {
+                    &Entry::String(ref x) => Some(x.clone()),
+                    _ => {None}
+                })
+                .collect()
+            }),
+        _ => Err(Error::new(Other, "status textmap parsing error")),
+    }
+}
+
 fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
     let err = || Error::new(Other, "pv textmap parsing error");
 
@@ -435,15 +451,20 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
         let pe_start = try!(pv_dict.i64_from_textmap("pe_start").ok_or(err()));
         let pe_count = try!(pv_dict.i64_from_textmap("pe_count").ok_or(err()));
 
-        let status: Vec<_> = try!(pv_dict.list_from_textmap("status").ok_or(err()))
-            .into_iter()
-            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
-            .collect();
+        let status = try!(status_from_textmap(pv_dict));
 
         let flags: Vec<_> = try!(pv_dict.list_from_textmap("flags").ok_or(err()))
             .into_iter()
-            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
+            .filter_map(|item| match item {
+                &Entry::String(ref x) => Some(x.clone()),
+                _ => {None}
+            })
             .collect();
+
+        // If textmap came from lvmetad, it may also include sections
+        // for data area (da0) and metadata area (mda0). These are not
+        // in the on-disk text metadata, but in the binary PV header.
+        // Don't know if we need them, omitting for now.
 
         ret_vec.insert(key.clone(), PV {
             name: key.clone(),
@@ -514,10 +535,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
 
         let segments = try!(segments_from_textmap(segment_count as u64, &lv_dict));
 
-        let status: Vec<_> = try!(lv_dict.list_from_textmap("status").ok_or(err()))
-            .into_iter()
-            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
-            .collect();
+        let status = try!(status_from_textmap(lv_dict));
 
         let flags: Vec<_> = try!(lv_dict.list_from_textmap("flags").ok_or(err()))
             .into_iter()
@@ -551,10 +569,7 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
     let max_pv = try!(map.i64_from_textmap("max_pv").ok_or(err()));
     let metadata_copies = try!(map.i64_from_textmap("metadata_copies").ok_or(err()));
 
-    let status: Vec<_> = try!(map.list_from_textmap("status").ok_or(err()))
-        .into_iter()
-        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
-        .collect();
+    let status = try!(status_from_textmap(map));
 
     let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
         .into_iter()

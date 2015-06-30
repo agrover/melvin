@@ -65,6 +65,10 @@ pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
             .and_then(|r| into_textmap(&r)));
     }
 
+    if response.get("global_invalid").is_some() || response.get("vg_invalid").is_some() {
+        return Err(Error::new(Other, "cached metadata flagged as invalid"));
+    }
+
     if try!(response.string_from_textmap("response").ok_or(err())) != "OK" {
         let reason = match response.string_from_textmap("reason") {
             Some(x) => x,

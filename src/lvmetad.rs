@@ -1,11 +1,14 @@
 use unix_socket::UnixStream;
 
-use std::io;
-use std::io::{Read, Write};
+use std::io::{Result, Read, Write};
+use std::io::Error;
+use std::io::ErrorKind::Other;
+
+use parser::{LvmTextMap, TextMapOps, into_textmap};
 
 const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
 
-fn response(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
+fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     let mut response = [0; 32];
     let mut v = Vec::new();
 
@@ -23,28 +26,52 @@ fn response(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
     }
 }
 
-fn open_lvmetad() {
+pub fn _request(s: &[u8], token: Option<&[u8]>, stream: &mut UnixStream, args: Option<&[&[u8]]>) -> Result<Vec<u8>> {
+    try!(stream.write_all(b"request = \""));
+    try!(stream.write_all(s));
+    try!(stream.write_all(b"\"\n"));
+    if let Some(token) = token {
+        try!(stream.write_all(b"token = \""));
+        try!(stream.write_all(token));
+        try!(stream.write_all(b"\"\n"));
+        try!(stream.write_all(b"\n"));
+    }
+    if let Some(args) = args {
+        for arg in args {
+            try!(stream.write_all(arg));
+            try!(stream.write_all(b"\n"));
+        }
+    }
 
-    request(b"hello", false);
-//    lvmetad_request(b"vg_list", true);
-//    lvmetad_request(b"pv_list", true);
-//    lvmetad_request(b"dump", false);
+    try!(stream.write_all(b"\n##\n"));
 
+    collect_response(stream)
 }
 
-pub fn request(s: &[u8], token: bool) -> io::Result<Vec<u8>>{
+pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
+    let err = || Error::new(Other, "response parsing error");
+    let token = b"0";
 
-    let mut stream = UnixStream::connect(LVMETAD_PATH).unwrap();
-    stream.write_all(b"request = \"").unwrap();
-    stream.write_all(s).unwrap();
-    stream.write_all(b"\"\n").unwrap();
-    if token {
-        stream.write_all(b"token = \"filter:0\"").unwrap();
-        stream.write_all(b"\n").unwrap();
+    let mut stream = try!(UnixStream::connect(LVMETAD_PATH));
+
+    let mut response = try!(_request(s, Some(token), &mut stream, args)
+        .and_then(|r| into_textmap(&r)));
+
+    if try!(response.string_from_textmap("response").ok_or(err())) == "token_mismatch" {
+        try!(_request(b"token_update", Some(token), &mut stream, None));
+        response = try!(_request(s, Some(token), &mut stream, args)
+            .and_then(|r| into_textmap(&r)));
     }
-    stream.write_all(b"\n##\n").unwrap();
 
-    let response = try!(response(&mut stream));
+    if try!(response.string_from_textmap("response").ok_or(err())) != "OK" {
+        let reason = match response.string_from_textmap("reason") {
+            Some(x) => x,
+            None => "no reason given",
+        };
+        return Err(Error::new(Other, reason));
+    }
+
+    response.remove("response");
 
     Ok(response)
 }

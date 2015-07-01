@@ -43,6 +43,18 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     Err(Error::new(Other, "dude"))
 }
 
+fn get_conf() -> Result<LvmTextMap> {
+    use std::fs;
+    use std::io::Read;
+
+    let mut f = try!(fs::File::open("/etc/lvm/lvm.conf"));
+
+    let mut buf = Vec::new();
+    try!(f.read_to_end(&mut buf));
+
+    parser::into_textmap(&buf)
+}
+
 fn main() {
     // println!("A");
     // let (name, map) = get_first_vg_meta().unwrap();
@@ -65,7 +77,7 @@ fn main() {
         }
     }
 
-    let tm = pvlabel::get_conf().expect("could not read lvm.conf");
+    let tm = get_conf().expect("could not read lvm.conf");
     let locking_type = tm.textmap_from_textmap("global")
         .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
 

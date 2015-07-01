@@ -28,16 +28,21 @@ fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     }
 }
 
-pub fn _request(s: &[u8], token: Option<&[u8]>, stream: &mut UnixStream, args: Option<&[&[u8]]>) -> Result<Vec<u8>> {
+pub fn _request(s: &[u8],
+                token: Option<&[u8]>,
+                stream: &mut UnixStream,
+                args: Option<&[&[u8]]>) -> Result<Vec<u8>> {
     try!(stream.write_all(b"request = \""));
     try!(stream.write_all(s));
     try!(stream.write_all(b"\"\n"));
+
     if let Some(token) = token {
         try!(stream.write_all(b"token = \""));
         try!(stream.write_all(token));
         try!(stream.write_all(b"\"\n"));
         try!(stream.write_all(b"\n"));
     }
+
     if let Some(args) = args {
         for arg in args {
             try!(stream.write_all(arg));
@@ -83,7 +88,7 @@ pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
 }
 
 pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
-let err = || Error::new(Other, "response parsing error");
+    let err = || Error::new(Other, "response parsing error");
     let mut v = Vec::new();
 
     let vg_list = try!(request(b"vg_list", None));

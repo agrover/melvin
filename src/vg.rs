@@ -37,7 +37,7 @@ impl VG {
             .sum()
     }
 
-    pub fn used_ranges(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    pub fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut used_map = BTreeMap::new();
 
         // pretty sure this is only correct for my system...
@@ -53,10 +53,10 @@ impl VG {
         used_map
     }
 
-    pub fn free_ranges(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    pub fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 
-        for (pvname, area_map) in &mut self.used_ranges() {
+        for (pvname, area_map) in &mut self.used_areas() {
 
             // Insert an entry to mark the end of the PV so the fold works correctly
             let pv = self.pvs.get(pvname).expect("area map name refers to nonexistent PV");

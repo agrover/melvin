@@ -502,10 +502,12 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segm
 
         segments.push(Segment{
             name: name,
-            start_extent: try!(seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
-            extent_count: try!(seg_dict.i64_from_textmap("extent_count").ok_or(err())) as u64,
-            ty: try!(seg_dict.string_from_textmap("type").ok_or(err())).to_string(),
-            stripe_count: try!(seg_dict.i64_from_textmap("stripe_count").ok_or(err())) as u64,
+            start_extent: try!(
+                seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
+            extent_count: try!(
+                seg_dict.i64_from_textmap("extent_count").ok_or(err())) as u64,
+            ty: try!(
+                seg_dict.string_from_textmap("type").ok_or(err())).to_string(),
             stripes: stripes,
         });
     }
@@ -548,8 +550,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
             status: status,
             flags: flags,
             creation_host: creation_host.to_string(),
-            creation_time: creation_time as u64,
-            segment_count: segment_count as u64,
+            creation_time: creation_time,
             segments: segments,
             });
     }

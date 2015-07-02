@@ -5,8 +5,8 @@ pub struct PV {
     pub status: Vec<String>,
     pub flags: Vec<String>,
     pub dev_size: u64,
-    pub pe_start: u64,
-    pub pe_count: u64,
+    pub pe_start: u64, // in sectors
+    pub pe_count: u64, // in extents
 }
 
 impl PV {

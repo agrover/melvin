@@ -5,7 +5,8 @@ extern crate crc;
 extern crate unix_socket;
 extern crate nix;
 extern crate libc;
-extern crate regex;
+extern crate uuid;
+extern crate time;
 
 use std::path;
 use std::io::Result;
@@ -68,13 +69,16 @@ fn main() {
     //     Err(x) => println!("error {}", x),
     // }
 
-    let vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
-    for vg in &vgs {
-        println!("{} tot {} alloc {} free {}",
-                 vg.name, vg.extents(), vg.extents_in_use(), vg.extents_free());
-        for lv in vg.lvs.keys() {
-            println!("lv {}", lv);
-        }
+    let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
+    let mut vg = &mut vgs[0];
+    for (lvname, lv) in &vg.lvs {
+        println!("lv segments {:?}", lv.segments);
+    }
+
+    vg.new_linear_lv("grover!!!", 100);
+
+    for (lvname, lv) in &vg.lvs {
+        println!("lv2 {:?}", lv);
     }
 
     let tm = get_conf().expect("could not read lvm.conf");
@@ -82,4 +86,6 @@ fn main() {
         .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
 
     println!("locking_type = {}", locking_type);
+
+    println!("nodename {:?}", nix::sys::utsname::uname().nodename());
 }

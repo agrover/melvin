@@ -9,6 +9,7 @@ use nix;
 
 use lv::{LV, Segment};
 use pv::PV;
+use parser::{LvmTextMap, TextMapOps, Entry};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
@@ -99,7 +100,7 @@ impl VG {
         let mut used_map = BTreeMap::new();
 
         // pretty sure this is only correct for my system...
-        for (lvname, lv) in &self.lvs {
+        for lv in self.lvs.values() {
             for seg in &lv.segments {
                 for &(ref pvname, start) in &seg.stripes {
                     used_map.entry(pvname.to_string()).or_insert(BTreeMap::new())
@@ -131,5 +132,47 @@ impl VG {
         }
 
         free_map
+    }
+
+    pub fn to_textmap(self) -> LvmTextMap {
+        let mut map = LvmTextMap::new();
+
+        map.insert("id".to_string(), Entry::String(self.id));
+        map.insert("seqno".to_string(), Entry::Number(self.seqno as i64 + 1));
+        map.insert("format".to_string(), Entry::String(self.format));
+
+        // map_insert("status", Entry::Textmap = self.status.into_iter()
+        //     .map(|x| Entry::String(x))
+        //     .collect();
+
+        map.insert("status".to_string(),
+                   Entry::List(
+                       Box::new(
+                           self.status
+                               .into_iter()
+                               .map(|x| Entry::String(x))
+                               .collect())));
+
+        map.insert("flags".to_string(),
+                   Entry::List(
+                       Box::new(
+                           self.flags
+                               .into_iter()
+                               .map(|x| Entry::String(x))
+                               .collect())));
+
+        map.insert("extent_size".to_string(), Entry::Number(self.extent_size as i64));
+        map.insert("metadata_copies".to_string(), Entry::Number(self.metadata_copies as i64));
+        map.insert("physical_volumes".to_string(),
+                   Entry::TextMap(
+                       Box::new(
+                           self.pvs
+                               .into_iter()
+                               .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                               .collect())));
+
+        // TODO: logical volumes
+
+        map
     }
 }

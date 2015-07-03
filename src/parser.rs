@@ -434,6 +434,15 @@ fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
     }
 }
 
+fn device_from_textmap(map: &LvmTextMap) -> Result<String> {
+    match map.get("device") {
+        Some(&Entry::String(ref x)) => Ok(x.clone()),
+        // TODO: look up devno and convert to a path?
+        Some(&Entry::Number(ref x)) => Ok(format!("{}", x)),
+        _ => Err(Error::new(Other, "device textmap parsing error")),
+    }
+}
+
 fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
     let err = || Error::new(Other, "pv textmap parsing error");
 
@@ -447,6 +456,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
         };
 
         let id = try!(pv_dict.string_from_textmap("id").ok_or(err()));
+        let device = try!(device_from_textmap(pv_dict));
         let dev_size = try!(pv_dict.i64_from_textmap("dev_size").ok_or(err()));
         let pe_start = try!(pv_dict.i64_from_textmap("pe_start").ok_or(err()));
         let pe_count = try!(pv_dict.i64_from_textmap("pe_count").ok_or(err()));
@@ -469,6 +479,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
         ret_vec.insert(key.clone(), PV {
             name: key.clone(),
             id: id.to_string(),
+            device: device.to_string(),
             status: status,
             flags: flags,
             dev_size: dev_size as u64,

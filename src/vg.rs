@@ -141,9 +141,8 @@ impl VG {
         map.insert("seqno".to_string(), Entry::Number(self.seqno as i64 + 1));
         map.insert("format".to_string(), Entry::String(self.format));
 
-        // map_insert("status", Entry::Textmap = self.status.into_iter()
-        //     .map(|x| Entry::String(x))
-        //     .collect();
+        map.insert("max_pv".to_string(), Entry::Number(0));
+        map.insert("max_lv".to_string(), Entry::Number(0));
 
         map.insert("status".to_string(),
                    Entry::List(
@@ -179,6 +178,10 @@ impl VG {
                                .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
                                .collect())));
 
-        map
+        let mut outer_map = LvmTextMap::new();
+
+        outer_map.insert(self.name, Entry::TextMap(Box::new(map)));
+
+        outer_map
     }
 }

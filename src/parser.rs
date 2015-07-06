@@ -611,3 +611,47 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
 
     Ok(vg)
 }
+
+pub fn textmap_serialize(tm: &LvmTextMap) -> Vec<u8> {
+    let mut vec = Vec::new();
+
+    for (k, v) in tm {
+        match v {
+            &Entry::String(ref x) => {
+                vec.extend(k.as_bytes());
+                vec.extend(b" = \"");
+                vec.extend(x.as_bytes());
+                vec.extend(b"\"\n");
+            },
+            &Entry::Number(ref x) => {
+                vec.extend(k.as_bytes());
+                vec.extend(b" = ");
+                vec.extend(format!("{}\n", x).as_bytes());
+            }
+            &Entry::List(ref x) => {
+                vec.extend(k.as_bytes());
+                vec.extend(b" = [");
+                let z: Vec<_> = x
+                    .iter()
+                    .map(|x| {
+                        match x {
+                            &Entry::String(ref x) => format!("\"{}\"", x),
+                            &Entry::Number(ref x) => format!("{}", x),
+                            _ => panic!("should not be in lists"),
+                        }})
+                    .collect();
+                vec.extend(z.connect(", ").as_bytes());
+                vec.extend(b"]\n");
+            }
+            &Entry::TextMap(ref x) => {
+                vec.extend(k.as_bytes());
+                vec.extend(b" {\n");
+                vec.extend(textmap_serialize(x));
+                vec.extend(b"}\n");
+
+            }
+        };
+    }
+
+    vec
+}

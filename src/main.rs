@@ -70,7 +70,7 @@ fn main() {
     // }
 
     let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
-    let mut vg = &mut vgs[0];
+    let mut vg = vgs.pop().expect("no vgs in vgs");;
     for (lvname, lv) in &vg.lvs {
         println!("lv segments {:?}", lv.segments);
     }
@@ -87,5 +87,5 @@ fn main() {
 
     println!("locking_type = {}", locking_type);
 
-    println!("nodename {:?}", nix::sys::utsname::uname().nodename());
+    println!("new textmap {:?}", vg.to_textmap());
 }

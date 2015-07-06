@@ -171,7 +171,13 @@ impl VG {
                                .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
                                .collect())));
 
-        // TODO: logical volumes
+        map.insert("logical_volumes".to_string(),
+                   Entry::TextMap(
+                       Box::new(
+                           self.lvs
+                               .into_iter()
+                               .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                               .collect())));
 
         map
     }

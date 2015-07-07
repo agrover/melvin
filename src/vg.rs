@@ -141,14 +141,14 @@ impl VG {
     }
 }
 
-impl Into<LvmTextMap> for VG {
-    fn into(self) -> LvmTextMap {
+impl From<VG> for LvmTextMap {
+    fn from(vg: VG) -> Self {
         let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(self.id));
+        map.insert("id".to_string(), Entry::String(vg.id));
         map.insert("seqno".to_string(),
-                   Entry::Number(self.seqno as i64 + 1));
-        map.insert("format".to_string(), Entry::String(self.format));
+                   Entry::Number(vg.seqno as i64 + 1));
+        map.insert("format".to_string(), Entry::String(vg.format));
 
         map.insert("max_pv".to_string(), Entry::Number(0));
         map.insert("max_lv".to_string(), Entry::Number(0));
@@ -156,7 +156,7 @@ impl Into<LvmTextMap> for VG {
         map.insert("status".to_string(),
                    Entry::List(
                        Box::new(
-                           self.status
+                           vg.status
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
@@ -164,19 +164,19 @@ impl Into<LvmTextMap> for VG {
         map.insert("flags".to_string(),
                    Entry::List(
                        Box::new(
-                           self.flags
+                           vg.flags
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
 
         map.insert("extent_size".to_string(),
-                   Entry::Number(self.extent_size as i64));
+                   Entry::Number(vg.extent_size as i64));
         map.insert("metadata_copies".to_string(),
-                   Entry::Number(self.metadata_copies as i64));
+                   Entry::Number(vg.metadata_copies as i64));
         map.insert("physical_volumes".to_string(),
                    Entry::TextMap(
                        Box::new(
-                           self.pvs
+                           vg.pvs
                                .into_iter()
                                .map(|(k, v)|
                                     (k, Entry::TextMap(Box::new(v.into()))))
@@ -185,7 +185,7 @@ impl Into<LvmTextMap> for VG {
         map.insert("logical_volumes".to_string(),
                    Entry::TextMap(
                        Box::new(
-                           self.lvs
+                           vg.lvs
                                .into_iter()
                                .map(|(k, v)|
                                     (k, Entry::TextMap(Box::new(v.into()))))
@@ -193,7 +193,7 @@ impl Into<LvmTextMap> for VG {
 
         let mut outer_map = LvmTextMap::new();
 
-        outer_map.insert(self.name, Entry::TextMap(Box::new(map)));
+        outer_map.insert(vg.name, Entry::TextMap(Box::new(map)));
 
         outer_map
     }

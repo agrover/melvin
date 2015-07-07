@@ -64,9 +64,9 @@ impl From<i64> for Device {
     }
 }
 
-impl Into<i64> for Device {
-    fn into(self) -> i64 {
-        ((self.major << 8) ^ (self.minor as u32 & 0xff)) as i64
+impl From<Device> for i64 {
+    fn from(dev: Device) -> i64 {
+        ((dev.major << 8) ^ (dev.minor as u32 & 0xff)) as i64
     }
 }
 
@@ -82,17 +82,17 @@ pub struct PV {
     pub pe_count: u64, // in extents
 }
 
-impl Into<LvmTextMap> for PV {
-    fn into(self) -> LvmTextMap {
+impl From<PV> for LvmTextMap {
+    fn from(pv: PV) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(self.id));
-        map.insert("device".to_string(), Entry::Number(self.device.into()));
+        map.insert("id".to_string(), Entry::String(pv.id));
+        map.insert("device".to_string(), Entry::Number(pv.device.into()));
 
         map.insert("status".to_string(),
                    Entry::List(
                        Box::new(
-                           self.status
+                           pv.status
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
@@ -100,14 +100,14 @@ impl Into<LvmTextMap> for PV {
         map.insert("flags".to_string(),
                    Entry::List(
                        Box::new(
-                           self.flags
+                           pv.flags
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
 
-        map.insert("dev_size".to_string(), Entry::Number(self.dev_size as i64));
-        map.insert("pe_start".to_string(), Entry::Number(self.pe_start as i64));
-        map.insert("pe_count".to_string(), Entry::Number(self.pe_count as i64));
+        map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));
+        map.insert("pe_start".to_string(), Entry::Number(pv.pe_start as i64));
+        map.insert("pe_count".to_string(), Entry::Number(pv.pe_count as i64));
 
         map
     }

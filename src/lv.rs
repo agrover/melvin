@@ -20,16 +20,16 @@ impl LV {
     }
 }
 
-impl Into<LvmTextMap> for LV {
-    fn into(self) -> LvmTextMap {
+impl From<LV> for LvmTextMap {
+    fn from(lv: LV) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(self.id));
+        map.insert("id".to_string(), Entry::String(lv.id));
 
         map.insert("status".to_string(),
                    Entry::List(
                        Box::new(
-                           self.status
+                           lv.status
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
@@ -37,20 +37,20 @@ impl Into<LvmTextMap> for LV {
         map.insert("flags".to_string(),
                    Entry::List(
                        Box::new(
-                           self.flags
+                           lv.flags
                                .into_iter()
                                .map(|x| Entry::String(x))
                                .collect())));
 
         map.insert("creation_host".to_string(),
-                   Entry::String(self.creation_host));
+                   Entry::String(lv.creation_host));
         map.insert("creation_time".to_string(),
-                   Entry::Number(self.creation_time as i64));
+                   Entry::Number(lv.creation_time as i64));
 
         map.insert("segment_count".to_string(),
-                   Entry::Number(self.segments.len() as i64));
+                   Entry::Number(lv.segments.len() as i64));
 
-        for (i, seg) in self.segments.into_iter().enumerate() {
+        for (i, seg) in lv.segments.into_iter().enumerate() {
             map.insert(format!("segment{}", i+1),
                        Entry::TextMap(
                            Box::new(seg.into())));
@@ -69,21 +69,23 @@ pub struct Segment {
     pub stripes: Vec<(String, u64)>,
 }
 
-impl Into<LvmTextMap> for Segment {
-    fn into(self) -> LvmTextMap {
+impl From<Segment> for LvmTextMap {
+    fn from(seg: Segment) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("start_extent".to_string(),
-                   Entry::Number(self.start_extent as i64));
+                   Entry::Number(seg.start_extent as i64));
         map.insert("extent_count".to_string(),
-                   Entry::Number(self.extent_count as i64));
-        map.insert("type".to_string(), Entry::String(self.ty));
-        map.insert("stripe_count".to_string(), Entry::Number(self.stripes.len() as i64));
+                   Entry::Number(seg.extent_count as i64));
+        map.insert("type".to_string(),
+                   Entry::String(seg.ty));
+        map.insert("stripe_count".to_string(),
+                   Entry::Number(seg.stripes.len() as i64));
 
         map.insert("stripes".to_string(),
                    Entry::List(
                        Box::new(
-                           self.stripes
+                           seg.stripes
                                .into_iter()
                                .map(|(k, v)|
                                     vec![

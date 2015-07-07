@@ -78,7 +78,9 @@ impl VG {
         let lv = LV {
             name: name.to_string(),
             id: Uuid::new_v4().to_hyphenated_string(),
-            status: vec!["READ".to_string(), "WRITE".to_string(), "VISIBLE".to_string()],
+            status: vec!["READ".to_string(),
+                         "WRITE".to_string(),
+                         "VISIBLE".to_string()],
             flags: Vec::new(),
             creation_host: nix::sys::utsname::uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
@@ -103,7 +105,8 @@ impl VG {
         for lv in self.lvs.values() {
             for seg in &lv.segments {
                 for &(ref pvname, start) in &seg.stripes {
-                    used_map.entry(pvname.to_string()).or_insert(BTreeMap::new())
+                    used_map.entry(pvname.to_string())
+                        .or_insert(BTreeMap::new())
                         .insert(start as u64, seg.extent_count);
                 }
             }
@@ -117,14 +120,17 @@ impl VG {
 
         for (pvname, area_map) in &mut self.used_areas() {
 
-            // Insert an entry to mark the end of the PV so the fold works correctly
-            let pv = self.pvs.get(pvname).expect("area map name refers to nonexistent PV");
+            // Insert an entry to mark the end of the PV so the fold works
+            // correctly
+            let pv = self.pvs.get(pvname)
+                .expect("area map name refers to nonexistent PV");
             area_map.insert(pv.pe_count, 0);
 
             area_map.iter()
                 .fold(0, |prev_end, (start, len)| {
                     if prev_end < *start {
-                        free_map.entry(pvname.clone()).or_insert(BTreeMap::new())
+                        free_map.entry(pvname.clone())
+                            .or_insert(BTreeMap::new())
                             .insert(prev_end, start-prev_end);
                     }
                     start + len
@@ -138,7 +144,8 @@ impl VG {
         let mut map = LvmTextMap::new();
 
         map.insert("id".to_string(), Entry::String(self.id));
-        map.insert("seqno".to_string(), Entry::Number(self.seqno as i64 + 1));
+        map.insert("seqno".to_string(),
+                   Entry::Number(self.seqno as i64 + 1));
         map.insert("format".to_string(), Entry::String(self.format));
 
         map.insert("max_pv".to_string(), Entry::Number(0));
@@ -160,14 +167,17 @@ impl VG {
                                .map(|x| Entry::String(x))
                                .collect())));
 
-        map.insert("extent_size".to_string(), Entry::Number(self.extent_size as i64));
-        map.insert("metadata_copies".to_string(), Entry::Number(self.metadata_copies as i64));
+        map.insert("extent_size".to_string(),
+                   Entry::Number(self.extent_size as i64));
+        map.insert("metadata_copies".to_string(),
+                   Entry::Number(self.metadata_copies as i64));
         map.insert("physical_volumes".to_string(),
                    Entry::TextMap(
                        Box::new(
                            self.pvs
                                .into_iter()
-                               .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                               .map(|(k, v)|
+                                    (k, Entry::TextMap(Box::new(v.to_textmap()))))
                                .collect())));
 
         map.insert("logical_volumes".to_string(),
@@ -175,7 +185,8 @@ impl VG {
                        Box::new(
                            self.lvs
                                .into_iter()
-                               .map(|(k, v)| (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                               .map(|(k, v)|
+                                    (k, Entry::TextMap(Box::new(v.to_textmap()))))
                                .collect())));
 
         let mut outer_map = LvmTextMap::new();

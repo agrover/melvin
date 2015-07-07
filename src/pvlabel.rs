@@ -240,7 +240,8 @@ impl MDA {
 
         let mda_areas = pvheader.metadata_areas.len();
         if mda_areas != 1 {
-            return Err(Error::new(Other, format!("Expecting 1 mda, found {}", mda_areas)));
+            return Err(Error::new(
+                Other, format!("Expecting 1 mda, found {}", mda_areas)));
         }
 
         let md = &pvheader.metadata_areas[0];
@@ -307,7 +308,8 @@ impl MDA {
             let mut text: Vec<u8> = Vec::new();
             let remaining = rl_end - self.area.len();
             text.extend(&self.area[rl_start..rl_end-remaining].to_owned());
-            text.extend(&self.area[MDA_HEADER_SIZE..MDA_HEADER_SIZE+remaining].to_owned());
+            text.extend(
+                &self.area[MDA_HEADER_SIZE..MDA_HEADER_SIZE+remaining].to_owned());
             parser::into_textmap(&text)
         }
     }
@@ -357,8 +359,10 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
     for dir in dirs {
         ret_vec.extend(try!(read_dir(dir))
             .into_iter()
-            .filter_map(|dir_e| if dir_e.is_ok() {Some(dir_e.unwrap().path())} else {None})
-            .filter(|path| { (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
+            .filter_map(|dir_e| if dir_e.is_ok()
+                        { Some(dir_e.unwrap().path()) } else {None} )
+            .filter(|path| {
+                (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
             .filter(|path| { find_pv_in_dev(&path).is_ok() })
             .collect::<Vec<_>>());
     }

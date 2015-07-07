@@ -1,4 +1,4 @@
-#![feature(iter_arith, result_expect)]
+#![feature(iter_arith, result_expect, path_ext)]
 
 extern crate byteorder;
 extern crate crc;

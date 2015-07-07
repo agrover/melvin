@@ -32,15 +32,15 @@
 
 
 use std::io;
-use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::str::FromStr;
 
 use std::collections::btree_map::BTreeMap;
 
 use lv::{LV, Segment};
 use vg::VG;
-use pv::PV;
+use pv::{PV, Device};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
@@ -419,7 +419,7 @@ pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 }
 
 // status may be either a string or a list of strings
-fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
+fn status_from_textmap(map: &LvmTextMap) -> io::Result<Vec<String>> {
     match map.get("status") {
         Some(&Entry::String(ref x)) => Ok(vec!(x.clone())),
         Some(&Entry::List(ref x)) =>
@@ -434,16 +434,20 @@ fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
     }
 }
 
-fn device_from_textmap(map: &LvmTextMap) -> Result<String> {
+fn device_from_textmap(map: &LvmTextMap) -> io::Result<Device> {
     match map.get("device") {
-        Some(&Entry::String(ref x)) => Ok(x.clone()),
-        // TODO: look up devno and convert to a path?
-        Some(&Entry::Number(ref x)) => Ok(format!("{}", x)),
+        Some(&Entry::String(ref x)) => {
+            match Device::from_str(x) {
+                Ok(x) => Ok(x),
+                Err(x) => Err(Error::new(Other, "could not parse string"))
+            }
+        },
+        Some(&Entry::Number(x)) => Ok(Device::from(x)),
         _ => Err(Error::new(Other, "device textmap parsing error")),
     }
 }
 
-fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
+fn pvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, PV>> {
     let err = || Error::new(Other, "pv textmap parsing error");
 
     let mut ret_vec = BTreeMap::new();
@@ -479,7 +483,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
         ret_vec.insert(key.clone(), PV {
             name: key.clone(),
             id: id.to_string(),
-            device: device.to_string(),
+            device: device,
             status: status,
             flags: flags,
             dev_size: dev_size as u64,
@@ -491,7 +495,7 @@ fn pvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, PV>> {
     Ok(ret_vec)
 }
 
-fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segment>> {
+fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->io::Result<Vec<Segment>> {
     let err = || Error::new(Other, "segment textmap parsing error");
 
     let mut segments = Vec::new();
@@ -526,7 +530,7 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->Result<Vec<Segm
     Ok(segments)
 }
 
-fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
+fn lvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, LV>> {
     let err = || Error::new(Other, "lv textmap parsing error");
 
     let mut ret_vec = BTreeMap::new();
@@ -569,7 +573,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> Result<BTreeMap<String, LV>> {
     Ok(ret_vec)
 }
 
-pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
+pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
 
     let err = || Error::new(Other, "vg textmap parsing error");
 

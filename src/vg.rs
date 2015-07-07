@@ -139,8 +139,10 @@ impl VG {
 
         free_map
     }
+}
 
-    pub fn to_textmap(self) -> LvmTextMap {
+impl Into<LvmTextMap> for VG {
+    fn into(self) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("id".to_string(), Entry::String(self.id));
@@ -177,7 +179,7 @@ impl VG {
                            self.pvs
                                .into_iter()
                                .map(|(k, v)|
-                                    (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                                    (k, Entry::TextMap(Box::new(v.into()))))
                                .collect())));
 
         map.insert("logical_volumes".to_string(),
@@ -186,7 +188,7 @@ impl VG {
                            self.lvs
                                .into_iter()
                                .map(|(k, v)|
-                                    (k, Entry::TextMap(Box::new(v.to_textmap()))))
+                                    (k, Entry::TextMap(Box::new(v.into()))))
                                .collect())));
 
         let mut outer_map = LvmTextMap::new();

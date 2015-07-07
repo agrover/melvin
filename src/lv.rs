@@ -12,15 +12,16 @@ pub struct LV {
 }
 
 impl LV {
-
     pub fn used_extents(&self) -> u64 {
         self.segments
             .iter()
             .map(|x| x.extent_count)
             .sum()
     }
+}
 
-    pub fn to_textmap(self) -> LvmTextMap {
+impl Into<LvmTextMap> for LV {
+    fn into(self) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("id".to_string(), Entry::String(self.id));
@@ -52,7 +53,7 @@ impl LV {
         for (i, seg) in self.segments.into_iter().enumerate() {
             map.insert(format!("segment{}", i+1),
                        Entry::TextMap(
-                           Box::new(seg.to_textmap())));
+                           Box::new(seg.into())));
         }
 
         map
@@ -68,8 +69,8 @@ pub struct Segment {
     pub stripes: Vec<(String, u64)>,
 }
 
-impl Segment {
-    fn to_textmap(self) -> LvmTextMap {
+impl Into<LvmTextMap> for Segment {
+    fn into(self) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("start_extent".to_string(),

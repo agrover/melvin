@@ -90,7 +90,7 @@ fn main() {
 
     println!("locking_type = {}", locking_type);
 
-    let vgtm = vg.to_textmap();
+    let vgtm = vg.into();
     println!("new textmap {:?}", vgtm);
     let s = parser::textmap_serialize(&vgtm);
     println!("ess {}", String::from_utf8_lossy(&s));

@@ -82,8 +82,8 @@ pub struct PV {
     pub pe_count: u64, // in extents
 }
 
-impl PV {
-    pub fn to_textmap(self) -> LvmTextMap {
+impl Into<LvmTextMap> for PV {
+    fn into(self) -> LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("id".to_string(), Entry::String(self.id));

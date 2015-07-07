@@ -345,6 +345,7 @@ pub fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
     Ok(v)
 }
 
+// TODO: More appropriate error type than io::Result
 fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
     let mut ret: LvmTextMap = BTreeMap::new();
 

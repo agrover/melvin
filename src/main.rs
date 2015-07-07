@@ -27,11 +27,14 @@ mod dm_ioctl;
 use parser::LvmTextMap;
 use parser::TextMapOps;
 
+use pvlabel::MDA;
+
 fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
 
     for pv in try!(pvlabel::scan_for_pvs(&dirs)) {
-        let map = try!(pvlabel::textmap_from_dev(pv.as_path()));
+        let mda = try!(MDA::new(&pv));
+        let map = try!(mda.read_metadata());
 
         for (key, value) in map {
             match value {
@@ -58,7 +61,7 @@ fn get_conf() -> Result<LvmTextMap> {
 
 fn main() {
     // println!("A");
-    // let (name, map) = get_first_vg_meta().unwrap();
+    let (name, map) = get_first_vg_meta().unwrap();
     // println!("B {}", name);
     // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
     // println!("heyo {} {}", vg.extents(), vg.extent_size);
@@ -75,7 +78,7 @@ fn main() {
         println!("lv segments {:?}", lv.segments);
     }
 
-    vg.new_linear_lv("grover!!!", 100);
+    vg.new_linear_lv("grover123", 100);
 
     for (lvname, lv) in &vg.lvs {
         println!("lv2 {:?}", lv);

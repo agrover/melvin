@@ -1,7 +1,9 @@
-use std::io::{Read, Result, Error, Seek, SeekFrom};
+use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
-use std::fs;
+use std::fs::{File, read_dir};
+use std::borrow::ToOwned;
+use std::cmp::min;
 
 use byteorder::{LittleEndian, ByteOrder};
 use crc::{crc32, Hasher32};
@@ -9,13 +11,15 @@ use nix::sys::stat;
 
 use parser;
 
-use parser::{LvmTextMap, into_textmap};
+use parser::{LvmTextMap, into_textmap, textmap_serialize};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
 const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
 const INITIAL_CRC: u32 = 0xf597a6cf;
+const CRC_SEED: u32 = 0xedb88320;
 const SECTOR_SIZE: usize = 512;
+const MDA_HEADER_SIZE: usize = 512;
 
 #[derive(Debug)]
 struct LabelHeader {
@@ -148,7 +152,8 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
 }
 
 fn crc32_ok(val: u32, buf: &[u8]) -> bool {
-    let mut digest = crc32::Digest::new(INITIAL_CRC);
+    let mut digest = crc32::Digest::new(CRC_SEED);
+    digest.value = INITIAL_CRC;
     digest.write(&buf);
     let crc32 = digest.sum32();
 
@@ -159,7 +164,7 @@ fn crc32_ok(val: u32, buf: &[u8]) -> bool {
     val == crc32
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 struct RawLocn {
     offset: u64,
     size: u64,
@@ -202,9 +207,9 @@ impl<'a> Iterator for RawLocnIter<'a> {
 
 fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
 
-    let mut f = try!(fs::File::open(path));
+    let mut f = try!(File::open(path));
 
-    let mut buf = vec![0; LABEL_SCAN_SECTORS * 512];
+    let mut buf = vec![0; LABEL_SCAN_SECTORS * SECTOR_SIZE];
 
     try!(f.read(&mut buf));
 
@@ -214,50 +219,135 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
     return Ok(pvheader);
 }
 
-pub fn textmap_from_dev(path: &Path) -> Result<LvmTextMap> {
+fn round_up_to_sector_size(num: u64) -> u64 {
+    let rem = num % SECTOR_SIZE as u64;
 
-    let pvheader = try!(find_pv_in_dev(&path));
+    num + SECTOR_SIZE as u64 - rem
+}
 
-    let mut f = try!(fs::File::open(path));
+#[derive(Debug)]
+pub struct MDA {
+    file: File,
+    area: Vec<u8>,
+    area_offset: u64,
+}
 
-    let mda_areas = pvheader.metadata_areas.len();
-    if mda_areas != 1 {
-        return Err(Error::new(Other, format!("Expecting 1 mda, found {}", mda_areas)));
+impl MDA {
+    pub fn new(path: &Path) -> Result<MDA> {
+        let pvheader = try!(find_pv_in_dev(&path));
+
+        let mut f = try!(File::open(path));
+
+        let mda_areas = pvheader.metadata_areas.len();
+        if mda_areas != 1 {
+            return Err(Error::new(Other, format!("Expecting 1 mda, found {}", mda_areas)));
+        }
+
+        let md = &pvheader.metadata_areas[0];
+        try!(f.seek(SeekFrom::Start(md.offset)));
+        let mut buf = vec![0; md.size as usize];
+        try!(f.read(&mut buf));
+
+        crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..MDA_HEADER_SIZE]);
+
+        if &buf[4..20] != MDA_MAGIC {
+            return Err(Error::new(
+                Other, format!("'{}' doesn't match MDA_MAGIC",
+                               String::from_utf8_lossy(&buf[4..20]))));
+        }
+
+        let ver = LittleEndian::read_u32(&buf[20..24]);
+        if ver != 1 {
+            return Err(Error::new(Other, "Bad version, expected 1"));
+        }
+
+        // TODO: validate these somehow
+        //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
+        //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
+
+        Ok(MDA {
+            file: f,
+            area: buf,
+            area_offset: md.offset,
+        })
     }
 
-    let md = &pvheader.metadata_areas[0];
-    try!(f.seek(SeekFrom::Start(md.offset)));
-    let mut buf = vec![0; md.size as usize];
-    try!(f.read(&mut buf));
+    fn get_rlocn0(&self) -> Result<RawLocn> {
+        let raw_locns: Vec<_> = iter_raw_locn(&self.area[40..]).collect();
+        let rlocn_len = raw_locns.len();
+        if rlocn_len != 1 {
+            return Err(Error::new(Other, format!("Expecting 1 rlocn, found {}", rlocn_len)));
+        }
 
-    crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..512]);
-
-    if &buf[4..20] != MDA_MAGIC {
-        return Err(Error::new(
-            Other, format!("'{}' doesn't match MDA_MAGIC",
-                           String::from_utf8_lossy(&buf[4..20]))));
+        Ok(raw_locns[0].clone())
     }
 
-    let ver = LittleEndian::read_u32(&buf[20..24]);
-    if ver != 1 {
-        return Err(Error::new(Other, "Bad version, expected 1"));
+    fn set_rlocn0(&mut self, rl: &RawLocn) -> Result<()> {
+        let mut raw_locn = &mut self.area[40..];
+
+        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
+        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
+        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+        LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
+
+        // TODO: write MDA header
+
+        Ok(())
     }
 
-    // TODO: validate these somehow
-    //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
-    //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
+    pub fn read_metadata(&self) -> Result<LvmTextMap> {
+        let rl = try!(self.get_rlocn0());
+        let rl_start = rl.offset as usize;
+        let rl_end = rl_start + rl.size as usize;
 
-    let raw_locns: Vec<_> = iter_raw_locn(&buf[40..]).collect();
-    let rlocn_len = raw_locns.len();
-    if rlocn_len != 1 {
-        return Err(Error::new(Other, format!("Expecting 1 rlocn, found {}", rlocn_len)));
+        if rl_end <= self.area.len() {
+            parser::into_textmap(&self.area[rl_start..rl_end])
+        } else {
+            // Split across end/beginning of md area
+            let mut text: Vec<u8> = Vec::new();
+            let remaining = rl_end - self.area.len();
+            text.extend(&self.area[rl_start..rl_end-remaining].to_owned());
+            text.extend(&self.area[MDA_HEADER_SIZE..MDA_HEADER_SIZE+remaining].to_owned());
+            parser::into_textmap(&text)
+        }
     }
 
-    let rl = &raw_locns[0];
-    let rl_start = rl.offset as usize;
-    let rl_end = rl_start + rl.size as usize;
+    pub fn write_textmap_to_next_rlocn(&mut self, map: &LvmTextMap) -> Result<()> {
+        let raw_locn = try!(self.get_rlocn0());
 
-    parser::into_textmap(&buf[rl_start..rl_end])
+        let mut text = textmap_serialize(map);
+        // must end in at least one null...
+        text.push(b'\0');
+        // ...but maybe more, to fill out last sector
+        let added_nulls = vec![0; text.len() % SECTOR_SIZE];
+        text.extend(added_nulls);
+
+        let last_text_end = raw_locn.offset + raw_locn.size;
+        let tail_space = last_text_end - self.area.len() as u64;
+
+        assert_eq!(text.len() % SECTOR_SIZE, 0);
+        assert_eq!(last_text_end % SECTOR_SIZE as u64, 0);
+        assert_eq!(tail_space % SECTOR_SIZE as u64, 0);
+
+        let written = if tail_space != 0 {
+            try!(self.file.seek(
+                SeekFrom::Start(self.area_offset + last_text_end)));
+            try!(self.file.write_all(
+                &text[..min(tail_space as usize, text.len())]));
+            min(tail_space as usize, text.len())
+        } else {
+            0
+        };
+
+        if written != text.len() {
+            try!(self.file.seek(
+                SeekFrom::Start(self.area_offset as u64 + MDA_HEADER_SIZE as u64)));
+            try!(self.file.write_all(
+                &text[written as usize..]));
+        }
+
+        Ok(())
+    }
 }
 
 pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
@@ -265,7 +355,7 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
     let mut ret_vec = Vec::new();
 
     for dir in dirs {
-        ret_vec.extend(try!(fs::read_dir(dir))
+        ret_vec.extend(try!(read_dir(dir))
             .into_iter()
             .filter_map(|dir_e| if dir_e.is_ok() {Some(dir_e.unwrap().path())} else {None})
             .filter(|path| { (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK

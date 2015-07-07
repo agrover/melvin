@@ -1,11 +1,10 @@
 use std::str::FromStr;
-use std::num::ParseIntError;
-use std::io::Error;
-use std::path::Path;
-use std::fs::PathExt;
+use std::io::{BufReader, BufRead};
+use std::path::{Path, PathBuf};
+use std::fs::{File, PathExt};
 use std::os::unix::fs::MetadataExt;
 
-use parser::{LvmTextMap, TextMapOps, Entry};
+use parser::{LvmTextMap, Entry};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Device {
@@ -13,8 +12,32 @@ pub struct Device {
     pub minor: u8,
 }
 
+impl Device {
+    pub fn path(&self) -> Option<PathBuf> {
+        let f = File::open("/proc/partitions")
+            .ok().expect("Could not open /proc/partitions");
+
+        let reader = BufReader::new(f);
+
+        for line in reader.lines().skip(2) {
+            if let Ok(line) = line {
+                let spl: Vec<_> = line
+                    .split(char::is_whitespace)
+                    .filter(|x| x.len() != 0)
+                    .collect();
+                println!("line {:?}", spl);
+
+                if spl[0].parse::<u32>().unwrap() == self.major
+                    && spl[1].parse::<u8>().unwrap() == self.minor {
+                        return Some(PathBuf::from(format!("/dev/{}", spl[3])));
+                    }
+            }
+        }
+        None
+    }
+}
+
 pub enum LvmDeviceError {
-    ParseIntError,
     IoError,
 }
 

@@ -1,8 +1,4 @@
-use std::io::Result;
-use std::io::Error;
-use std::io::ErrorKind::Other;
-use vg::VG;
-use parser::{LvmTextMap, TextMapOps, Entry};
+use parser::{LvmTextMap, Entry};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LV {

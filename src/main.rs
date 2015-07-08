@@ -74,24 +74,19 @@ fn main() {
 
     let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
     let mut vg = vgs.pop().expect("no vgs in vgs");;
-    for (lvname, lv) in &vg.lvs {
-        println!("lv segments {:?}", lv.segments);
-    }
 
     vg.new_linear_lv("grover123", 100);
 
-    for (lvname, lv) in &vg.lvs {
-        println!("lv2 {:?}", lv);
-    }
+    // for (lvname, lv) in &vg.lvs {
+    //     println!("lv2 {:?}", lv);
+    // }
 
-    let tm = get_conf().expect("could not read lvm.conf");
-    let locking_type = tm.textmap_from_textmap("global")
-        .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
+    // let tm = get_conf().expect("could not read lvm.conf");
+    // let locking_type = tm.textmap_from_textmap("global")
+    //     .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
 
-    println!("locking_type = {}", locking_type);
+    // println!("locking_type = {}", locking_type);
 
-    let vgtm = vg.into();
-    println!("new textmap {:?}", vgtm);
-    let s = parser::textmap_serialize(&vgtm);
-    println!("ess {}", String::from_utf8_lossy(&s));
+    // let vgtm = vg.into();
+    // let s = parser::textmap_serialize(&vgtm);
 }

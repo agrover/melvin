@@ -94,6 +94,7 @@ pub struct Lexer<'a> {
     chars: &'a[u8],
     next_byte: Option<u8>,
     cursor: usize,
+    next_is_ident: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -103,6 +104,7 @@ impl<'a> Lexer<'a> {
             chars: chars,
             next_byte: None,
             cursor: 0,
+            next_is_ident: false,
         }
     }
 
@@ -156,6 +158,7 @@ impl<'a> Iterator for Lexer<'a> {
                 Mode::Main => {
                     match c {
                         b'{' => {
+                            self.next_is_ident = true;
                             return Some(Token::CurlyOpen);
                         },
                         b'}' => {
@@ -168,7 +171,11 @@ impl<'a> Iterator for Lexer<'a> {
                             state = Mode::Ident(self.cursor - 1);
                         },
                         b'0' ... b'9' | b'-' => {
-                            state = Mode::Number(self.cursor - 1);
+                            if self.next_is_ident {
+                                state = Mode::Ident(self.cursor - 1);
+                            } else {
+                                state = Mode::Number(self.cursor - 1);
+                            }
                         },
                         b'#' => {
                             state = Mode::Comment(self.cursor - 1);
@@ -212,6 +219,7 @@ impl<'a> Iterator for Lexer<'a> {
                             }
                         _ => {
                             self.put_back(c);
+                            self.next_is_ident = false;
                             return Some(Token::Ident(
                                 &self.chars[first..self.cursor]));
                         }
@@ -224,20 +232,9 @@ impl<'a> Iterator for Lexer<'a> {
                         },
                         _ => {
                             self.put_back(c);
-                            // HACK
-                            // If followed by =, we're not a number we're an ident.
-                            // Only time this should be needed is
-                            // dump() device_to_pvid section. Otherwise idents
-                            // never start with 0..9
-                            if self.chars[self.cursor..self.cursor+2].contains(&b'=') {
-                                return Some(
-                                    Token::Ident(&self.chars[first..self.cursor]));
-                            } else {
-                                let s = String::from_utf8_lossy(
-                                    &self.chars[first..self.cursor]).into_owned();
-                                return Some(
-                                    Token::Number(s.parse().unwrap()));
-                            }
+                            let s = String::from_utf8_lossy(
+                                &self.chars[first..self.cursor]).into_owned();
+                            return Some(Token::Number(s.parse().unwrap()));
                         }
                     }
                 }

@@ -1,7 +1,7 @@
 use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
-use std::fs::{File, read_dir};
+use std::fs::{File, read_dir, OpenOptions};
 use std::borrow::ToOwned;
 use std::cmp::min;
 
@@ -164,6 +164,13 @@ fn crc32_ok(val: u32, buf: &[u8]) -> bool {
     val == crc32
 }
 
+fn crc32_calc(buf: &[u8]) -> u32 {
+    let mut digest = crc32::Digest::new(CRC_SEED);
+    digest.value = INITIAL_CRC;
+    digest.write(&buf);
+    digest.sum32()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 struct RawLocn {
     offset: u64,
@@ -236,7 +243,7 @@ impl MDA {
     pub fn new(path: &Path) -> Result<MDA> {
         let pvheader = try!(find_pv_in_dev(&path));
 
-        let mut f = try!(File::open(path));
+        let mut f = try!(OpenOptions::new().read(true).write(true).open(path));
 
         let mda_areas = pvheader.metadata_areas.len();
         if mda_areas != 1 {
@@ -273,35 +280,44 @@ impl MDA {
         })
     }
 
-    fn get_rlocn0(&self) -> Result<RawLocn> {
+    fn get_rlocn0(&self) -> RawLocn {
         let raw_locns: Vec<_> = iter_raw_locn(&self.area[40..]).collect();
         let rlocn_len = raw_locns.len();
         if rlocn_len != 1 {
-            return Err(Error::new(Other, format!("Expecting 1 rlocn, found {}", rlocn_len)));
+            panic!("Expecting 1 rlocn, found {}", rlocn_len);
         }
 
-        Ok(raw_locns[0].clone())
+        raw_locns[0].clone()
     }
 
     fn set_rlocn0(&mut self, rl: &RawLocn) -> Result<()> {
-        let mut raw_locn = &mut self.area[40..];
 
-        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
-        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
-        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
-        LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
 
-        // TODO: write MDA header
+        {
+            let mut raw_locn = &mut self.area[40..];
+
+            LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
+            LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
+            LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+            LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
+        }
+
+        let csum = crc32_calc(&self.area[4..MDA_HEADER_SIZE]);
+        LittleEndian::write_u32(&mut self.area[..4], csum);
+
+        try!(self.file.seek(SeekFrom::Start(self.area_offset)));
+        try!(self.file.write_all(&mut self.area[..MDA_HEADER_SIZE]));
 
         Ok(())
     }
 
     pub fn read_metadata(&self) -> Result<LvmTextMap> {
-        let rl = try!(self.get_rlocn0());
+        let rl = self.get_rlocn0();
         let rl_start = rl.offset as usize;
         let rl_end = rl_start + rl.size as usize;
 
         if rl_end <= self.area.len() {
+            crc32_ok(rl.checksum, &self.area[rl_start..rl_end]);
             parser::into_textmap(&self.area[rl_start..rl_end])
         } else {
             // Split across end/beginning of md area
@@ -310,30 +326,29 @@ impl MDA {
             text.extend(&self.area[rl_start..rl_end-remaining].to_owned());
             text.extend(
                 &self.area[MDA_HEADER_SIZE..MDA_HEADER_SIZE+remaining].to_owned());
+            crc32_ok(rl.checksum, &text);
             parser::into_textmap(&text)
         }
     }
 
     pub fn write_textmap_to_next_rlocn(&mut self, map: &LvmTextMap) -> Result<()> {
-        let raw_locn = try!(self.get_rlocn0());
+        let mut raw_locn = self.get_rlocn0();
 
         let mut text = textmap_serialize(map);
-        // must end in at least one null...
+        // Ends with one null
         text.push(b'\0');
-        // ...but maybe more, to fill out last sector
-        let added_nulls = vec![0; text.len() % SECTOR_SIZE];
-        text.extend(added_nulls);
 
-        let last_text_end = raw_locn.offset + raw_locn.size;
-        let tail_space = last_text_end - self.area.len() as u64;
+        let start_off =
+            round_up_to_sector_size(raw_locn.offset + raw_locn.size)
+            % self.area.len() as u64;
+        let tail_space = self.area.len() as u64 - start_off;
 
-        assert_eq!(text.len() % SECTOR_SIZE, 0);
-        assert_eq!(last_text_end % SECTOR_SIZE as u64, 0);
+        assert_eq!(start_off % SECTOR_SIZE as u64, 0);
         assert_eq!(tail_space % SECTOR_SIZE as u64, 0);
 
         let written = if tail_space != 0 {
             try!(self.file.seek(
-                SeekFrom::Start(self.area_offset + last_text_end)));
+                SeekFrom::Start(self.area_offset + start_off)));
             try!(self.file.write_all(
                 &text[..min(tail_space as usize, text.len())]));
             min(tail_space as usize, text.len())
@@ -342,11 +357,22 @@ impl MDA {
         };
 
         if written != text.len() {
+            println!("writing2 {} {}", written, text.len());
             try!(self.file.seek(
                 SeekFrom::Start(self.area_offset as u64 + MDA_HEADER_SIZE as u64)));
             try!(self.file.write_all(
                 &text[written as usize..]));
         }
+
+        println!("rlocn {:#?}", raw_locn);
+        raw_locn.offset = start_off;
+        raw_locn.size = text.len() as u64;
+        raw_locn.checksum = crc32_calc(&text);
+        println!("rlocn {:#?}", raw_locn);
+
+        try!(self.set_rlocn0(&raw_locn));
+
+        println!("new rlocn {:#?}", self.get_rlocn0());
 
         Ok(())
     }

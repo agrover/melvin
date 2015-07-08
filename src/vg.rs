@@ -9,7 +9,8 @@ use nix;
 
 use lv::{LV, Segment};
 use pv::PV;
-use parser::{LvmTextMap, TextMapOps, Entry};
+use parser::{LvmTextMap, Entry};
+use pvlabel::MDA;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
@@ -69,7 +70,7 @@ impl VG {
 
         let segment = Segment {
             name: "segment1".to_string(),
-            start_extent: area_start,
+            start_extent: 0,
             extent_count: extent_size,
             ty: "striped".to_string(),
             stripes: vec![(pv_with_area, area_start)],
@@ -89,8 +90,14 @@ impl VG {
 
         self.lvs.insert(name.to_string(), lv);
 
-        // write metadata to metadata areas
-        // commit metadata
+        for (name, pv) in &self.pvs {
+            if let Some(path) = pv.device.path() {
+                let mut mda = MDA::new(&path).expect("could not open MDA");
+
+                mda.write_textmap_to_next_rlocn(&self.clone().into());
+            }
+        }
+
         // tell lvmetad
         // poke dm and tell it about a new device
         // open champagne

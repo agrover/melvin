@@ -61,8 +61,8 @@ pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
 
     let mut stream = try!(UnixStream::connect(LVMETAD_PATH));
 
-    let mut response = try!(_request(s, Some(token), &mut stream, args)
-        .and_then(|r| into_textmap(&r)));
+    let txt = try!(_request(s, Some(token), &mut stream, args));
+    let mut response = try!(into_textmap(&txt));
 
     if try!(response.string_from_textmap("response").ok_or(err())) == "token_mismatch" {
         try!(_request(b"token_update", Some(token), &mut stream, None));

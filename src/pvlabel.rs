@@ -6,7 +6,7 @@ use std::borrow::ToOwned;
 use std::cmp::min;
 
 use byteorder::{LittleEndian, ByteOrder};
-use crc::{crc32, Hasher32};
+use crc::crc32;
 use nix::sys::stat;
 
 use parser;
@@ -152,12 +152,8 @@ fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
 }
 
 fn crc32_ok(val: u32, buf: &[u8]) -> bool {
-    let mut digest = crc32::Digest::new(CRC_SEED);
-    digest.value = INITIAL_CRC;
-    digest.write(&buf);
-    let crc32 = digest.sum32();
+    let crc32 = crc32_calc(buf);
 
-    // TODO: all our crcs are failing, how come?
     if val != crc32 {
         println!("CRC32: input {:x} != calculated {:x}", val, crc32);
     }
@@ -165,10 +161,11 @@ fn crc32_ok(val: u32, buf: &[u8]) -> bool {
 }
 
 fn crc32_calc(buf: &[u8]) -> u32 {
-    let mut digest = crc32::Digest::new(CRC_SEED);
-    digest.value = INITIAL_CRC;
-    digest.write(&buf);
-    digest.sum32()
+    let table = crc32::make_table(CRC_SEED);
+
+    // For some reason, we need to negate the initial CRC value
+    // and the result, to match what LVM2 is generating.
+    !crc32::update(!INITIAL_CRC, &table, buf)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -256,7 +253,9 @@ impl MDA {
         let mut buf = vec![0; md.size as usize];
         try!(f.read(&mut buf));
 
-        crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..MDA_HEADER_SIZE]);
+        if !crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..MDA_HEADER_SIZE]) {
+            return Err(Error::new(Other, "MDA header checksum failure"));
+        }
 
         if &buf[4..20] != MDA_MAGIC {
             return Err(Error::new(

@@ -94,7 +94,7 @@ impl VG {
             if let Some(path) = pv.device.path() {
                 let mut mda = MDA::new(&path).expect("could not open MDA");
 
-                mda.write_textmap_to_next_rlocn(&self.clone().into());
+                mda.write_metadata(&self.clone().into());
             }
         }
 

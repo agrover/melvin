@@ -33,7 +33,7 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
 
     for pv in try!(pvlabel::scan_for_pvs(&dirs)) {
-        let mda = try!(MDA::new(&pv));
+        let mut mda = try!(MDA::new(&pv));
         let map = try!(mda.read_metadata());
 
         for (key, value) in map {
@@ -72,10 +72,10 @@ fn main() {
     //     Err(x) => println!("error {}", x),
     // }
 
-    let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
-    let mut vg = vgs.pop().expect("no vgs in vgs");;
+    //let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
+    //let mut vg = vgs.pop().expect("no vgs in vgs");;
 
-    vg.new_linear_lv("grover123", 100);
+    //vg.new_linear_lv("grover123", 100);
 
     // for (lvname, lv) in &vg.lvs {
     //     println!("lv2 {:?}", lv);
@@ -89,4 +89,5 @@ fn main() {
 
     // let vgtm = vg.into();
     // let s = parser::textmap_serialize(&vgtm);
+
 }

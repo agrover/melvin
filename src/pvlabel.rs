@@ -213,7 +213,7 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
 
     let mut f = try!(File::open(path));
 
-    let mut buf = vec![0; LABEL_SCAN_SECTORS * SECTOR_SIZE];
+    let mut buf = [0u8; LABEL_SCAN_SECTORS * SECTOR_SIZE];
 
     try!(f.read(&mut buf));
 
@@ -229,11 +229,11 @@ fn round_up_to_sector_size(num: u64) -> u64 {
     num + SECTOR_SIZE as u64 - rem
 }
 
-#[derive(Debug)]
 pub struct MDA {
     file: File,
-    area: Vec<u8>,
+    hdr: [u8; MDA_HEADER_SIZE],
     area_offset: u64,
+    area_len: u64,
 }
 
 impl MDA {
@@ -249,8 +249,9 @@ impl MDA {
         }
 
         let md = &pvheader.metadata_areas[0];
+        assert!(md.size as usize > MDA_HEADER_SIZE);
         try!(f.seek(SeekFrom::Start(md.offset)));
-        let mut buf = vec![0; md.size as usize];
+        let mut buf = [0; MDA_HEADER_SIZE];
         try!(f.read(&mut buf));
 
         if !crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..MDA_HEADER_SIZE]) {
@@ -274,13 +275,24 @@ impl MDA {
 
         Ok(MDA {
             file: f,
-            area: buf,
+            hdr: buf,
             area_offset: md.offset,
+            area_len: md.size,
         })
     }
 
+    fn write_mda_header(&mut self) -> Result<()> {
+        let csum = crc32_calc(&self.hdr[4..]);
+        LittleEndian::write_u32(&mut self.hdr[..4], csum);
+
+        try!(self.file.seek(SeekFrom::Start(self.area_offset)));
+        try!(self.file.write_all(&mut self.hdr));
+
+        Ok(())
+    }
+
     fn get_rlocn0(&self) -> RawLocn {
-        let raw_locns: Vec<_> = iter_raw_locn(&self.area[40..]).collect();
+        let raw_locns: Vec<_> = iter_raw_locn(&self.hdr[40..]).collect();
         let rlocn_len = raw_locns.len();
         if rlocn_len != 1 {
             panic!("Expecting 1 rlocn, found {}", rlocn_len);
@@ -289,58 +301,49 @@ impl MDA {
         raw_locns[0].clone()
     }
 
-    fn set_rlocn0(&mut self, rl: &RawLocn) -> Result<()> {
+    fn set_rlocn0(&mut self, rl: &RawLocn) -> () {
+        let mut raw_locn = &mut self.hdr[40..];
 
-
-        {
-            let mut raw_locn = &mut self.area[40..];
-
-            LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
-            LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
-            LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
-            LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
-        }
-
-        let csum = crc32_calc(&self.area[4..MDA_HEADER_SIZE]);
-        LittleEndian::write_u32(&mut self.area[..4], csum);
-
-        try!(self.file.seek(SeekFrom::Start(self.area_offset)));
-        try!(self.file.write_all(&mut self.area[..MDA_HEADER_SIZE]));
-
-        Ok(())
+        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
+        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
+        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+        LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
     }
 
-    pub fn read_metadata(&self) -> Result<LvmTextMap> {
+    pub fn read_metadata(&mut self) -> Result<LvmTextMap> {
         let rl = self.get_rlocn0();
-        let rl_start = rl.offset as usize;
-        let rl_end = rl_start + rl.size as usize;
 
-        if rl_end <= self.area.len() {
-            crc32_ok(rl.checksum, &self.area[rl_start..rl_end]);
-            parser::into_textmap(&self.area[rl_start..rl_end])
-        } else {
-            // Split across end/beginning of md area
-            let mut text: Vec<u8> = Vec::new();
-            let remaining = rl_end - self.area.len();
-            text.extend(&self.area[rl_start..rl_end-remaining].to_owned());
-            text.extend(
-                &self.area[MDA_HEADER_SIZE..MDA_HEADER_SIZE+remaining].to_owned());
-            crc32_ok(rl.checksum, &text);
-            parser::into_textmap(&text)
+        let mut text = vec![0; rl.size as usize];
+        let first_read = min(self.area_len - rl.offset, rl.size) as usize;
+        try!(self.file.seek(SeekFrom::Start(self.area_offset + rl.offset)));
+        try!(self.file.read(&mut text[..first_read]));
+
+        if first_read != rl.size as usize {
+            try!(self.file.seek(SeekFrom::Start(
+                self.area_offset + MDA_HEADER_SIZE as u64)));
+            try!(self.file.read(&mut text[rl.size as usize - first_read..]));
         }
+
+        if crc32_ok(rl.checksum, &text) == false {
+            return Err(Error::new(Other, "MDA text checksum failure"));
+        }
+
+        parser::into_textmap(&text)
     }
 
-    pub fn write_textmap_to_next_rlocn(&mut self, map: &LvmTextMap) -> Result<()> {
-        let mut raw_locn = self.get_rlocn0();
+    pub fn write_metadata(&mut self, map: &LvmTextMap) -> Result<()> {
+        let raw_locn = self.get_rlocn0();
 
         let mut text = textmap_serialize(map);
         // Ends with one null
         text.push(b'\0');
 
-        let start_off =
-            round_up_to_sector_size(raw_locn.offset + raw_locn.size)
-            % self.area.len() as u64;
-        let tail_space = self.area.len() as u64 - start_off;
+        // start at next sector in loop, but skip 0th sector
+        let start_off = min(MDA_HEADER_SIZE as u64,
+                            (round_up_to_sector_size(
+                                raw_locn.offset + raw_locn.size)
+                             % self.area_len as u64));
+        let tail_space = self.area_len as u64 - start_off;
 
         assert_eq!(start_off % SECTOR_SIZE as u64, 0);
         assert_eq!(tail_space % SECTOR_SIZE as u64, 0);
@@ -356,24 +359,21 @@ impl MDA {
         };
 
         if written != text.len() {
-            println!("writing2 {} {}", written, text.len());
             try!(self.file.seek(
                 SeekFrom::Start(self.area_offset as u64 + MDA_HEADER_SIZE as u64)));
             try!(self.file.write_all(
                 &text[written as usize..]));
         }
 
-        println!("rlocn {:#?}", raw_locn);
-        raw_locn.offset = start_off;
-        raw_locn.size = text.len() as u64;
-        raw_locn.checksum = crc32_calc(&text);
-        println!("rlocn {:#?}", raw_locn);
+        self.set_rlocn0(
+            &RawLocn {
+                offset: start_off,
+                size: text.len() as u64,
+                checksum: crc32_calc(&text),
+                flags: 0
+            });
 
-        try!(self.set_rlocn0(&raw_locn));
-
-        println!("new rlocn {:#?}", self.get_rlocn0());
-
-        Ok(())
+        self.write_mda_header()
     }
 }
 

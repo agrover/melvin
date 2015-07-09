@@ -315,6 +315,7 @@ impl MDA {
 
         let mut text = vec![0; rl.size as usize];
         let first_read = min(self.area_len - rl.offset, rl.size) as usize;
+
         try!(self.file.seek(SeekFrom::Start(self.area_offset + rl.offset)));
         try!(self.file.read(&mut text[..first_read]));
 
@@ -324,7 +325,7 @@ impl MDA {
             try!(self.file.read(&mut text[rl.size as usize - first_read..]));
         }
 
-        if crc32_ok(rl.checksum, &text) == false {
+        if !crc32_ok(rl.checksum, &text) {
             return Err(Error::new(Other, "MDA text checksum failure"));
         }
 

@@ -43,17 +43,15 @@ pub enum LvmDeviceError {
 impl FromStr for Device {
     type Err = LvmDeviceError;
     fn from_str(s: &str) -> Result<Device, LvmDeviceError> {
-        let val = match s.parse::<i64>() {
-            Ok(x) => x,
+        match s.parse::<i64>() {
+            Ok(x) => Ok(Device::from(x)),
             Err(_) => {
-                let path = Path::new(s);
-                match path.metadata() {
-                    Ok(x) => x.dev() as i64,
-                    Err(_) => return Err(LvmDeviceError::IoError)
+                match Path::new(s).metadata() {
+                    Ok(x) => Ok(Device::from(x.dev() as i64)),
+                    Err(_) => Err(LvmDeviceError::IoError)
                 }
             }
-        };
-        Ok(Device::from(val))
+        }
     }
 }
 
@@ -76,7 +74,7 @@ pub struct PV {
     pub device: Device,
     pub status: Vec<String>,
     pub flags: Vec<String>,
-    pub dev_size: u64,
+    pub dev_size: u64, // in bytes
     pub pe_start: u64, // in sectors
     pub pe_count: u64, // in extents
 }

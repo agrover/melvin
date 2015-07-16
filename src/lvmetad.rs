@@ -4,9 +4,18 @@ use std::io::{Result, Read, Write};
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
-use parser::{LvmTextMap, TextMapOps, into_textmap};
+use std::collections::btree_map::BTreeMap;
+
+use parser::{
+    LvmTextMap,
+    TextMapOps,
+    buf_to_textmap,
+    vg_from_textmap,
+    textmap_to_buf,
+    Entry,
+};
 use vg;
-use parser;
+
 
 const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
 
@@ -31,43 +40,45 @@ fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
 pub fn _request(s: &[u8],
                 token: Option<&[u8]>,
                 stream: &mut UnixStream,
-                args: Option<&[&[u8]]>) -> Result<Vec<u8>> {
-    try!(stream.write_all(b"request = \""));
-    try!(stream.write_all(s));
-    try!(stream.write_all(b"\"\n"));
+                args: &Option<Vec<&[u8]>>) -> Result<Vec<u8>> {
+
+    let mut v = Vec::new();
+    v.extend(b"request = \"");
+    v.extend(s);
+    v.extend(b"\"\n");
 
     if let Some(token) = token {
-        try!(stream.write_all(b"token = \""));
-        try!(stream.write_all(token));
-        try!(stream.write_all(b"\"\n"));
-        try!(stream.write_all(b"\n"));
+        v.extend(b"token = \"filter:");
+        v.extend(token);
+        v.extend(b"\"\n");
     }
 
-    if let Some(args) = args {
+    if let &Some(ref args) = args {
         for arg in args {
-            try!(stream.write_all(arg));
-            try!(stream.write_all(b"\n"));
+            v.extend(arg.clone());
+            v.extend(b"\n");
         }
     }
 
+    try!(stream.write_all(&v));
     try!(stream.write_all(b"\n##\n"));
 
     collect_response(stream)
 }
 
-pub fn request(s: &[u8], args: Option<&[&[u8]]>) -> Result<LvmTextMap> {
+pub fn request(s: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");
     let token = b"0";
 
     let mut stream = try!(UnixStream::connect(LVMETAD_PATH));
 
-    let txt = try!(_request(s, Some(token), &mut stream, args));
-    let mut response = try!(into_textmap(&txt));
+    let txt = try!(_request(s, Some(token), &mut stream, &args));
+    let mut response = try!(buf_to_textmap(&txt));
 
     if try!(response.string_from_textmap("response").ok_or(err())) == "token_mismatch" {
-        try!(_request(b"token_update", Some(token), &mut stream, None));
-        response = try!(_request(s, Some(token), &mut stream, args)
-            .and_then(|r| into_textmap(&r)));
+        try!(_request(b"token_update", Some(token), &mut stream, &None));
+        response = try!(_request(s, Some(token), &mut stream, &args)
+            .and_then(|r| buf_to_textmap(&r)));
     }
 
     if response.get("global_invalid").is_some() || response.get("vg_invalid").is_some() {
@@ -105,10 +116,10 @@ pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
         option.extend(b"\"");
         let options = vec!(&option[..]);
 
-        let vg_info = try!(request(b"vg_lookup", Some(&options[..])));
+        let vg_info = try!(request(b"vg_lookup", Some(options)));
         let md = try!(vg_info.textmap_from_textmap("metadata").ok_or(err()));
 
-        let vg = parser::vg_from_textmap(&name, md).expect("didn't get vg!");
+        let vg = vg_from_textmap(&name, md).expect("didn't get vg!");
 
         v.push(vg);
     }

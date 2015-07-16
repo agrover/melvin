@@ -25,7 +25,6 @@ mod pv;
 mod dm_ioctl;
 
 use parser::LvmTextMap;
-use parser::TextMapOps;
 
 use pvlabel::MDA;
 

@@ -4,15 +4,12 @@ use std::io::{Result, Read, Write};
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
-use std::collections::btree_map::BTreeMap;
-
 use parser::{
     LvmTextMap,
     TextMapOps,
     buf_to_textmap,
     vg_from_textmap,
     textmap_to_buf,
-    Entry,
 };
 use vg;
 

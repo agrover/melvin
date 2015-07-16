@@ -2,7 +2,6 @@ use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
 use std::fs::{File, read_dir, OpenOptions};
-use std::borrow::ToOwned;
 use std::cmp::min;
 
 use byteorder::{LittleEndian, ByteOrder};

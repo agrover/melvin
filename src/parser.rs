@@ -437,7 +437,7 @@ fn device_from_textmap(map: &LvmTextMap) -> io::Result<Device> {
         Some(&Entry::String(ref x)) => {
             match Device::from_str(x) {
                 Ok(x) => Ok(x),
-                Err(x) => Err(Error::new(Other, "could not parse string"))
+                Err(_) => Err(Error::new(Other, "could not parse string"))
             }
         },
         Some(&Entry::Number(x)) => Ok(Device::from(x)),

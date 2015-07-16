@@ -94,11 +94,11 @@ impl VG {
         let map = self.clone().into();
 
         // TODO: atomicity of updating pvs, metad, dm
-        for (name, pv) in &self.pvs {
+        for pv in self.pvs.values() {
             if let Some(path) = pv.device.path() {
                 let mut mda = MDA::new(&path).expect("could not open MDA");
 
-                mda.write_metadata(&map);
+                try!(mda.write_metadata(&map));
             }
         }
 

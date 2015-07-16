@@ -115,3 +115,30 @@ pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
 
     Ok(v)
 }
+
+pub fn vg_update_lvmetad(map: &LvmTextMap) -> Result<()> {
+
+    assert_eq!(map.len(), 1);
+
+    let k = map.keys().next().unwrap();
+    let v = map.textmap_from_textmap(k).unwrap();
+
+    let mut option = Vec::new();
+    option.extend(b"vgname = \"");
+    option.extend(k.as_bytes());
+    option.extend(b"\"");
+
+    let mut option2 = Vec::new();
+    option2.extend(b"metadata {");
+    option2.extend(textmap_to_buf(v));
+    option2.extend(b"}");
+
+    let mut options: Vec<&[u8]> = Vec::new();
+
+    options.push(&option);
+    options.push(&option2);
+
+    try!(request(b"vg_update", Some(options)));
+
+    Ok(())
+}

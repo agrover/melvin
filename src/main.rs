@@ -56,7 +56,7 @@ fn get_conf() -> Result<LvmTextMap> {
     let mut buf = Vec::new();
     try!(f.read_to_end(&mut buf));
 
-    parser::into_textmap(&buf)
+    parser::buf_to_textmap(&buf)
 }
 
 fn main() {

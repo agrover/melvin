@@ -403,7 +403,7 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
     Ok(ret)
 }
 
-pub fn into_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
+pub fn buf_to_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 
     let mut tokens: Vec<Token> = Vec::new();
 
@@ -614,7 +614,7 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
     Ok(vg)
 }
 
-pub fn textmap_serialize(tm: &LvmTextMap) -> Vec<u8> {
+pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
     let mut vec = Vec::new();
 
     for (k, v) in tm {
@@ -648,7 +648,7 @@ pub fn textmap_serialize(tm: &LvmTextMap) -> Vec<u8> {
             &Entry::TextMap(ref x) => {
                 vec.extend(k.as_bytes());
                 vec.extend(b" {\n");
-                vec.extend(textmap_serialize(x));
+                vec.extend(textmap_to_buf(x));
                 vec.extend(b"}\n");
 
             }

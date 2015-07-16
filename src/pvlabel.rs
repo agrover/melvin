@@ -11,7 +11,7 @@ use nix::sys::stat;
 
 use parser;
 
-use parser::{LvmTextMap, into_textmap, textmap_serialize};
+use parser::{LvmTextMap, buf_to_textmap, textmap_to_buf};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -329,13 +329,13 @@ impl MDA {
             return Err(Error::new(Other, "MDA text checksum failure"));
         }
 
-        parser::into_textmap(&text)
+        parser::buf_to_textmap(&text)
     }
 
     pub fn write_metadata(&mut self, map: &LvmTextMap) -> Result<()> {
         let raw_locn = self.get_rlocn0();
 
-        let mut text = textmap_serialize(map);
+        let mut text = textmap_to_buf(map);
         // Ends with one null
         text.push(b'\0');
 

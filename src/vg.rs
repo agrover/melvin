@@ -11,6 +11,7 @@ use lv::{LV, Segment};
 use pv::PV;
 use parser::{LvmTextMap, Entry};
 use pvlabel::MDA;
+use lvmetad::vg_update_lvmetad;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
@@ -90,13 +91,18 @@ impl VG {
 
         self.lvs.insert(name.to_string(), lv);
 
+        let map = self.clone().into();
+
+        // TODO: atomicity of updating pvs, metad, dm
         for (name, pv) in &self.pvs {
             if let Some(path) = pv.device.path() {
                 let mut mda = MDA::new(&path).expect("could not open MDA");
 
-                mda.write_metadata(&self.clone().into());
+                mda.write_metadata(&map);
             }
         }
+
+        try!(vg_update_lvmetad(&map));
 
         // tell lvmetad
         // poke dm and tell it about a new device

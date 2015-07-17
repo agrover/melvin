@@ -21,10 +21,7 @@ impl Device {
 
         for line in reader.lines().skip(2) {
             if let Ok(line) = line {
-                let spl: Vec<_> = line
-                    .split(char::is_whitespace)
-                    .filter(|x| x.len() != 0)
-                    .collect();
+                let spl: Vec<_> = line.split_whitespace().collect();
 
                 if spl[0].parse::<u32>().unwrap() == self.major
                     && spl[1].parse::<u8>().unwrap() == self.minor {

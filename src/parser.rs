@@ -593,8 +593,10 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
     let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
                    .and_then(|tm| pvs_from_textmap(tm)));
 
-    let lvs = try!(map.textmap_from_textmap("logical_volumes").ok_or(err())
-                   .and_then(|tm| lvs_from_textmap(tm)));
+    let lvs = match map.textmap_from_textmap("logical_volumes") {
+        Some(ref x) => try!(lvs_from_textmap(x)),
+        None => BTreeMap::new(),
+    };
 
     let vg = VG {
         name: name.to_string(),

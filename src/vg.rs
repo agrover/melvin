@@ -150,6 +150,14 @@ impl VG {
                 });
         }
 
+        for (pvname, pv) in &self.pvs {
+            if !free_map.contains_key(pvname) {
+                let mut map = BTreeMap::new();
+                map.insert(0, pv.pe_count);
+                free_map.insert(pvname.clone(), map);
+            }
+        }
+
         free_map
     }
 }

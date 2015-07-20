@@ -183,7 +183,7 @@ impl <'a> DM<'a> {
         let mut buf: Vec<u8> = Vec::with_capacity(hdr.data_size as usize);
         unsafe {
             let ptr: *mut u8 = mem::transmute(&mut hdr);
-            let slc = slice::from_raw_parts(ptr, hdr_len as usize);
+            let slc = slice::from_raw_parts(ptr, hdr.data_start as usize);
             buf.extend(slc);
         }
 

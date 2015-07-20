@@ -38,6 +38,24 @@ impl <'a> DM<'a> {
         })
     }
 
+    fn initialize_hdr(hdr: &mut dmi::Struct_dm_ioctl) -> () {
+        hdr.version[0] = DM_VERSION_MAJOR;
+        hdr.version[1] = DM_VERSION_MINOR;
+        hdr.version[2] = DM_VERSION_PATCHLEVEL;
+
+        hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
+    }
+
+    fn hdr_set_name(hdr: &mut dmi::Struct_dm_ioctl, name: &[u8]) -> () {
+        let name_dest: &mut [u8; 128] = unsafe { mem::transmute(&mut hdr.name) };
+        copy_memory(name, &mut name_dest[..]);
+    }
+
+    fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, uuid: &[u8]) -> () {
+        let uuid_dest: &mut [u8; 129] = unsafe { mem::transmute(&mut hdr.uuid) };
+        copy_memory(uuid, &mut uuid_dest[..]);
+    }
+
     fn get_version(&self) -> io::Result<(u32, u32, u32)> {
 
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
@@ -57,19 +75,11 @@ impl <'a> DM<'a> {
     }
 
     fn list_devices(&self) -> io::Result<Vec<(String, u64)>> {
+        let mut buf = [0u8; 16 * 1024];
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 
-        let mut devs = Vec::new();
-
-        let mut buf = [0u8; 10240];
-
-        let hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
-
-        let hdr_size = mem::size_of::<dmi::Struct_dm_ioctl>();
-        hdr.version[0] = DM_VERSION_MAJOR;
-        hdr.version[1] = DM_VERSION_MINOR;
-        hdr.version[2] = DM_VERSION_PATCHLEVEL;
+        Self::initialize_hdr(&mut hdr);
         hdr.data_size = buf.len() as u32;
-        hdr.data_start = hdr_size as u32;
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_LIST_DEVICES_CMD as u8, buf.len());
 
@@ -78,8 +88,9 @@ impl <'a> DM<'a> {
             _ => {},
         };
 
-        if (hdr.data_size - hdr_size as u32) != 0 {
-            let mut result = &buf[hdr_size..];
+        let mut devs = Vec::new();
+        if (hdr.data_size - hdr.data_start as u32) != 0 {
+            let mut result = &buf[hdr.data_start as usize..];
 
             loop {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
@@ -96,23 +107,14 @@ impl <'a> DM<'a> {
         Ok(devs)
     }
 
-    fn initialize_hdr(lv: &LV, hdr: &mut dmi::Struct_dm_ioctl) -> () {
-        hdr.version[0] = DM_VERSION_MAJOR;
-        hdr.version[1] = DM_VERSION_MINOR;
-        hdr.version[2] = DM_VERSION_PATCHLEVEL;
-
-        // Transmute [i8; 128] to [u8; 128]
-        let name_dest: &mut [u8; 128] = unsafe { mem::transmute(&mut hdr.name) };
-        copy_memory(&lv.name.as_bytes(), &mut name_dest[..]);
-
-        let uuid_dest: &mut [u8; 129] = unsafe { mem::transmute(&mut hdr.uuid) };
-        copy_memory(&lv.id.as_bytes(), &mut uuid_dest[..]);
-    }
-
     fn create_device(&self, lv: &mut LV) -> io::Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
-        Self::initialize_hdr(lv, &mut hdr);
+        Self::initialize_hdr(&mut hdr);
+        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
+        // TODO: concat uuid or something?
+        //Self::hdr_set_uuid(&mut hdr, lv.uuid);
+        hdr.data_size = hdr.data_start;
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_CREATE_CMD as u8,
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
@@ -129,54 +131,55 @@ impl <'a> DM<'a> {
 
     fn load_device(&self, lv: &LV) -> io::Result<()> {
         let sectors_per_extent = self.vg.extent_size;
-        let mut tgt = Vec::new();
+        let mut targs = Vec::new();
 
+        // Construct targets first, since we need to know how many & size
+        // before initializing the header.
         for seg in &lv.segments {
             for &(ref pvname, ref loc) in &seg.stripes {
                 let err = || Error::new(Other, "dm load_device error");
                 let pv = try!(self.vg.pvs.get(pvname).ok_or(err()));
 
-                let mut ts: dmi::Struct_dm_target_spec = Default::default();
-                ts.sector_start = seg.start_extent * sectors_per_extent;
-                ts.length = seg.extent_count * sectors_per_extent;
-                ts.status = 0;
+                let mut targ: dmi::Struct_dm_target_spec = Default::default();
+                targ.sector_start = seg.start_extent * sectors_per_extent;
+                targ.length = seg.extent_count * sectors_per_extent;
+                targ.status = 0;
 
                 let mut dst: &mut [u8] = unsafe {
-                    mem::transmute(&mut ts.target_type[..])
+                    mem::transmute(&mut targ.target_type[..])
                 };
-                copy_memory(b"linear", &mut dst);
+                copy_memory(seg.ty.as_bytes(), &mut dst);
 
                 let mut params = Vec::new();
-                params.extend(format!("{}:{} {}",
-                                      pv.device.major,
-                                      pv.device.minor,
-                                      (loc * sectors_per_extent) + pv.pe_start).as_bytes());
+                params.extend(
+                    format!("{}:{} {}",
+                            pv.device.major,
+                            pv.device.minor,
+                            (loc * sectors_per_extent) + pv.pe_start).as_bytes());
 
                 let pad_bytes = align_to(
                     params.len() + 1usize, 8usize) - params.len();
                 params.extend(vec![0; pad_bytes]);
 
-                ts.next = (mem::size_of::<dmi::Struct_dm_target_spec>()
+                targ.next = (mem::size_of::<dmi::Struct_dm_target_spec>()
                            + params.len()) as u32;
 
-                tgt.push((ts, params));
+                targs.push((targ, params));
             }
         }
 
-        let targets_len: u32 = tgt
-            .iter()
-            .map(|&(ts, _)| ts.next)
-            .sum();
-
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
-        let hdr_len = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
 
-        Self::initialize_hdr(lv, &mut hdr);
+        Self::initialize_hdr(&mut hdr);
+        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
 
-        hdr.data_start = hdr_len as u32;
-        hdr.data_size = hdr_len + targets_len;
-        hdr.target_count = tgt.len() as u32;
+        hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
+        hdr.data_size = hdr.data_start + targs.iter()
+            .map(|&(t, _)| t.next)
+            .sum::<u32>();
+        hdr.target_count = targs.len() as u32;
 
+        // Flatten into buf
         let mut buf: Vec<u8> = Vec::with_capacity(hdr.data_size as usize);
         unsafe {
             let ptr: *mut u8 = mem::transmute(&mut hdr);
@@ -184,9 +187,9 @@ impl <'a> DM<'a> {
             buf.extend(slc);
         }
 
-        for (ts, param) in tgt {
+        for (targ, param) in targs {
             unsafe {
-                let ptr: *mut u8 = mem::transmute(&ts);
+                let ptr: *mut u8 = mem::transmute(&targ);
                 let slc = slice::from_raw_parts(
                     ptr, mem::size_of::<dmi::Struct_dm_target_spec>());
                 buf.extend(slc);
@@ -195,11 +198,9 @@ impl <'a> DM<'a> {
             buf.extend(&param);
         }
 
-        println!("FF {} {}", hdr_len, buf.len());
-
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_LOAD_CMD as u8, buf.len());
 
-        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
+        match unsafe { ioctl::read_into_ptr(self.file.as_raw_fd(), op, buf.as_mut_ptr()) } {
             Err(_) => return Err((io::Error::last_os_error())),
             _ => Ok(())
         }
@@ -208,9 +209,10 @@ impl <'a> DM<'a> {
     fn resume_device(&self, lv: &LV) -> io::Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
-        Self::initialize_hdr(lv, &mut hdr);
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = hdr.data_start;
+        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
 
-        // TODO: broken, need to pass some flags
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
@@ -225,10 +227,6 @@ impl <'a> DM<'a> {
     pub fn activate_device(&self, lv: &mut LV) -> io::Result<()> {
 
         // TODO: name/uuid mangle?
-
-        try!(self.get_version());
-
-        try!(self.list_devices());
 
         try!(self.create_device(lv));
 

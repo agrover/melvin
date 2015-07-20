@@ -72,10 +72,11 @@ fn main() {
     //     Err(x) => println!("error {}", x),
     // }
 
-    //let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
-    //let mut vg = vgs.pop().expect("no vgs in vgs");;
+    let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
+    let mut vg = vgs.pop().expect("no vgs in vgs");;
 
-    //vg.new_linear_lv("grover123", 100);
+    vg.new_linear_lv("grover125", 100);
+    vg.new_linear_lv("grover126", 200);
 
     // for (lvname, lv) in &vg.lvs {
     //     println!("lv2 {:?}", lv);

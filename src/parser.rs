@@ -565,6 +565,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, LV>> {
             creation_host: creation_host.to_string(),
             creation_time: creation_time,
             segments: segments,
+            device: None,
             });
     }
 

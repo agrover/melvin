@@ -1,4 +1,5 @@
 use parser::{LvmTextMap, Entry};
+use pv::Device;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LV {
@@ -9,6 +10,7 @@ pub struct LV {
     pub creation_host: String,
     pub creation_time: i64,
     pub segments: Vec<Segment>,
+    pub device: Option<Device>,
 }
 
 impl LV {

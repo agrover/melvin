@@ -12,6 +12,7 @@ use pv::PV;
 use parser::{LvmTextMap, Entry};
 use pvlabel::MDA;
 use lvmetad::vg_update_lvmetad;
+use dm::DM;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
@@ -77,7 +78,7 @@ impl VG {
             stripes: vec![(pv_with_area, area_start)],
         };
 
-        let lv = LV {
+        let mut lv = LV {
             name: name.to_string(),
             id: Uuid::new_v4().to_hyphenated_string(),
             status: vec!["READ".to_string(),
@@ -87,26 +88,32 @@ impl VG {
             creation_host: nix::sys::utsname::uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
             segments: vec![segment],
+            device: None,
         };
+
+        // poke dm and tell it about a new device
+        {
+            let dm = try!(DM::new(self));
+            try!(dm.activate_device(&mut lv));
+        }
 
         self.lvs.insert(name.to_string(), lv);
 
-        let map = self.clone().into();
+        // let map = self.clone().into();
 
-        // TODO: atomicity of updating pvs, metad, dm
-        for pv in self.pvs.values() {
-            if let Some(path) = pv.device.path() {
-                let mut mda = MDA::new(&path).expect("could not open MDA");
+        // // TODO: atomicity of updating pvs, metad, dm
+        // for pv in self.pvs.values() {
+        //     if let Some(path) = pv.device.path() {
+        //         let mut mda = MDA::new(&path).expect("could not open MDA");
 
-                try!(mda.write_metadata(&map));
-            }
-        }
+        //         try!(mda.write_metadata(&map));
+        //     }
+        // }
 
-        try!(vg_update_lvmetad(&map));
+        // // tell lvmetad
+        // try!(vg_update_lvmetad(&map));
 
-        // tell lvmetad
-        // poke dm and tell it about a new device
-        // open champagne
+        // open champagne ?
 
         Ok(())
     }

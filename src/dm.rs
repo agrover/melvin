@@ -14,6 +14,8 @@ use nix::sys::ioctl;
 use dm_ioctl as dmi;
 use lv::LV;
 use vg::VG;
+use util::align_to;
+use pv;
 
 const DM_IOCTL: u8 = 0xfd;
 const DM_CTL_PATH: &'static str= "/dev/mapper/control";
@@ -106,7 +108,7 @@ impl <'a> DM<'a> {
         copy_memory(&lv.id.as_bytes(), &mut uuid_dest[..]);
     }
 
-    fn create_device(&self, lv: &LV) -> io::Result<()> {
+    fn create_device(&self, lv: &mut LV) -> io::Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(lv, &mut hdr);
@@ -116,62 +118,112 @@ impl <'a> DM<'a> {
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
             Err(_) => return Err((io::Error::last_os_error())),
-            _ => Ok(())
-        }
+            _ => { }
+        };
+
+        lv.device = Some(pv::Device::from(hdr.dev as i64));
+
+        Ok(())
     }
 
     fn load_device(&self, lv: &LV) -> io::Result<()> {
         let mut buf = [0u8; 10240];
-
-        println!("hihi");
-
-        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
-
-        let hdr_size = mem::size_of::<dmi::Struct_dm_ioctl>();
-
-        Self::initialize_hdr(lv, &mut hdr);
-
-        hdr.data_size = buf.len() as u32;
-        hdr.data_start = hdr_size as u32;
-
-        println!("hihi2");
-
-        //let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_LIST_DEVICES_CMD as u8, buf.len());
-
-        let err = || Error::new(Other, "dm load_device error");
-
+        let hdr_len = mem::size_of::<dmi::Struct_dm_ioctl>();
         let sectors_per_extent = self.vg.extent_size;
+        let mut targets_len = 0;
+        let mut target_count = 0;
 
-        let data = &buf[hdr_size..];
-        for seg in &lv.segments {
-            for &(ref pvname, ref loc) in &seg.stripes {
-                let pv = try!(self.vg.pvs.get(pvname).ok_or(err()));
+        // Fill in targets
+        {
+            let mut data = &mut buf[hdr_len..];
 
-                println!("{} {} linear {}:{} {}",
-                         seg.start_extent * sectors_per_extent,
-                         seg.extent_count * sectors_per_extent,
-                         pv.device.major,
-                         pv.device.minor,
-                         (loc * sectors_per_extent) + pv.pe_start);
+            for seg in &lv.segments {
+                for &(ref pvname, ref loc) in &seg.stripes {
+                    let err = || Error::new(Other, "dm load_device error");
+                    let pv = try!(self.vg.pvs.get(pvname).ok_or(err()));
+
+                    let params = format!("{}:{} {}",
+                                         pv.device.major,
+                                         pv.device.minor,
+                                         (loc * sectors_per_extent) + pv.pe_start);
+
+
+                    let table_size = mem::size_of::<dmi::Struct_dm_target_spec>();
+                    let entry_size = table_size
+                        + align_to(params.as_bytes().len() + 1usize, 8usize);
+
+                    {
+                        let mut sp: &mut dmi::Struct_dm_target_spec = unsafe {
+                            mem::transmute(&mut data)
+                        };
+
+                        sp.sector_start = seg.start_extent * sectors_per_extent;
+                        sp.length = seg.extent_count * sectors_per_extent;
+                        sp.status = 0;
+
+                        let mut dst: &mut [u8] = unsafe {
+                            mem::transmute(&mut sp.target_type[..])
+                        };
+
+                        copy_memory(b"linear", &mut dst);
+
+                        sp.next = entry_size as u32;
+                    }
+
+                    copy_memory(&params.as_bytes(), &mut data[table_size..]);
+
+                    targets_len += entry_size;
+                    target_count += 1;
+                    let mut data = &mut data[entry_size..];
+                }
             }
         }
 
-        Ok(())
+        // Fill in header 2nd, now that we know overall size etc.
+        {
+            let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+
+            Self::initialize_hdr(lv, &mut hdr);
+
+            hdr.data_start = hdr_len as u32;
+            hdr.data_size = hdr_len as u32 + targets_len as u32;
+            hdr.target_count = target_count;
+        }
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_LOAD_CMD as u8, buf.len());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => Ok(())
+        }
     }
 
     fn resume_device(&self, lv: &LV) -> io::Result<()> {
+        let mut hdr: dmi::Struct_dm_ioctl = Default::default();
+
+        Self::initialize_hdr(lv, &mut hdr);
+
+        // TODO: broken, need to pass some flags
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
+                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => { }
+        };
+
         Ok(())
     }
 
-    pub fn activate_device(&self, lv: &LV) -> io::Result<()> {
+    pub fn activate_device(&self, lv: &mut LV) -> io::Result<()> {
 
         // TODO: name/uuid mangle?
 
-//        self.create_device(&lv);
+        self.create_device(lv);
 
-        self.load_device(&lv);
+        self.load_device(lv);
 
-        self.resume_device(&lv);
+        self.resume_device(lv);
 
         Ok(())
     }

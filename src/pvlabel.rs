@@ -11,6 +11,7 @@ use nix::sys::stat;
 use parser;
 
 use parser::{LvmTextMap, buf_to_textmap, textmap_to_buf};
+use util::align_to;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -222,12 +223,6 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
     return Ok(pvheader);
 }
 
-fn round_up_to_sector_size(num: u64) -> u64 {
-    let rem = num % SECTOR_SIZE as u64;
-
-    num + SECTOR_SIZE as u64 - rem
-}
-
 pub struct MDA {
     file: File,
     hdr: [u8; MDA_HEADER_SIZE],
@@ -340,9 +335,10 @@ impl MDA {
 
         // start at next sector in loop, but skip 0th sector
         let start_off = min(MDA_HEADER_SIZE as u64,
-                            (round_up_to_sector_size(
-                                raw_locn.offset + raw_locn.size)
-                             % self.area_len as u64));
+                            (align_to(
+                                (raw_locn.offset + raw_locn.size) as usize,
+                                SECTOR_SIZE)
+                             % self.area_len as usize) as u64);
         let tail_space = self.area_len as u64 - start_off;
 
         assert_eq!(start_off % SECTOR_SIZE as u64, 0);

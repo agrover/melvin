@@ -1,4 +1,4 @@
-#![feature(iter_arith, result_expect, path_ext)]
+#![feature(iter_arith, result_expect, path_ext, slice_bytes)]
 
 extern crate byteorder;
 extern crate crc;
@@ -20,6 +20,7 @@ mod dm;
 mod lv;
 mod vg;
 mod pv;
+mod util;
 
 #[allow(dead_code, non_camel_case_types)]
 mod dm_ioctl;

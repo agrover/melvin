@@ -176,6 +176,7 @@ impl VG {
                 });
         }
 
+        // Also return completely-unused PVs
         for (pvname, pv) in &self.pvs {
             if !free_map.contains_key(pvname) {
                 let mut map = BTreeMap::new();

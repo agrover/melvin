@@ -645,7 +645,7 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
                             _ => panic!("should not be in lists"),
                         }})
                     .collect();
-                vec.extend(z.connect(", ").as_bytes());
+                vec.extend(z.join(", ").as_bytes());
                 vec.extend(b"]\n");
             }
             &Entry::TextMap(ref x) => {

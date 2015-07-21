@@ -99,19 +99,19 @@ impl VG {
 
         self.lvs.insert(name.to_string(), lv);
 
-        // let map = self.clone().into();
+        let map = self.clone().into();
 
-        // // TODO: atomicity of updating pvs, metad, dm
-        // for pv in self.pvs.values() {
-        //     if let Some(path) = pv.device.path() {
-        //         let mut mda = MDA::new(&path).expect("could not open MDA");
+        // TODO: atomicity of updating pvs, metad, dm
+        for pv in self.pvs.values() {
+            if let Some(path) = pv.device.path() {
+                let mut mda = MDA::new(&path).expect("could not open MDA");
 
-        //         try!(mda.write_metadata(&map));
-        //     }
-        // }
+                try!(mda.write_metadata(&map));
+            }
+        }
 
-        // // tell lvmetad
-        // try!(vg_update_lvmetad(&map));
+        // tell lvmetad
+        try!(vg_update_lvmetad(&map));
 
         // open champagne ?
 

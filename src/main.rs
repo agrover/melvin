@@ -1,33 +1,20 @@
-#![feature(iter_arith, result_expect, path_ext, slice_bytes)]
+#![feature(result_expect)]
 
-extern crate byteorder;
-extern crate crc;
-extern crate unix_socket;
-extern crate nix;
-extern crate libc;
-extern crate uuid;
-extern crate time;
+extern crate melvin;
 
 use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
-mod parser;
-mod lvmetad;
-mod pvlabel;
-mod dm;
-mod lv;
-mod vg;
-mod pv;
-mod util;
+use melvin::parser;
+use melvin::parser::LvmTextMap;
+use melvin::parser::TextMapOps;
+use melvin::lvmetad;
+use melvin::pvlabel;
+use melvin::pvlabel::MDA;
+use melvin::dm;
 
-#[allow(dead_code, non_camel_case_types)]
-mod dm_ioctl;
-
-use parser::LvmTextMap;
-
-use pvlabel::MDA;
 
 fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
@@ -60,17 +47,18 @@ fn get_conf() -> Result<LvmTextMap> {
 }
 
 fn main() {
-    // println!("A");
     let (name, map) = get_first_vg_meta().unwrap();
-    // println!("B {}", name);
-    // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
-    // println!("heyo {} {}", vg.extents(), vg.extent_size);
-    // println!("output {:?}", vg);
+    let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
+    println!("heyo {} {}", vg.extents(), vg.extent_size);
+    println!("output {:?}", vg);
 
-    // match dm::list_devices() {
-    //     Ok(x) => println!("{:?}", x),
-    //     Err(x) => println!("error {}", x),
-    // }
+    {
+        let dm = dm::DM::new(&vg).unwrap();
+        match dm.list_devices() {
+            Ok(x) => println!("{:?}", x),
+            Err(x) => println!("error {}", x),
+        }
+    }
 
     let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
     let mut vg = vgs.pop().expect("no vgs in vgs");;
@@ -78,17 +66,16 @@ fn main() {
     vg.new_linear_lv("grover125", 100);
     vg.new_linear_lv("grover126", 200);
 
-    // for (lvname, lv) in &vg.lvs {
-    //     println!("lv2 {:?}", lv);
-    // }
+    for (lvname, lv) in &vg.lvs {
+        println!("lv2 {:?}", lv);
+    }
 
-    // let tm = get_conf().expect("could not read lvm.conf");
-    // let locking_type = tm.textmap_from_textmap("global")
-    //     .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
+    let tm = get_conf().expect("could not read lvm.conf");
+    let locking_type = tm.textmap_from_textmap("global")
+        .and_then(|g| g.i64_from_textmap("locking_type")).unwrap();
 
-    // println!("locking_type = {}", locking_type);
+    println!("locking_type = {}", locking_type);
 
-    // let vgtm = vg.into();
-    // let s = parser::textmap_serialize(&vgtm);
-
+    let vgtm = vg.into();
+    let s = parser::textmap_to_buf(&vgtm);
 }

@@ -1,4 +1,3 @@
-use std::fs;
 use std::fs::File;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -56,7 +55,7 @@ impl <'a> DM<'a> {
         copy_memory(uuid, &mut uuid_dest[..]);
     }
 
-    fn get_version(&self) -> io::Result<(u32, u32, u32)> {
+    pub fn get_version(&self) -> io::Result<(u32, u32, u32)> {
 
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
         hdr.version[0] = DM_VERSION_MAJOR;
@@ -74,7 +73,7 @@ impl <'a> DM<'a> {
         Ok((hdr.version[0], hdr.version[1], hdr.version[2]))
     }
 
-    fn list_devices(&self) -> io::Result<Vec<(String, u64)>> {
+    pub fn list_devices(&self) -> io::Result<Vec<(String, u64)>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 

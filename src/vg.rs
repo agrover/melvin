@@ -1,3 +1,5 @@
+//! Volume Groups
+
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
@@ -14,23 +16,37 @@ use pvlabel::MDA;
 use lvmetad::vg_update_lvmetad;
 use dm::DM;
 
+/// A Volume Group.
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
+    /// Name.
     pub name: String,
+    /// Uuid.
     pub id: String,
+    /// The generation of metadata this VG represents.
     pub seqno: u64,
+    /// Always "LVM2".
     pub format: String,
+    /// Status.
     pub status: Vec<String>,
+    /// Flags.
     pub flags: Vec<String>,
+    /// Size of each extent, in 512-byte sectors.
     pub extent_size: u64,
+    /// Maximum number of LVs, 0 means no limit.
     pub max_lv: u64,
+    /// Maximum number of PVs, 0 means no limit.
     pub max_pv: u64,
+    /// How many metadata copies (?)
     pub metadata_copies: u64,
+    /// Physical Volumes within this volume group.
     pub pvs: BTreeMap<String, PV>,
+    /// Logical Volumes within this volume group.
     pub lvs: BTreeMap<String, LV>,
 }
 
 impl VG {
+    /// The total number of extents in use in the volume group.
     pub fn extents_in_use(&self) -> u64 {
         self.lvs
             .values()
@@ -38,10 +54,12 @@ impl VG {
             .sum()
     }
 
+    /// The total number of free extents in the volume group.
     pub fn extents_free(&self) -> u64 {
         self.extents() - self.extents_in_use()
     }
 
+    /// The total number of extents in the volume group.
     pub fn extents(&self) -> u64 {
         self.pvs
             .values()
@@ -49,6 +67,7 @@ impl VG {
             .sum()
     }
 
+    /// Create a new linear logival volume in the volume group.
     pub fn new_linear_lv(&mut self, name: &str, extent_size: u64) -> Result<()> {
         if self.lvs.contains_key(name) {
             return Err(Error::new(Other, "LV already exists"));
@@ -118,7 +137,7 @@ impl VG {
         Ok(())
     }
 
-    pub fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut used_map = BTreeMap::new();
 
         // pretty sure this is only correct for my system...
@@ -135,7 +154,7 @@ impl VG {
         used_map
     }
 
-    pub fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 
         for (pvname, area_map) in &mut self.used_areas() {

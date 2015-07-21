@@ -1,3 +1,5 @@
+//! Reading and writing LVM on-disk labels and metadata.
+
 use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
@@ -223,6 +225,7 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
     return Ok(pvheader);
 }
 
+/// A handle to an LVM on-disk metadata area (MDA)
 pub struct MDA {
     file: File,
     hdr: [u8; MDA_HEADER_SIZE],
@@ -231,6 +234,7 @@ pub struct MDA {
 }
 
 impl MDA {
+    /// Construct an MDA given a path to a block device containing an LVM Physical Volume (PV)
     pub fn new(path: &Path) -> Result<MDA> {
         let pvheader = try!(find_pv_in_dev(&path));
 
@@ -304,6 +308,7 @@ impl MDA {
         LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
     }
 
+    /// Read the metadata contained in the metadata area.
     pub fn read_metadata(&mut self) -> Result<LvmTextMap> {
         let rl = self.get_rlocn0();
 
@@ -326,6 +331,7 @@ impl MDA {
         parser::buf_to_textmap(&text)
     }
 
+    /// Write a new version of the metadata to the metadata area.
     pub fn write_metadata(&mut self, map: &LvmTextMap) -> Result<()> {
         let raw_locn = self.get_rlocn0();
 
@@ -373,6 +379,7 @@ impl MDA {
     }
 }
 
+/// Scan a list of directories for block devices containing LVM PV labels.
 pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
 
     let mut ret_vec = Vec::new();

@@ -1,5 +1,7 @@
 #![feature(iter_arith, result_expect, path_ext, slice_bytes)]
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
+
+//! Melvin is pure Rust library for configuring [LVM](https://www.sourceware.org/lvm2/).
 
 extern crate byteorder;
 extern crate crc;

@@ -1,3 +1,5 @@
+//! Physical Volumes
+
 use std::str::FromStr;
 use std::io::{BufReader, BufRead};
 use std::path::{Path, PathBuf};
@@ -6,13 +8,19 @@ use std::os::unix::fs::MetadataExt;
 
 use parser::{LvmTextMap, Entry};
 
+/// A struct containing the device's major and minor numbers
+///
+/// Also allows conversion to/from a single 64bit value.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Device {
+    /// Device major number
     pub major: u32,
+    /// Device minor number
     pub minor: u8,
 }
 
 impl Device {
+    /// Returns the path in `/dev` that corresponds with the device number
     pub fn path(&self) -> Option<PathBuf> {
         let f = File::open("/proc/partitions")
             .ok().expect("Could not open /proc/partitions");
@@ -33,7 +41,9 @@ impl Device {
     }
 }
 
+/// Errors that can occur when converting from a String into a Device
 pub enum LvmDeviceError {
+    /// IO Error
     IoError,
 }
 
@@ -64,16 +74,25 @@ impl From<Device> for i64 {
     }
 }
 
+/// A Physical Volume.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PV {
+    /// The mostly-useless name
     pub name: String,
+    /// Its UUID
     pub id: String,
+    /// Device number for the block device the PV is on
     pub device: Device,
+    /// Status
     pub status: Vec<String>,
+    /// Flags
     pub flags: Vec<String>,
-    pub dev_size: u64, // in bytes
-    pub pe_start: u64, // in sectors
-    pub pe_count: u64, // in extents
+    /// The device's size, in bytes
+    pub dev_size: u64,
+    /// The offset in sectors of where the first extent starts
+    pub pe_start: u64,
+    /// The number of extents in the PV
+    pub pe_count: u64,
 }
 
 impl From<PV> for LvmTextMap {

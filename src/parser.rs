@@ -30,6 +30,7 @@
 // VG struct, with associated LVs and PVs.
 //
 
+//! Parsing LVM's text-based configuration format.
 
 use std::io;
 use std::io::Error;
@@ -43,7 +44,7 @@ use vg::VG;
 use pv::{PV, Device};
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token<'a> {
+enum Token<'a> {
     /// `{`
     CurlyOpen,
     /// `}`
@@ -90,7 +91,7 @@ impl<'a> AsRef<str> for Token<'a> {
     }
 }
 
-pub struct Lexer<'a> {
+struct Lexer<'a> {
     chars: &'a[u8],
     next_byte: Option<u8>,
     cursor: usize,
@@ -99,7 +100,7 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// Returns a new Lexer from a given byte iterator.
-    pub fn new(chars: &'a[u8]) -> Lexer<'a> {
+    fn new(chars: &'a[u8]) -> Lexer<'a> {
         Lexer {
             chars: chars,
             next_byte: None,
@@ -257,27 +258,47 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
+/// A Map that represents LVM metadata.
+///
+/// This is an intermediate representation between LVM's textual metadata format
+/// and actual Rust structs. It is an associative map in which each entry can
+/// refer to either a `Number`, a `String`, a `List`, or another `LvmTextMap`.
 pub type LvmTextMap = BTreeMap<String, Entry>;
 
+/// Each value in an LvmTextMap is an Entry.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Entry {
+    /// An integral numeric value
     Number(i64),
+    /// A text string
     String(String),
-    TextMap(Box<LvmTextMap>),
+    /// An ordered list of strings and numbers, possibly both
     List(Box<Vec<Entry>>),
+    /// A nested LvmTextMap
+    TextMap(Box<LvmTextMap>),
 }
 
+/// Operations that can be used to extract values from an `LvmTextMap`.
+///
+/// One usually knows the type of a given attribute in an `LvmTextMap`,
+/// and an attribute of another type is a configuration error. These
+/// methods return a reference to the value of the looked-for attribute,
+/// or None.
 pub trait TextMapOps {
+    /// Get an i64 value from a LvmTextMap.
     fn i64_from_textmap(&self, name: &str) -> Option<i64>;
+    /// Get a reference to a string in an LvmTextMap.
     fn string_from_textmap(&self, name: &str) -> Option<&str>;
-    fn textmap_from_textmap(&self, name: &str) -> Option<&LvmTextMap>;
+    /// Get a reference to a List within an LvmTextMap.
     fn list_from_textmap(&self, name: &str) -> Option<&Vec<Entry>>;
+    /// Get a reference to a nested LvmTextMap within an LvmTextMap.
+    fn textmap_from_textmap(&self, name: &str) -> Option<&LvmTextMap>;
 }
 
 impl TextMapOps for LvmTextMap {
     fn i64_from_textmap(&self, name: &str) -> Option<i64> {
         match self.get(name) {
-            Some(&Entry::Number(ref x)) => Some(x.clone()),
+            Some(&Entry::Number(ref x)) => Some(*x),
             _ => None
         }
     }
@@ -322,7 +343,7 @@ fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &
 }
 
 // lists can only contain strings and numbers, yay
-pub fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
+fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
     let mut v = Vec::new();
 
     assert_eq!(*tokens.first().unwrap(), Token::BracketOpen);
@@ -403,6 +424,10 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
     Ok(ret)
 }
 
+/// Generate an `LvmTextMap` from a textual LVM configuration string.
+///
+/// LVM uses the same configuration file format for it's on-disk metadata,
+/// as well as for lvmetad, and the lvm.conf configuration file.
 pub fn buf_to_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 
     let mut tokens: Vec<Token> = Vec::new();
@@ -572,6 +597,7 @@ fn lvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, LV>> {
     Ok(ret_vec)
 }
 
+/// Construct a `VG` from its name and an `LvmTextMap`.
 pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
 
     let err = || Error::new(Other, "vg textmap parsing error");
@@ -617,6 +643,7 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
     Ok(vg)
 }
 
+/// Generate a textual LVM configuration string from an LvmTextMap.
 pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
     let mut vec = Vec::new();
 

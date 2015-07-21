@@ -1,3 +1,5 @@
+//! Communicating with the running kernel using devicemapper.
+
 use std::fs::File;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -24,12 +26,14 @@ const DM_VERSION_MAJOR: u32 = 4;
 const DM_VERSION_MINOR: u32 = 30;
 const DM_VERSION_PATCHLEVEL: u32 = 0;
 
+/// Context needed for communicating with devicemapper.
 pub struct DM<'a> {
     file: File,
     vg: &'a VG,
 }
 
 impl <'a> DM<'a> {
+    /// Create a new context for communicating about a given VG with DM.
     pub fn new(vg: &'a VG) -> io::Result<Self> {
         Ok(DM {
             file: try!(File::open(DM_CTL_PATH)),
@@ -55,6 +59,7 @@ impl <'a> DM<'a> {
         copy_memory(uuid, &mut uuid_dest[..]);
     }
 
+    /// Devicemapper version information: Major, Minor, and patchlevel versions.
     pub fn get_version(&self) -> io::Result<(u32, u32, u32)> {
 
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
@@ -73,6 +78,8 @@ impl <'a> DM<'a> {
         Ok((hdr.version[0], hdr.version[1], hdr.version[2]))
     }
 
+    /// Returns a list of tuples containing DM device names and their major/minor
+    /// device numbers.
     pub fn list_devices(&self) -> io::Result<Vec<(String, u64)>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
@@ -223,6 +230,9 @@ impl <'a> DM<'a> {
         Ok(())
     }
 
+    /// Activate a Logical Volume.
+    ///
+    /// Also populates the LV's device field.
     pub fn activate_device(&self, lv: &mut LV) -> io::Result<()> {
 
         // TODO: name/uuid mangle?

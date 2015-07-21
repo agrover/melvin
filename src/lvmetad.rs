@@ -1,3 +1,5 @@
+//! Communicating with `lvmetad`.
+
 use unix_socket::UnixStream;
 
 use std::io::{Result, Read, Write};
@@ -34,7 +36,7 @@ fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     }
 }
 
-pub fn _request(s: &[u8],
+fn _request(s: &[u8],
                 token: Option<&[u8]>,
                 stream: &mut UnixStream,
                 args: &Option<Vec<&[u8]>>) -> Result<Vec<u8>> {
@@ -63,6 +65,13 @@ pub fn _request(s: &[u8],
     collect_response(stream)
 }
 
+/// Make a request to the running lvmetad daemon.
+///
+/// # Examples
+///
+/// ```
+///    let vg_list = try!(request(b"vg_list", None));
+/// ```
 pub fn request(s: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");
     let token = b"0";
@@ -95,6 +104,7 @@ pub fn request(s: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     Ok(response)
 }
 
+/// Query `lvmetad` for a list of Volume Groups on the system.
 pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
     let err = || Error::new(Other, "response parsing error");
     let mut v = Vec::new();
@@ -124,6 +134,7 @@ pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
     Ok(v)
 }
 
+/// Tell `lvmetad` about the current state of a Volume Group.
 pub fn vg_update_lvmetad(map: &LvmTextMap) -> Result<()> {
 
     assert_eq!(map.len(), 1);
@@ -131,10 +142,7 @@ pub fn vg_update_lvmetad(map: &LvmTextMap) -> Result<()> {
     let k = map.keys().next().unwrap();
     let v = map.textmap_from_textmap(k).unwrap();
 
-    let mut option = Vec::new();
-    option.extend(b"vgname = \"");
-    option.extend(k.as_bytes());
-    option.extend(b"\"");
+    let option = format!("vgname = \"{}\"", k);
 
     let mut option2 = Vec::new();
     option2.extend(b"metadata {");
@@ -143,7 +151,7 @@ pub fn vg_update_lvmetad(map: &LvmTextMap) -> Result<()> {
 
     let mut options: Vec<&[u8]> = Vec::new();
 
-    options.push(&option);
+    options.push(&option.as_bytes());
     options.push(&option2);
 
     try!(request(b"vg_update", Some(options)));

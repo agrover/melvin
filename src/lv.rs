@@ -1,19 +1,31 @@
+//! Logical Volumes
+
 use parser::{LvmTextMap, Entry};
 use pv::Device;
 
+/// A Logical Volume.
 #[derive(Debug, PartialEq, Clone)]
 pub struct LV {
+    /// The name.
     pub name: String,
+    /// The UUID.
     pub id: String,
+    /// The status.
     pub status: Vec<String>,
+    /// Flags.
     pub flags: Vec<String>,
+    /// Created by this host.
     pub creation_host: String,
+    /// Created at this Unix time.
     pub creation_time: i64,
+    /// A list of the segments comprising the LV.
     pub segments: Vec<Segment>,
+    /// The major/minor number of the LV.
     pub device: Option<Device>,
 }
 
 impl LV {
+    /// The total number of extents used by this logical volume.
     pub fn used_extents(&self) -> u64 {
         self.segments
             .iter()
@@ -62,12 +74,18 @@ impl From<LV> for LvmTextMap {
     }
 }
 
+/// A Logical Volume Segment.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Segment {
+    /// A mostly-useless name.
     pub name: String,
+    /// The first extent within the LV this segment comprises.
     pub start_extent: u64,
+    /// How many extents this segment comprises
     pub extent_count: u64,
+    /// The segment type.
     pub ty: String,
+    /// If >1, Segment is striped across multiple PVs.
     pub stripes: Vec<(String, u64)>,
 }
 

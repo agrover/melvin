@@ -67,7 +67,7 @@ impl VG {
             .sum()
     }
 
-    /// Create a new linear logival volume in the volume group.
+    /// Create a new linear logical volume in the volume group.
     pub fn new_linear_lv(&mut self, name: &str, extent_size: u64) -> Result<()> {
         if self.lvs.contains_key(name) {
             return Err(Error::new(Other, "LV already exists"));
@@ -137,6 +137,9 @@ impl VG {
         Ok(())
     }
 
+    // Returns e.g. {"pv0": {0: 45, 47: 100} }
+    // PVs with no used areas are not in the outer map at all.
+    //
     fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut used_map = BTreeMap::new();
 

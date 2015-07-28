@@ -40,14 +40,14 @@ fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     }
 }
 
-fn _request(s: &[u8],
+fn _request(req: &[u8],
                 token: Option<&[u8]>,
                 stream: &mut UnixStream,
                 args: &Option<Vec<&[u8]>>) -> Result<Vec<u8>> {
 
     let mut v = Vec::new();
     v.extend(b"request = \"");
-    v.extend(s);
+    v.extend(req);
     v.extend(b"\"\n");
 
     if let Some(token) = token {
@@ -78,18 +78,18 @@ fn _request(s: &[u8],
 ///
 ///    let vg_list = request(b"vg_list", None);
 /// ```
-pub fn request(s: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
+pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");
     let token = b"0";
 
     let mut stream = try!(UnixStream::connect(LVMETAD_PATH));
 
-    let txt = try!(_request(s, Some(token), &mut stream, &args));
+    let txt = try!(_request(req, Some(token), &mut stream, &args));
     let mut response = try!(buf_to_textmap(&txt));
 
     if try!(response.string_from_textmap("response").ok_or(err())) == "token_mismatch" {
         try!(_request(b"token_update", Some(token), &mut stream, &None));
-        response = try!(_request(s, Some(token), &mut stream, &args)
+        response = try!(_request(req, Some(token), &mut stream, &args)
             .and_then(|r| buf_to_textmap(&r)));
     }
 

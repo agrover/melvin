@@ -86,6 +86,7 @@ fn label_header_from_buf(buf: &[u8]) -> Result<LabelHeader> {
                 id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
                 sector: sector,
                 crc: crc,
+                // switch from "offset from label" to "offset from start", more convenient.
                 offset: LittleEndian::read_u32(&sec_buf[20..24]) + (x*SECTOR_SIZE as usize) as u32,
                 label: String::from_utf8_lossy(&sec_buf[24..32]).into_owned(),
             })

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["LvmDeviceError","Errors that can occur when converting from a String into a Device"]],"struct":[["Device","A struct containing the device's major and minor numbers"],["PV","A Physical Volume."]]});

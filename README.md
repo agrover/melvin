@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/agrover/melvin.svg?branch=master)](https://travis-ci.org/agrover/melvin)
+
+
 MeLVin
 
 A 100% Rust implementation of LVM

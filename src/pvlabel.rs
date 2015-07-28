@@ -54,7 +54,7 @@ struct PvHeader {
 }
 
 
-fn get_label_header(buf: &[u8]) -> Result<LabelHeader> {
+fn label_header_from_buf(buf: &[u8]) -> Result<LabelHeader> {
 
     for x in 0..LABEL_SCAN_SECTORS {
         let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
@@ -120,7 +120,7 @@ impl<'a> Iterator for PvAreaIter<'a> {
 // - if version > 0
 //   - 0+ bootloader areas (usually 0)
 //
-fn get_pv_header(buf: &[u8]) -> Result<PvHeader> {
+fn pv_header_from_buf(buf: &[u8]) -> Result<PvHeader> {
 
     let mut da_buf = &buf[ID_LEN+8..];
 
@@ -223,8 +223,8 @@ fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
 
     try!(f.read(&mut buf));
 
-    let label_header = try!(get_label_header(&buf));
-    let pvheader = try!(get_pv_header(&buf[label_header.offset as usize..]));
+    let label_header = try!(label_header_from_buf(&buf));
+    let pvheader = try!(pv_header_from_buf(&buf[label_header.offset as usize..]));
 
     return Ok(pvheader);
 }

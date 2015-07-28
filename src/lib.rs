@@ -23,6 +23,3 @@ pub mod lv;
 pub mod vg;
 pub mod pv;
 mod util;
-
-#[allow(dead_code, non_camel_case_types)]
-mod dm_ioctl;

@@ -4,6 +4,9 @@
 
 //! Communicating with the running kernel using devicemapper.
 
+#[allow(dead_code, non_camel_case_types)]
+mod dm_ioctl;
+
 use std::fs::File;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -17,7 +20,7 @@ use byteorder::{LittleEndian, ByteOrder};
 
 use nix::sys::ioctl;
 
-use dm_ioctl as dmi;
+use dm::dm_ioctl as dmi;
 use lv::LV;
 use vg::VG;
 use util::align_to;

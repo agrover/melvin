@@ -4,6 +4,21 @@
 
 //! Reading and writing LVM on-disk labels and metadata.
 
+//
+// label is at start of sectors 0-3, usually 1
+// label includes offset of pvheader (also within 1st 4 sectors)
+// pvheader includes ptrs to data (1), metadata(0-2), and boot(0-1) areas
+// metadata area (MDA), located anywhere, starts with 512b mda header, then
+//   large text area
+// mda header has 40b of stuff, then rlocns[].
+// rlocns point into mda text area. rlocn 0 used for text metadata, rlocn 1
+//   points to precommitted data (not currently supported by Melvin)
+// text metadata written aligned to sector-size; text area treated as circular
+//   and text may wrap across end to beginning
+// text metadata contains vg metadata in lvm config text format. Each write
+//   increments seqno.
+//
+
 use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};

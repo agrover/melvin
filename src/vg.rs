@@ -154,7 +154,6 @@ impl VG {
     fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut used_map = BTreeMap::new();
 
-        // pretty sure this is only correct for my system...
         for lv in self.lvs.values() {
             for seg in &lv.segments {
                 for &(ref pvname, start) in &seg.stripes {
@@ -171,11 +170,11 @@ impl VG {
     fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 
-        for (pvname, area_map) in &mut self.used_areas() {
+        for (pvname, mut area_map) in self.used_areas() {
 
             // Insert an entry to mark the end of the PV so the fold works
             // correctly
-            let pv = self.pvs.get(pvname)
+            let pv = self.pvs.get(&pvname)
                 .expect("area map name refers to nonexistent PV");
             area_map.insert(pv.pe_count, 0);
 

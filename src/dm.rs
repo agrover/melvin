@@ -157,6 +157,7 @@ impl <'a> DM<'a> {
                 copy_memory(seg.ty.as_bytes(), &mut dst);
 
                 let mut params = Vec::new();
+                // TODO: only works for linear
                 params.extend(
                     format!("{}:{} {}",
                             pv.device.major,
@@ -224,10 +225,8 @@ impl <'a> DM<'a> {
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
             Err(_) => return Err((io::Error::last_os_error())),
-            _ => { }
-        };
-
-        Ok(())
+            _ => Ok(())
+        }
     }
 
     /// Activate a Logical Volume.
@@ -241,9 +240,9 @@ impl <'a> DM<'a> {
 
         try!(self.load_device(lv));
 
-        try!(self.resume_device(lv));
+        self.resume_device(lv)
+    }
 
-        Ok(())
     /// Remove a Logical Volume.
     // UNTESTED
     pub fn remove_device(&self, lv: LV) -> io::Result<()> {

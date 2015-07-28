@@ -74,7 +74,9 @@ fn _request(s: &[u8],
 /// # Examples
 ///
 /// ```
-///    let vg_list = try!(request(b"vg_list", None));
+///    use melvin::lvmetad::request;
+///
+///    let vg_list = request(b"vg_list", None);
 /// ```
 pub fn request(s: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");

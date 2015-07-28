@@ -118,6 +118,21 @@ impl VG {
 
         self.lvs.insert(name.to_string(), lv);
 
+        self.commit()
+    }
+
+    /// Destroy a logical volume.
+    pub fn lv_remove(&mut self, name: &str) -> Result<()> {
+        match self.lvs.remove(name) {
+            Some(_) => {
+                // TODO: poke dm; remove device
+                self.commit()
+            },
+            None => Err(Error::new(Other, "LV not found in VG")),
+        }
+    }
+
+    fn commit(&self) -> Result<()> {
         let map = self.clone().into();
 
         // TODO: atomicity of updating pvs, metad, dm
@@ -130,11 +145,7 @@ impl VG {
         }
 
         // tell lvmetad
-        try!(vg_update_lvmetad(&map));
-
-        // open champagne ?
-
-        Ok(())
+        vg_update_lvmetad(&map)
     }
 
     // Returns e.g. {"pv0": {0: 45, 47: 100} }

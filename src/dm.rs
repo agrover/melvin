@@ -244,6 +244,23 @@ impl <'a> DM<'a> {
         try!(self.resume_device(lv));
 
         Ok(())
+    /// Remove a Logical Volume.
+    // UNTESTED
+    pub fn remove_device(&self, lv: LV) -> io::Result<()> {
+        let mut hdr: dmi::Struct_dm_ioctl = Default::default();
+
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = hdr.data_start;
+        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_REMOVE_CMD as u8,
+                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => Ok(())
+        }
+
     }
 }
 

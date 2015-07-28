@@ -136,7 +136,7 @@ impl VG {
         }
     }
 
-    fn commit(&self) -> Result<()> {
+    fn commit(&mut self) -> Result<()> {
         let map = self.clone().into();
 
         // TODO: atomicity of updating pvs, metad, dm

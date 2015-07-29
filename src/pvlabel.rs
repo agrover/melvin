@@ -213,7 +213,7 @@ struct RawLocn {
     offset: u64,
     size: u64,
     checksum: u32,
-    flags: u32,
+    ignored: bool,
 }
 
 #[derive(Debug)]
@@ -243,7 +243,7 @@ impl<'a> Iterator for RawLocnIter<'a> {
                 offset: off,
                 size: size,
                 checksum: checksum,
-                flags: flags,
+                ignored: (flags & 1) > 0,
             })
         }
     }
@@ -343,7 +343,10 @@ impl MDA {
         LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
         LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
         LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
-        LittleEndian::write_u32(&mut raw_locn[20..24], rl.flags);
+
+        let flags = rl.ignored as u32;
+
+        LittleEndian::write_u32(&mut raw_locn[20..24], flags);
     }
 
     /// Read the metadata contained in the metadata area.
@@ -410,7 +413,7 @@ impl MDA {
                 offset: start_off,
                 size: text.len() as u64,
                 checksum: crc32_calc(&text),
-                flags: 0
+                ignored: false,
             });
 
         self.write_mda_header()

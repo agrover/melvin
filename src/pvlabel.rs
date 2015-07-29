@@ -24,6 +24,7 @@ use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
 use std::fs::{File, read_dir, OpenOptions};
 use std::cmp::min;
+use std::slice::bytes::copy_memory;
 
 use byteorder::{LittleEndian, ByteOrder};
 use crc::crc32;
@@ -94,6 +95,23 @@ fn label_header_from_buf(buf: &[u8]) -> Result<LabelHeader> {
     }
 
     Err(Error::new(Other, "Label not found"))
+}
+
+fn write_label_header(label: &LabelHeader, device: &Path) -> Result<()> {
+    let mut sec_buf = [0u8; SECTOR_SIZE];
+
+    copy_memory(label.id.as_bytes(), &mut sec_buf[..8]); // b"LABELONE"
+    LittleEndian::write_u64(&mut sec_buf[8..16], label.sector);
+    // switch back to "offset from label" from the more convenient "offset from start".
+    LittleEndian::write_u32(
+        &mut sec_buf[20..24], label.offset - (label.sector * SECTOR_SIZE as u64) as u32);
+    copy_memory(label.label.as_bytes(), &mut sec_buf[24..32]);
+    let crc_val = crc32_calc(&sec_buf[20..]);
+    LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
+
+    let mut f = try!(OpenOptions::new().write(true).open(device));
+    try!(f.seek(SeekFrom::Start(label.sector * SECTOR_SIZE as u64)));
+    f.write_all(&mut sec_buf)
 }
 
 #[derive(Debug)]

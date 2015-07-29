@@ -249,7 +249,7 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-fn find_pv_in_dev(path: &Path) -> Result<PvHeader> {
+fn find_pvheader_in_dev(path: &Path) -> Result<PvHeader> {
 
     let mut f = try!(File::open(path));
 
@@ -274,7 +274,7 @@ pub struct MDA {
 impl MDA {
     /// Construct an MDA given a path to a block device containing an LVM Physical Volume (PV)
     pub fn new(path: &Path) -> Result<MDA> {
-        let pvheader = try!(find_pv_in_dev(&path));
+        let pvheader = try!(find_pvheader_in_dev(&path));
 
         let mut f = try!(OpenOptions::new().read(true).write(true).open(path));
 
@@ -432,7 +432,7 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
                         { Some(dir_e.unwrap().path()) } else {None} )
             .filter(|path| {
                 (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
-            .filter(|path| { find_pv_in_dev(&path).is_ok() })
+            .filter(|path| { find_pvheader_in_dev(&path).is_ok() })
             .collect::<Vec<_>>());
     }
 

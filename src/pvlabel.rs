@@ -130,7 +130,7 @@ impl<'a> Iterator for PvAreaIter<'a> {
 // - static header (uuid and size)
 // - 0+ data areas (actually max 1, usually 1; size 0 == "rest of blkdev")
 // - blank entry
-// - 0+ metadata areas (max 1, usually 1)
+// - 0+ metadata areas (max 2, usually 1)
 // - blank entry
 // - 8 bytes of pvextension header
 // - if version > 0

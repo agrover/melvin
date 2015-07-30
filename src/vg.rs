@@ -15,8 +15,8 @@ use nix;
 
 use lv::{LV, Segment};
 use pv::PV;
+use pvlabel::PvHeader;
 use parser::{LvmTextMap, Entry};
-use pvlabel::MDA;
 use lvmetad::vg_update_lvmetad;
 use dm::DM;
 
@@ -142,9 +142,10 @@ impl VG {
         // TODO: atomicity of updating pvs, metad, dm
         for pv in self.pvs.values() {
             if let Some(path) = pv.device.path() {
-                let mut mda = MDA::new(&path).expect("could not open MDA");
+                let mut pvheader = PvHeader::find_in_dev(&path)
+                    .expect("could not find pvheader");
 
-                try!(mda.write_metadata(&map));
+                try!(pvheader.write_metadata(&map));
             }
         }
 

@@ -19,6 +19,7 @@
 //   increments seqno.
 //
 
+use std::io;
 use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
@@ -29,9 +30,7 @@ use std::slice::bytes::copy_memory;
 use byteorder::{LittleEndian, ByteOrder};
 use nix::sys::stat;
 
-use parser;
-
-use parser::{LvmTextMap, buf_to_textmap, textmap_to_buf};
+use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap};
 use util::{align_to, crc32_calc};
 
 const LABEL_SCAN_SECTORS: usize = 4;
@@ -49,66 +48,59 @@ struct LabelHeader {
     label: String,
 }
 
-#[derive(Debug)]
-struct PvArea {
-    offset: u64,
-    size: u64,
-}
+impl LabelHeader {
+    fn from_buf(buf: &[u8]) -> Result<LabelHeader> {
+        for x in 0..LABEL_SCAN_SECTORS {
+            let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
+            if &sec_buf[..8] == b"LABELONE" {
+                let crc = LittleEndian::read_u32(&sec_buf[16..20]);
+                if crc != crc32_calc(&sec_buf[20..SECTOR_SIZE]) {
+                }
 
-#[derive(Debug)]
-struct PvHeader {
-    uuid: String,
-    size: u64, // in bytes
-    ext_version: u32,
-    ext_flags: u32,
-    data_areas: Vec<PvArea>,
-    metadata_areas: Vec<PvArea>,
-    bootloader_areas: Vec<PvArea>,
-}
+                let sector = LittleEndian::read_u64(&sec_buf[8..16]);
+                if sector != x as u64 {
+                    return Err(Error::new(Other, "Sector field should equal sector count"));
+                }
 
-
-fn label_header_from_buf(buf: &[u8]) -> Result<LabelHeader> {
-
-    for x in 0..LABEL_SCAN_SECTORS {
-        let sec_buf = &buf[x*SECTOR_SIZE..x*SECTOR_SIZE+SECTOR_SIZE];
-        if &sec_buf[..8] == b"LABELONE" {
-            let crc = LittleEndian::read_u32(&sec_buf[16..20]);
-            crc32_ok(crc, &sec_buf[20..SECTOR_SIZE]);
-
-            let sector = LittleEndian::read_u64(&sec_buf[8..16]);
-            if sector != x as u64 {
-                return Err(Error::new(Other, "Sector field should equal sector count"));
+                return Ok(LabelHeader{
+                    id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
+                    sector: sector,
+                    crc: crc,
+                    // switch from "offset from label" to "offset from start", more convenient.
+                    offset: LittleEndian::read_u32(&sec_buf[20..24]) + (x*SECTOR_SIZE as usize) as u32,
+                    label: String::from_utf8_lossy(&sec_buf[24..32]).into_owned(),
+                })
             }
-
-            return Ok(LabelHeader{
-                id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
-                sector: sector,
-                crc: crc,
-                // switch from "offset from label" to "offset from start", more convenient.
-                offset: LittleEndian::read_u32(&sec_buf[20..24]) + (x*SECTOR_SIZE as usize) as u32,
-                label: String::from_utf8_lossy(&sec_buf[24..32]).into_owned(),
-            })
         }
+
+        Err(Error::new(Other, "Label not found"))
     }
 
-    Err(Error::new(Other, "Label not found"))
+    fn write(&self, device: &Path) -> Result<()> {
+        let mut sec_buf = [0u8; SECTOR_SIZE];
+
+        copy_memory(self.id.as_bytes(), &mut sec_buf[..8]); // b"LABELONE"
+        LittleEndian::write_u64(&mut sec_buf[8..16], self.sector);
+        // switch back to "offset from label" from the more convenient "offset from start".
+        LittleEndian::write_u32(
+            &mut sec_buf[20..24], self.offset - (self.sector * SECTOR_SIZE as u64) as u32);
+        copy_memory(self.label.as_bytes(), &mut sec_buf[24..32]);
+        let crc_val = crc32_calc(&sec_buf[20..]);
+        LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
+
+        let mut f = try!(OpenOptions::new().write(true).open(device));
+        try!(f.seek(SeekFrom::Start(self.sector * SECTOR_SIZE as u64)));
+        f.write_all(&mut sec_buf)
+    }
 }
 
-fn write_label_header(label: &LabelHeader, device: &Path) -> Result<()> {
-    let mut sec_buf = [0u8; SECTOR_SIZE];
-
-    copy_memory(label.id.as_bytes(), &mut sec_buf[..8]); // b"LABELONE"
-    LittleEndian::write_u64(&mut sec_buf[8..16], label.sector);
-    // switch back to "offset from label" from the more convenient "offset from start".
-    LittleEndian::write_u32(
-        &mut sec_buf[20..24], label.offset - (label.sector * SECTOR_SIZE as u64) as u32);
-    copy_memory(label.label.as_bytes(), &mut sec_buf[24..32]);
-    let crc_val = crc32_calc(&sec_buf[20..]);
-    LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
-
-    let mut f = try!(OpenOptions::new().write(true).open(device));
-    try!(f.seek(SeekFrom::Start(label.sector * SECTOR_SIZE as u64)));
-    f.write_all(&mut sec_buf)
+/// Describes an area within a PV
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct PvArea {
+    /// The offset from the start of the device in bytes
+    pub offset: u64,
+    /// The size in bytes
+    pub size: u64,
 }
 
 #[derive(Debug)]
@@ -138,54 +130,6 @@ impl<'a> Iterator for PvAreaIter<'a> {
             })
         }
     }
-}
-
-//
-// PV HEADER LAYOUT:
-// - static header (uuid and size)
-// - 0+ data areas (actually max 1, usually 1; size 0 == "rest of blkdev")
-// - blank entry
-// - 0+ metadata areas (max 2, usually 1)
-// - blank entry
-// - 8 bytes of pvextension header
-// - if version > 0
-//   - 0+ bootloader areas (usually 0)
-//
-fn pv_header_from_buf(buf: &[u8]) -> Result<PvHeader> {
-
-    let mut da_buf = &buf[ID_LEN+8..];
-
-    let da_vec: Vec<_> = iter_pv_area(da_buf).collect();
-
-    // move slice past any actual entries plus blank
-    // terminating entry
-    da_buf = &da_buf[(da_vec.len()+1)*16..];
-
-    let md_vec: Vec<_> = iter_pv_area(da_buf).collect();
-
-    da_buf = &da_buf[(md_vec.len()+1)*16..];
-
-    let ext_version = LittleEndian::read_u32(&da_buf[..4]);
-    let mut ext_flags = 0;
-    let mut ba_vec = Vec::new();
-
-    if ext_version != 0 {
-        ext_flags = LittleEndian::read_u32(&da_buf[4..8]);
-
-        da_buf = &da_buf[8..];
-
-        ba_vec = iter_pv_area(da_buf).collect();
-    }
-
-    Ok(PvHeader{
-        uuid: String::from_utf8_lossy(&buf[..ID_LEN]).into_owned(),
-        size: LittleEndian::read_u64(&buf[ID_LEN..ID_LEN+8]),
-        ext_version: ext_version,
-        ext_flags: ext_flags,
-        data_areas: da_vec,
-        metadata_areas: md_vec,
-        bootloader_areas: ba_vec,
-    })
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -229,48 +173,120 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-fn find_pvheader_in_dev(path: &Path) -> Result<PvHeader> {
-
-    let mut f = try!(File::open(path));
-
-    let mut buf = [0u8; LABEL_SCAN_SECTORS * SECTOR_SIZE];
-
-    try!(f.read(&mut buf));
-
-    let label_header = try!(label_header_from_buf(&buf));
-    let pvheader = try!(pv_header_from_buf(&buf[label_header.offset as usize..]));
-
-    return Ok(pvheader);
+/// A struct containing the values in the PV header. It contains pointers to
+/// the data area, and possibly metadata areas and bootloader area.
+#[derive(Debug)]
+pub struct PvHeader {
+    /// The unique identifier.
+    pub uuid: String,
+    /// Size in bytes of the entire PV
+    pub size: u64,
+    /// Extension version. If 1, we look for an extension header that may contain a reference
+    /// to a bootloader area.
+    pub ext_version: u32,
+    /// Extension flags, of which there are none.
+    pub ext_flags: u32,
+    /// A list of the data areas.
+    pub data_areas: Vec<PvArea>,
+    /// A list of the metadata areas.
+    pub metadata_areas: Vec<PvArea>,
+    /// A list of the bootloader areas.
+    pub bootloader_areas: Vec<PvArea>,
+    /// The device this pvheader is for
+    pub dev_path: PathBuf,
 }
 
-/// A handle to an LVM on-disk metadata area (MDA)
-pub struct MDA {
-    file: File,
-    hdr: [u8; MDA_HEADER_SIZE],
-    area_offset: u64,
-    area_len: u64,
-}
+impl PvHeader {
+    //
+    // PV HEADER LAYOUT:
+    // - static header (uuid and size)
+    // - 0+ data areas (actually max 1, usually 1; size 0 == "rest of blkdev")
+    // - blank entry
+    // - 0+ metadata areas (max 2, usually 1)
+    // - blank entry
+    // - 8 bytes of pvextension header
+    // - if version > 0
+    //   - 0+ bootloader areas (usually 0)
+    //
+    /// Parse a buf containing the on-disk pvheader and create a struct
+    /// representing it.
+    pub fn from_buf(buf: &[u8], path: &Path) -> Result<PvHeader> {
 
-impl MDA {
-    /// Construct an MDA given a path to a block device containing an LVM Physical Volume (PV)
-    pub fn new(path: &Path) -> Result<MDA> {
-        let pvheader = try!(find_pvheader_in_dev(&path));
+        let mut da_buf = &buf[ID_LEN+8..];
 
-        let mut f = try!(OpenOptions::new().read(true).write(true).open(path));
+        let da_vec: Vec<_> = iter_pv_area(da_buf).collect();
 
-        let mda_areas = pvheader.metadata_areas.len();
-        if mda_areas != 1 {
-            return Err(Error::new(
-                Other, format!("Expecting 1 mda, found {}", mda_areas)));
+        // move slice past any actual entries plus blank
+        // terminating entry
+        da_buf = &da_buf[(da_vec.len()+1)*16..];
+
+        let md_vec: Vec<_> = iter_pv_area(da_buf).collect();
+
+        da_buf = &da_buf[(md_vec.len()+1)*16..];
+
+        let ext_version = LittleEndian::read_u32(&da_buf[..4]);
+        let mut ext_flags = 0;
+        let mut ba_vec = Vec::new();
+
+        if ext_version != 0 {
+            ext_flags = LittleEndian::read_u32(&da_buf[4..8]);
+
+            da_buf = &da_buf[8..];
+
+            ba_vec = iter_pv_area(da_buf).collect();
         }
 
-        let md = &pvheader.metadata_areas[0];
-        assert!(md.size as usize > MDA_HEADER_SIZE);
-        try!(f.seek(SeekFrom::Start(md.offset)));
-        let mut buf = [0; MDA_HEADER_SIZE];
+        Ok(PvHeader{
+            uuid: String::from_utf8_lossy(&buf[..ID_LEN]).into_owned(),
+            size: LittleEndian::read_u64(&buf[ID_LEN..ID_LEN+8]),
+            ext_version: ext_version,
+            ext_flags: ext_flags,
+            data_areas: da_vec,
+            metadata_areas: md_vec,
+            bootloader_areas: ba_vec,
+            dev_path: path.to_owned(),
+        })
+    }
+
+    /// Find the PvHeader struct in a given device.
+    pub fn find_in_dev(path: &Path) -> Result<PvHeader> {
+
+        let mut f = try!(File::open(path));
+
+        let mut buf = [0u8; LABEL_SCAN_SECTORS * SECTOR_SIZE];
+
         try!(f.read(&mut buf));
 
-        if !crc32_ok(LittleEndian::read_u32(&buf[..4]), &buf[4..MDA_HEADER_SIZE]) {
+        let label_header = try!(LabelHeader::from_buf(&buf));
+        let pvheader = try!(PvHeader::from_buf(&buf[label_header.offset as usize..], path));
+
+        return Ok(pvheader);
+    }
+
+    fn get_rlocn0(buf: &[u8]) -> RawLocn {
+        let raw_locns: Vec<_> = iter_raw_locn(&buf[40..]).collect();
+        let rlocn_len = raw_locns.len();
+        if rlocn_len != 1 {
+            panic!("Expecting 1 rlocn, found {}", rlocn_len);
+        }
+
+        raw_locns[0].clone()
+    }
+
+    fn set_rlocn0(buf: &mut [u8], rl: &RawLocn) -> () {
+        let mut raw_locn = &mut buf[40..];
+
+        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
+        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
+        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+
+        let flags = rl.ignored as u32;
+
+        LittleEndian::write_u32(&mut raw_locn[20..24], flags);
+    }
+
+    fn verify_mda_header(buf: &[u8; MDA_HEADER_SIZE]) -> io::Result<()> {
+        if LittleEndian::read_u32(&buf[..4]) != crc32_calc(&buf[4..MDA_HEADER_SIZE]) {
             return Err(Error::new(Other, "MDA header checksum failure"));
         }
 
@@ -288,115 +304,118 @@ impl MDA {
         // TODO: validate these somehow
         //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
         //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
-
-        Ok(MDA {
-            file: f,
-            hdr: buf,
-            area_offset: md.offset,
-            area_len: md.size,
-        })
+        Ok(())
     }
 
-    fn write_mda_header(&mut self) -> Result<()> {
-        let csum = crc32_calc(&self.hdr[4..]);
-        LittleEndian::write_u32(&mut self.hdr[..4], csum);
+    /// Read the metadata contained in the metadata area.
+    /// In the case of multiple metadata areas, return the information
+    /// from the first valid one.
+    pub fn read_metadata(&self) -> io::Result<LvmTextMap> {
+        let mut f = try!(OpenOptions::new().read(true).open(&self.dev_path));
 
-        try!(self.file.seek(SeekFrom::Start(self.area_offset)));
-        try!(self.file.write_all(&mut self.hdr));
+        let mut hdr = [0u8; MDA_HEADER_SIZE];
+        for pvarea in &self.metadata_areas {
+            try!(Self::read_mda_header(&pvarea, &mut hdr, &mut f));
+
+            let rl = Self::get_rlocn0(&hdr);
+
+            let mut text = vec![0; rl.size as usize];
+            let first_read = min(pvarea.size - rl.offset, rl.size) as usize;
+
+            try!(f.seek(SeekFrom::Start(pvarea.offset + rl.offset)));
+            try!(f.read(&mut text[..first_read]));
+
+            if first_read != rl.size as usize {
+                try!(f.seek(SeekFrom::Start(
+                    pvarea.offset + MDA_HEADER_SIZE as u64)));
+                try!(f.read(&mut text[rl.size as usize - first_read..]));
+            }
+
+            if rl.checksum != crc32_calc(&text) {
+                return Err(Error::new(Other, "MDA text checksum failure"));
+            }
+
+            return buf_to_textmap(&text);
+        }
+
+        return Err(Error::new(Other, "No valid metadata found"));
+    }
+
+    /// Write the given metadata to all metadata areas in the PV.
+    pub fn write_metadata(&mut self, map: &LvmTextMap) -> io::Result<()> {
+
+        let mut f = try!(OpenOptions::new().read(true).write(true)
+                         .open(&self.dev_path));
+
+        for pvarea in &self.metadata_areas {
+            let mut hdr = [0u8; MDA_HEADER_SIZE];
+            try!(Self::read_mda_header(&pvarea, &mut hdr, &mut f));
+
+            let rl = Self::get_rlocn0(&hdr);
+
+            let mut text = textmap_to_buf(map);
+            // Ends with one null
+            text.push(b'\0');
+
+            // start at next sector in loop, but skip 0th sector
+            let start_off = min(MDA_HEADER_SIZE as u64,
+                                (align_to(
+                                    (rl.offset + rl.size) as usize,
+                                    SECTOR_SIZE)
+                                 % pvarea.size as usize) as u64);
+            let tail_space = pvarea.size as u64 - start_off;
+
+            assert_eq!(start_off % SECTOR_SIZE as u64, 0);
+            assert_eq!(tail_space % SECTOR_SIZE as u64, 0);
+
+            let written = if tail_space != 0 {
+                try!(f.seek(
+                    SeekFrom::Start(pvarea.offset + start_off)));
+                try!(f.write_all(&text[..min(tail_space as usize, text.len())]));
+                min(tail_space as usize, text.len())
+            } else {
+                0
+            };
+
+            if written != text.len() {
+                try!(f.seek(
+                    SeekFrom::Start(pvarea.offset + MDA_HEADER_SIZE as u64)));
+                try!(f.write_all(&text[written as usize..]));
+            }
+
+            Self::set_rlocn0(&mut hdr,
+                &RawLocn {
+                    offset: start_off,
+                    size: text.len() as u64,
+                    checksum: crc32_calc(&text),
+                    ignored: false,
+                });
+
+            try!(Self::write_mda_header(&pvarea, &mut hdr, &mut f));
+        }
 
         Ok(())
     }
 
-    fn get_rlocn0(&self) -> RawLocn {
-        let raw_locns: Vec<_> = iter_raw_locn(&self.hdr[40..]).collect();
-        let rlocn_len = raw_locns.len();
-        if rlocn_len != 1 {
-            panic!("Expecting 1 rlocn, found {}", rlocn_len);
-        }
+    fn read_mda_header(area: &PvArea, hdr: &mut [u8; MDA_HEADER_SIZE], file: &mut File)
+                        -> io::Result<()> {
+        assert!(area.size as usize > MDA_HEADER_SIZE);
+        try!(file.seek(SeekFrom::Start(area.offset)));
+        try!(file.read(hdr));
 
-        raw_locns[0].clone()
+        Self::verify_mda_header(hdr)
     }
 
-    fn set_rlocn0(&mut self, rl: &RawLocn) -> () {
-        let mut raw_locn = &mut self.hdr[40..];
 
-        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
-        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
-        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+    fn write_mda_header(area: &PvArea, hdr: &mut [u8; MDA_HEADER_SIZE], file: &mut File)
+                        -> io::Result<()> {
+        let csum = crc32_calc(&hdr[4..]);
+        LittleEndian::write_u32(&mut hdr[..4], csum);
 
-        let flags = rl.ignored as u32;
+        try!(file.seek(SeekFrom::Start(area.offset)));
+        try!(file.write_all(hdr));
 
-        LittleEndian::write_u32(&mut raw_locn[20..24], flags);
-    }
-
-    /// Read the metadata contained in the metadata area.
-    pub fn read_metadata(&mut self) -> Result<LvmTextMap> {
-        let rl = self.get_rlocn0();
-
-        let mut text = vec![0; rl.size as usize];
-        let first_read = min(self.area_len - rl.offset, rl.size) as usize;
-
-        try!(self.file.seek(SeekFrom::Start(self.area_offset + rl.offset)));
-        try!(self.file.read(&mut text[..first_read]));
-
-        if first_read != rl.size as usize {
-            try!(self.file.seek(SeekFrom::Start(
-                self.area_offset + MDA_HEADER_SIZE as u64)));
-            try!(self.file.read(&mut text[rl.size as usize - first_read..]));
-        }
-
-        if !crc32_ok(rl.checksum, &text) {
-            return Err(Error::new(Other, "MDA text checksum failure"));
-        }
-
-        parser::buf_to_textmap(&text)
-    }
-
-    /// Write a new version of the metadata to the metadata area.
-    pub fn write_metadata(&mut self, map: &LvmTextMap) -> Result<()> {
-        let raw_locn = self.get_rlocn0();
-
-        let mut text = textmap_to_buf(map);
-        // Ends with one null
-        text.push(b'\0');
-
-        // start at next sector in loop, but skip 0th sector
-        let start_off = min(MDA_HEADER_SIZE as u64,
-                            (align_to(
-                                (raw_locn.offset + raw_locn.size) as usize,
-                                SECTOR_SIZE)
-                             % self.area_len as usize) as u64);
-        let tail_space = self.area_len as u64 - start_off;
-
-        assert_eq!(start_off % SECTOR_SIZE as u64, 0);
-        assert_eq!(tail_space % SECTOR_SIZE as u64, 0);
-
-        let written = if tail_space != 0 {
-            try!(self.file.seek(
-                SeekFrom::Start(self.area_offset + start_off)));
-            try!(self.file.write_all(
-                &text[..min(tail_space as usize, text.len())]));
-            min(tail_space as usize, text.len())
-        } else {
-            0
-        };
-
-        if written != text.len() {
-            try!(self.file.seek(
-                SeekFrom::Start(self.area_offset as u64 + MDA_HEADER_SIZE as u64)));
-            try!(self.file.write_all(
-                &text[written as usize..]));
-        }
-
-        self.set_rlocn0(
-            &RawLocn {
-                offset: start_off,
-                size: text.len() as u64,
-                checksum: crc32_calc(&text),
-                ignored: false,
-            });
-
-        self.write_mda_header()
+        Ok(())
     }
 }
 
@@ -412,7 +431,7 @@ pub fn scan_for_pvs(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
                         { Some(dir_e.unwrap().path()) } else {None} )
             .filter(|path| {
                 (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
-            .filter(|path| { find_pvheader_in_dev(&path).is_ok() })
+            .filter(|path| { PvHeader::find_in_dev(&path).is_ok() })
             .collect::<Vec<_>>());
     }
 

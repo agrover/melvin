@@ -285,37 +285,14 @@ impl PvHeader {
         LittleEndian::write_u32(&mut raw_locn[20..24], flags);
     }
 
-    fn verify_mda_header(buf: &[u8; MDA_HEADER_SIZE]) -> io::Result<()> {
-        if LittleEndian::read_u32(&buf[..4]) != crc32_calc(&buf[4..MDA_HEADER_SIZE]) {
-            return Err(Error::new(Other, "MDA header checksum failure"));
-        }
-
-        if &buf[4..20] != MDA_MAGIC {
-            return Err(Error::new(
-                Other, format!("'{}' doesn't match MDA_MAGIC",
-                               String::from_utf8_lossy(&buf[4..20]))));
-        }
-
-        let ver = LittleEndian::read_u32(&buf[20..24]);
-        if ver != 1 {
-            return Err(Error::new(Other, "Bad version, expected 1"));
-        }
-
-        // TODO: validate these somehow
-        //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
-        //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
-        Ok(())
-    }
-
     /// Read the metadata contained in the metadata area.
     /// In the case of multiple metadata areas, return the information
     /// from the first valid one.
     pub fn read_metadata(&self) -> io::Result<LvmTextMap> {
         let mut f = try!(OpenOptions::new().read(true).open(&self.dev_path));
 
-        let mut hdr = [0u8; MDA_HEADER_SIZE];
         for pvarea in &self.metadata_areas {
-            try!(Self::read_mda_header(&pvarea, &mut hdr, &mut f));
+            let hdr = try!(Self::read_mda_header(&pvarea, &mut f));
 
             let rl = Self::get_rlocn0(&hdr);
 
@@ -348,8 +325,7 @@ impl PvHeader {
                          .open(&self.dev_path));
 
         for pvarea in &self.metadata_areas {
-            let mut hdr = [0u8; MDA_HEADER_SIZE];
-            try!(Self::read_mda_header(&pvarea, &mut hdr, &mut f));
+            let mut hdr = try!(Self::read_mda_header(&pvarea, &mut f));
 
             let rl = Self::get_rlocn0(&hdr);
 
@@ -397,13 +373,32 @@ impl PvHeader {
         Ok(())
     }
 
-    fn read_mda_header(area: &PvArea, hdr: &mut [u8; MDA_HEADER_SIZE], file: &mut File)
-                        -> io::Result<()> {
+    fn read_mda_header(area: &PvArea, file: &mut File)
+                        -> io::Result<[u8; MDA_HEADER_SIZE]> {
         assert!(area.size as usize > MDA_HEADER_SIZE);
         try!(file.seek(SeekFrom::Start(area.offset)));
-        try!(file.read(hdr));
+        let mut hdr = [0u8; MDA_HEADER_SIZE];
+        try!(file.read(&mut hdr));
 
-        Self::verify_mda_header(hdr)
+        if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
+            return Err(Error::new(Other, "MDA header checksum failure"));
+        }
+
+        if &hdr[4..20] != MDA_MAGIC {
+            return Err(Error::new(
+                Other, format!("'{}' doesn't match MDA_MAGIC",
+                               String::from_utf8_lossy(&hdr[4..20]))));
+        }
+
+        let ver = LittleEndian::read_u32(&hdr[20..24]);
+        if ver != 1 {
+            return Err(Error::new(Other, "Bad version, expected 1"));
+        }
+
+        // TODO: validate these somehow
+        //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
+        //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
+        Ok(hdr)
     }
 
 

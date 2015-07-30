@@ -132,7 +132,7 @@ impl<'a> Iterator for PvAreaIter<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct RawLocn {
     offset: u64,
     size: u64,
@@ -263,14 +263,8 @@ impl PvHeader {
         return Ok(pvheader);
     }
 
-    fn get_rlocn0(buf: &[u8]) -> RawLocn {
-        let raw_locns: Vec<_> = iter_raw_locn(&buf[40..]).collect();
-        let rlocn_len = raw_locns.len();
-        if rlocn_len != 1 {
-            panic!("Expecting 1 rlocn, found {}", rlocn_len);
-        }
-
-        raw_locns[0].clone()
+    fn get_rlocn0(buf: &[u8]) -> Option<RawLocn> {
+        iter_raw_locn(&buf[40..]).next()
     }
 
     fn set_rlocn0(buf: &mut [u8], rl: &RawLocn) -> () {
@@ -294,7 +288,14 @@ impl PvHeader {
         for pvarea in &self.metadata_areas {
             let hdr = try!(Self::read_mda_header(&pvarea, &mut f));
 
-            let rl = Self::get_rlocn0(&hdr);
+            let rl = match Self::get_rlocn0(&hdr) {
+                None => continue,
+                Some(x) => x,
+            };
+
+            if rl.ignored {
+                continue
+            }
 
             let mut text = vec![0; rl.size as usize];
             let first_read = min(pvarea.size - rl.offset, rl.size) as usize;
@@ -318,7 +319,7 @@ impl PvHeader {
         return Err(Error::new(Other, "No valid metadata found"));
     }
 
-    /// Write the given metadata to all metadata areas in the PV.
+    /// Write the given metadata to all active metadata areas in the PV.
     pub fn write_metadata(&mut self, map: &LvmTextMap) -> io::Result<()> {
 
         let mut f = try!(OpenOptions::new().read(true).write(true)
@@ -327,7 +328,20 @@ impl PvHeader {
         for pvarea in &self.metadata_areas {
             let mut hdr = try!(Self::read_mda_header(&pvarea, &mut f));
 
-            let rl = Self::get_rlocn0(&hdr);
+            // If this is the first write, supply an initial RawLocn template
+            let rl = match Self::get_rlocn0(&hdr) {
+                None => RawLocn {
+                    offset: MDA_HEADER_SIZE as u64,
+                    size: 0,
+                    checksum: 0,
+                    ignored: false,
+                },
+                Some(x) => x,
+            };
+
+            if rl.ignored {
+                continue
+            }
 
             let mut text = textmap_to_buf(map);
             // Ends with one null
@@ -364,7 +378,7 @@ impl PvHeader {
                     offset: start_off,
                     size: text.len() as u64,
                     checksum: crc32_calc(&text),
-                    ignored: false,
+                    ignored: rl.ignored,
                 });
 
             try!(Self::write_mda_header(&pvarea, &mut hdr, &mut f));

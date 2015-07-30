@@ -55,6 +55,7 @@ impl LabelHeader {
             if &sec_buf[..8] == b"LABELONE" {
                 let crc = LittleEndian::read_u32(&sec_buf[16..20]);
                 if crc != crc32_calc(&sec_buf[20..SECTOR_SIZE]) {
+                    return Err(Error::new(Other, "Label CRC error"));
                 }
 
                 let sector = LittleEndian::read_u64(&sec_buf[8..16]);

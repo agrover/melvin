@@ -27,19 +27,16 @@ use std::cmp::min;
 use std::slice::bytes::copy_memory;
 
 use byteorder::{LittleEndian, ByteOrder};
-use crc::crc32;
 use nix::sys::stat;
 
 use parser;
 
 use parser::{LvmTextMap, buf_to_textmap, textmap_to_buf};
-use util::align_to;
+use util::{align_to, crc32_calc};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
 const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
-const INITIAL_CRC: u32 = 0xf597a6cf;
-const CRC_SEED: u32 = 0xedb88320;
 const SECTOR_SIZE: usize = 512;
 const MDA_HEADER_SIZE: usize = 512;
 
@@ -189,23 +186,6 @@ fn pv_header_from_buf(buf: &[u8]) -> Result<PvHeader> {
         metadata_areas: md_vec,
         bootloader_areas: ba_vec,
     })
-}
-
-fn crc32_ok(val: u32, buf: &[u8]) -> bool {
-    let crc32 = crc32_calc(buf);
-
-    if val != crc32 {
-        println!("CRC32: input {:x} != calculated {:x}", val, crc32);
-    }
-    val == crc32
-}
-
-fn crc32_calc(buf: &[u8]) -> u32 {
-    let table = crc32::make_table(CRC_SEED);
-
-    // For some reason, we need to negate the initial CRC value
-    // and the result, to match what LVM2 is generating.
-    !crc32::update(!INITIAL_CRC, &table, buf)
 }
 
 #[derive(Debug, PartialEq, Clone)]

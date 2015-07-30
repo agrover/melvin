@@ -24,7 +24,7 @@ use dm::dm_ioctl as dmi;
 use lv::LV;
 use vg::VG;
 use util::align_to;
-use pv;
+use pv::Device;
 
 const DM_IOCTL: u8 = 0xfd;
 const DM_CTL_PATH: &'static str= "/dev/mapper/control";
@@ -87,7 +87,7 @@ impl <'a> DM<'a> {
 
     /// Returns a list of tuples containing DM device names and their major/minor
     /// device numbers.
-    pub fn list_devices(&self) -> io::Result<Vec<(String, u64)>> {
+    pub fn list_devices(&self) -> io::Result<Vec<(String, Device)>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 
@@ -108,7 +108,7 @@ impl <'a> DM<'a> {
             loop {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
                 let devno = LittleEndian::read_u64(&result[..8]);
-                devs.push((String::from_utf8_lossy(slc).into_owned(), devno));
+                devs.push((String::from_utf8_lossy(slc).into_owned(), Device::from(devno as i64)));
 
                 let next = LittleEndian::read_u32(&result[8..12]);
                 if next == 0 { break }
@@ -137,7 +137,7 @@ impl <'a> DM<'a> {
             _ => { }
         };
 
-        lv.device = Some(pv::Device::from(hdr.dev as i64));
+        lv.device = Some(Device::from(hdr.dev as i64));
 
         Ok(())
     }

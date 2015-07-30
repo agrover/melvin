@@ -55,10 +55,10 @@ impl FromStr for Device {
     type Err = LvmDeviceError;
     fn from_str(s: &str) -> Result<Device, LvmDeviceError> {
         match s.parse::<i64>() {
-            Ok(x) => Ok(Device::from(x)),
+            Ok(x) => Ok(Device::from(x as u64)),
             Err(_) => {
                 match Path::new(s).metadata() {
-                    Ok(x) => Ok(Device::from(x.dev() as i64)),
+                    Ok(x) => Ok(Device::from(x.dev())),
                     Err(_) => Err(LvmDeviceError::IoError)
                 }
             }
@@ -66,15 +66,15 @@ impl FromStr for Device {
     }
 }
 
-impl From<i64> for Device {
-    fn from(val: i64) -> Device {
+impl From<u64> for Device {
+    fn from(val: u64) -> Device {
         Device { major: (val >> 8) as u32, minor: (val & 0xff) as u8 }
     }
 }
 
-impl From<Device> for i64 {
-    fn from(dev: Device) -> i64 {
-        ((dev.major << 8) ^ (dev.minor as u32 & 0xff)) as i64
+impl From<Device> for u64 {
+    fn from(dev: Device) -> u64 {
+        ((dev.major << 8) ^ (dev.minor as u32 & 0xff)) as u64
     }
 }
 
@@ -104,7 +104,8 @@ impl From<PV> for LvmTextMap {
         let mut map = LvmTextMap::new();
 
         map.insert("id".to_string(), Entry::String(pv.id));
-        map.insert("device".to_string(), Entry::Number(pv.device.into()));
+        let tmp: u64 = pv.device.into();
+        map.insert("device".to_string(), Entry::Number(tmp as i64));
 
         map.insert("status".to_string(),
                    Entry::List(

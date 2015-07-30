@@ -461,7 +461,7 @@ fn device_from_textmap(map: &LvmTextMap) -> io::Result<Device> {
                 Err(_) => Err(Error::new(Other, "could not parse string"))
             }
         },
-        Some(&Entry::Number(x)) => Ok(Device::from(x)),
+        Some(&Entry::Number(x)) => Ok(Device::from(x as u64)),
         _ => Err(Error::new(Other, "device textmap parsing error")),
     }
 }

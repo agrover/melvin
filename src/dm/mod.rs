@@ -108,7 +108,7 @@ impl <'a> DM<'a> {
             loop {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
                 let devno = LittleEndian::read_u64(&result[..8]);
-                devs.push((String::from_utf8_lossy(slc).into_owned(), Device::from(devno as i64)));
+                devs.push((String::from_utf8_lossy(slc).into_owned(), Device::from(devno)));
 
                 let next = LittleEndian::read_u32(&result[8..12]);
                 if next == 0 { break }
@@ -137,7 +137,7 @@ impl <'a> DM<'a> {
             _ => { }
         };
 
-        lv.device = Some(Device::from(hdr.dev as i64));
+        lv.device = Some(Device::from(hdr.dev));
 
         Ok(())
     }

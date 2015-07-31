@@ -153,7 +153,12 @@ impl VG {
         vg_update_lvmetad(&map)
     }
 
-    // Returns e.g. {"pv0": {0: 45, 47: 100} }
+    // Returns e.g. {"pv0": {0: 45, 47: 100, 100: 200} }
+    // This means extents 0-44 are used, 45 and 46 are not,
+    // 47-99 are used, then 100-199 are used.
+    //
+    // Adjacent used areas are not merged.
+    //
     // PVs with no used areas are not in the outer map at all.
     //
     fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
@@ -172,6 +177,11 @@ impl VG {
         used_map
     }
 
+    // Returns e.g. {"pv0": {45: 47, 200: 1000} }
+    // (assuming pv0 has 1000 extents)
+    //
+    // PVs with no used areas are not in the outer map at all.
+    //
     fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 

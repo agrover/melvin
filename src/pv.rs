@@ -5,6 +5,7 @@
 //! Physical Volumes
 
 use std::str::FromStr;
+use std::io;
 use std::io::{BufReader, BufRead};
 use std::path::{Path, PathBuf};
 use std::fs::{File, PathExt};
@@ -45,22 +46,15 @@ impl Device {
     }
 }
 
-/// Errors that can occur when converting from a String into a Device
-#[derive(Debug)]
-pub enum LvmDeviceError {
-    /// IO Error
-    IoError,
-}
-
 impl FromStr for Device {
-    type Err = LvmDeviceError;
-    fn from_str(s: &str) -> Result<Device, LvmDeviceError> {
+    type Err = io::Error;
+    fn from_str(s: &str) -> io::Result<Device> {
         match s.parse::<i64>() {
             Ok(x) => Ok(Device::from(x as u64)),
             Err(_) => {
                 match Path::new(s).metadata() {
                     Ok(x) => Ok(Device::from(x.rdev())),
-                    Err(_) => Err(LvmDeviceError::IoError)
+                    Err(x) => Err(x)
                 }
             }
         }

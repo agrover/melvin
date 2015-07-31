@@ -46,6 +46,7 @@ impl Device {
 }
 
 /// Errors that can occur when converting from a String into a Device
+#[derive(Debug)]
 pub enum LvmDeviceError {
     /// IO Error
     IoError,

@@ -42,6 +42,8 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
         println!("pvheader {:#?}", pvheader);
         let map = try!(pvheader.read_metadata());
 
+        // Find the textmap for the vg, among all the other stuff.
+        // (It's the only textmap.)
         for (key, value) in map {
             match value {
                 parser::Entry::TextMap(x) => return Ok((key, *x)),

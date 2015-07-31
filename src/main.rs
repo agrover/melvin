@@ -10,6 +10,7 @@ use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::str::FromStr;
 
 use melvin::parser;
 use melvin::parser::LvmTextMap;
@@ -17,7 +18,19 @@ use melvin::parser::TextMapOps;
 use melvin::lvmetad;
 use melvin::pvlabel;
 use melvin::pvlabel::PvHeader;
+use melvin::pv::Device;
 use melvin::dm;
+
+fn print_pvheaders() -> Result<()> {
+    let dirs = vec![path::Path::new("/dev")];
+
+    for path in try!(pvlabel::scan_for_pvs(&dirs)) {
+        let pvheader = try!(PvHeader::find_in_dev(&path));
+        println!("pvheader {:#?}", pvheader);
+    }
+
+    Ok(())
+}
 
 
 fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
@@ -25,6 +38,7 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
 
     for path in try!(pvlabel::scan_for_pvs(&dirs)) {
         let pvheader = try!(PvHeader::find_in_dev(&path));
+        println!("pvheader {:#?}", pvheader);
         let map = try!(pvheader.read_metadata());
 
         for (key, value) in map {
@@ -51,8 +65,10 @@ fn get_conf() -> Result<LvmTextMap> {
 }
 
 fn main() {
-    let (name, map) = get_first_vg_meta().unwrap();
-    let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
+    println!("{:?}", PvHeader::initialize(&Device::from_str("/dev/vdc1").unwrap()));
+    print_pvheaders();
+    // let (name, map) = get_first_vg_meta().unwrap();
+    // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
     // println!("heyo {} {}", vg.extents(), vg.extent_size);
     // println!("output {:?}", vg);
 

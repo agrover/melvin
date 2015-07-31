@@ -301,16 +301,17 @@ impl PvHeader {
             LittleEndian::write_u64(&mut pvh[ID_LEN..ID_LEN+8], dev_size);
             let mut pvh = &mut pvh[ID_LEN+8..];
 
-            // define two mdas of 1024K and one data area
-            // First mda starts at 5th sector
+            // mda0 starts at 5th sector
             let mda0_offset = (LABEL_SCAN_SECTORS * SECTOR_SIZE) as u64;
-            let mda0_length = DEFAULT_MDA_SIZE;
+            // mda0's length is reduced a little by the header length,
+            // maybe to keep the data area aligned to 1MB?
+            let mda0_length = DEFAULT_MDA_SIZE - mda0_offset;
 
             if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
                 return Err(Error::new(Other, "Device too small"));
             }
 
-            // mda0:da0:mda1
+            // da0 defined first, but "in the middle"
             LittleEndian::write_u64(pvh, mda0_offset + mda0_length);
             let mut pvh = &mut pvh[8..];
             LittleEndian::write_u64(pvh, 0); // da0 length is not used

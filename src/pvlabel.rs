@@ -209,9 +209,9 @@ impl PvHeader {
     // - if version > 0
     //   - 0+ bootloader areas (usually 0)
     //
-    /// Parse a buf containing the on-disk pvheader and create a struct
-    /// representing it.
-    pub fn from_buf(buf: &[u8], path: &Path) -> Result<PvHeader> {
+    // Parse a buf containing the on-disk pvheader and create a struct
+    // representing it.
+    fn from_buf(buf: &[u8], path: &Path) -> Result<PvHeader> {
 
         let mut da_buf = &buf[ID_LEN+8..];
 
@@ -259,7 +259,7 @@ impl PvHeader {
         try!(f.read(&mut buf));
 
         let label_header = try!(LabelHeader::from_buf(&buf));
-        let pvheader = try!(PvHeader::from_buf(&buf[label_header.offset as usize..], path));
+        let pvheader = try!(Self::from_buf(&buf[label_header.offset as usize..], path));
 
         return Ok(pvheader);
     }

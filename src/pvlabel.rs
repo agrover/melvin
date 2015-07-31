@@ -278,7 +278,7 @@ impl PvHeader {
 
     /// Initialize a device as a PV with reasonable defaults: two metadata
     /// areas, no bootsector area, and size based on the device's size.
-    pub fn initialize(dev: &Device) -> Result<()> {
+    pub fn initialize(dev: &Device) -> Result<PvHeader> {
 
         let pathbuf = match dev.path() {
             Some(x) => x,
@@ -345,7 +345,9 @@ impl PvHeader {
         LabelHeader::initialize(&mut sec_buf);
 
         try!(f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64)));
-        f.write_all(&mut sec_buf)
+        try!(f.write_all(&mut sec_buf));
+
+        Self::from_buf(&mut sec_buf[LABEL_SIZE..], &pathbuf)
     }
 
     fn get_rlocn0(buf: &[u8]) -> Option<RawLocn> {

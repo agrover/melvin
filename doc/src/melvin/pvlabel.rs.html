@@ -443,6 +443,135 @@
 <span id="401">401</span>
 <span id="402">402</span>
 <span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -450,28 +579,47 @@
 
 <span class='doccomment'>//! Reading and writing LVM on-disk labels and metadata.</span>
 
+<span class='comment'>//</span>
+<span class='comment'>// label is at start of sectors 0-3, usually 1</span>
+<span class='comment'>// label includes offset of pvheader (also within 1st 4 sectors)</span>
+<span class='comment'>// pvheader includes ptrs to data (1), metadata(0-2), and boot(0-1) areas</span>
+<span class='comment'>// metadata area (MDA), located anywhere, starts with 512b mda header, then</span>
+<span class='comment'>//   large text area</span>
+<span class='comment'>// mda header has 40b of stuff, then rlocns[].</span>
+<span class='comment'>// rlocns point into mda text area. rlocn 0 used for text metadata, rlocn 1</span>
+<span class='comment'>//   points to precommitted data (not currently supported by Melvin)</span>
+<span class='comment'>// text metadata written aligned to sector-size; text area treated as circular</span>
+<span class='comment'>//   and text may wrap across end to beginning</span>
+<span class='comment'>// text metadata contains vg metadata in lvm config text format. Each write</span>
+<span class='comment'>//   increments seqno.</span>
+<span class='comment'>//</span>
+
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::{<span class='ident'>Read</span>, <span class='ident'>Write</span>, <span class='prelude-ty'>Result</span>, <span class='ident'>Error</span>, <span class='ident'>Seek</span>, <span class='ident'>SeekFrom</span>};
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>path</span>::{<span class='ident'>Path</span>, <span class='ident'>PathBuf</span>};
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>fs</span>::{<span class='ident'>File</span>, <span class='ident'>read_dir</span>, <span class='ident'>OpenOptions</span>};
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>cmp</span>::<span class='ident'>min</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>slice</span>::<span class='ident'>bytes</span>::<span class='ident'>copy_memory</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>os</span>::<span class='ident'>unix</span>::<span class='ident'>io</span>::<span class='ident'>AsRawFd</span>;
 
 <span class='kw'>use</span> <span class='ident'>byteorder</span>::{<span class='ident'>LittleEndian</span>, <span class='ident'>ByteOrder</span>};
-<span class='kw'>use</span> <span class='ident'>crc</span>::<span class='ident'>crc32</span>;
-<span class='kw'>use</span> <span class='ident'>nix</span>::<span class='ident'>sys</span>::<span class='ident'>stat</span>;
+<span class='kw'>use</span> <span class='ident'>nix</span>::<span class='ident'>sys</span>::{<span class='ident'>stat</span>, <span class='ident'>ioctl</span>};
+<span class='kw'>use</span> <span class='ident'>uuid</span>::<span class='ident'>Uuid</span>;
 
-<span class='kw'>use</span> <span class='ident'>parser</span>;
-
-<span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>buf_to_textmap</span>, <span class='ident'>textmap_to_buf</span>};
-<span class='kw'>use</span> <span class='ident'>util</span>::<span class='ident'>align_to</span>;
+<span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>textmap_to_buf</span>, <span class='ident'>buf_to_textmap</span>};
+<span class='kw'>use</span> <span class='ident'>util</span>::{<span class='ident'>align_to</span>, <span class='ident'>crc32_calc</span>};
+<span class='kw'>use</span> <span class='ident'>pv</span>::<span class='ident'>Device</span>;
 
 <span class='kw'>const</span> <span class='ident'>LABEL_SCAN_SECTORS</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>4</span>;
 <span class='kw'>const</span> <span class='ident'>ID_LEN</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>32</span>;
 <span class='kw'>const</span> <span class='ident'>MDA_MAGIC</span>: <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;static</span> [<span class='ident'>u8</span>] <span class='op'>=</span> <span class='string'>b&quot;\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e&quot;</span>;
-<span class='kw'>const</span> <span class='ident'>INITIAL_CRC</span>: <span class='ident'>u32</span> <span class='op'>=</span> <span class='number'>0xf597a6cf</span>;
-<span class='kw'>const</span> <span class='ident'>CRC_SEED</span>: <span class='ident'>u32</span> <span class='op'>=</span> <span class='number'>0xedb88320</span>;
+<span class='kw'>const</span> <span class='ident'>LABEL_SIZE</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>32</span>;
+<span class='kw'>const</span> <span class='ident'>LABEL_SECTOR</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>1</span>;
 <span class='kw'>const</span> <span class='ident'>SECTOR_SIZE</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>512</span>;
 <span class='kw'>const</span> <span class='ident'>MDA_HEADER_SIZE</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>512</span>;
+<span class='kw'>const</span> <span class='ident'>DEFAULT_MDA_SIZE</span>: <span class='ident'>u64</span> <span class='op'>=</span> (<span class='number'>1024</span> <span class='op'>*</span> <span class='number'>1024</span>);
+<span class='kw'>const</span> <span class='ident'>EXTENSION_VERSION</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>1</span>;
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
 <span class='kw'>struct</span> <span class='ident'>LabelHeader</span> {
@@ -482,48 +630,53 @@
     <span class='ident'>label</span>: <span class='ident'>String</span>,
 }
 
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
-<span class='kw'>struct</span> <span class='ident'>PvArea</span> {
-    <span class='ident'>offset</span>: <span class='ident'>u64</span>,
-    <span class='ident'>size</span>: <span class='ident'>u64</span>,
-}
+<span class='kw'>impl</span> <span class='ident'>LabelHeader</span> {
+    <span class='kw'>fn</span> <span class='ident'>from_buf</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LabelHeader</span><span class='op'>&gt;</span> {
+        <span class='kw'>for</span> <span class='ident'>x</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='ident'>LABEL_SCAN_SECTORS</span> {
+            <span class='kw'>let</span> <span class='ident'>sec_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span>..<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span><span class='op'>+</span><span class='ident'>SECTOR_SIZE</span>];
+            <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[..<span class='number'>8</span>] <span class='op'>==</span> <span class='string'>b&quot;LABELONE&quot;</span> {
+                <span class='kw'>let</span> <span class='ident'>crc</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>16</span>..<span class='number'>20</span>]);
+                <span class='kw'>if</span> <span class='ident'>crc</span> <span class='op'>!=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='ident'>SECTOR_SIZE</span>]) {
+                    <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Label CRC error&quot;</span>));
+                }
 
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
-<span class='kw'>struct</span> <span class='ident'>PvHeader</span> {
-    <span class='ident'>uuid</span>: <span class='ident'>String</span>,
-    <span class='ident'>size</span>: <span class='ident'>u64</span>, <span class='comment'>// in bytes</span>
-    <span class='ident'>ext_version</span>: <span class='ident'>u32</span>,
-    <span class='ident'>ext_flags</span>: <span class='ident'>u32</span>,
-    <span class='ident'>data_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
-    <span class='ident'>metadata_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
-    <span class='ident'>bootloader_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
-}
+                <span class='kw'>let</span> <span class='ident'>sector</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>8</span>..<span class='number'>16</span>]);
+                <span class='kw'>if</span> <span class='ident'>sector</span> <span class='op'>!=</span> <span class='ident'>x</span> <span class='kw'>as</span> <span class='ident'>u64</span> {
+                    <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Sector field should equal sector count&quot;</span>));
+                }
 
-
-<span class='kw'>fn</span> <span class='ident'>get_label_header</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LabelHeader</span><span class='op'>&gt;</span> {
-
-    <span class='kw'>for</span> <span class='ident'>x</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='ident'>LABEL_SCAN_SECTORS</span> {
-        <span class='kw'>let</span> <span class='ident'>sec_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span>..<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span><span class='op'>+</span><span class='ident'>SECTOR_SIZE</span>];
-        <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[..<span class='number'>8</span>] <span class='op'>==</span> <span class='string'>b&quot;LABELONE&quot;</span> {
-            <span class='kw'>let</span> <span class='ident'>crc</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>16</span>..<span class='number'>20</span>]);
-            <span class='ident'>crc32_ok</span>(<span class='ident'>crc</span>, <span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='ident'>SECTOR_SIZE</span>]);
-
-            <span class='kw'>let</span> <span class='ident'>sector</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>8</span>..<span class='number'>16</span>]);
-            <span class='kw'>if</span> <span class='ident'>sector</span> <span class='op'>!=</span> <span class='ident'>x</span> <span class='kw'>as</span> <span class='ident'>u64</span> {
-                <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Sector field should equal sector count&quot;</span>));
+                <span class='kw'>return</span> <span class='prelude-val'>Ok</span>(<span class='ident'>LabelHeader</span>{
+                    <span class='ident'>id</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[..<span class='number'>8</span>]).<span class='ident'>into_owned</span>(),
+                    <span class='ident'>sector</span>: <span class='ident'>sector</span>,
+                    <span class='ident'>crc</span>: <span class='ident'>crc</span>,
+                    <span class='comment'>// switch from &quot;offset from label&quot; to &quot;offset from start&quot;, more convenient.</span>
+                    <span class='ident'>offset</span>: <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='number'>24</span>]) <span class='op'>+</span> (<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>usize</span>) <span class='kw'>as</span> <span class='ident'>u32</span>,
+                    <span class='ident'>label</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>24</span>..<span class='number'>32</span>]).<span class='ident'>into_owned</span>(),
+                })
             }
-
-            <span class='kw'>return</span> <span class='prelude-val'>Ok</span>(<span class='ident'>LabelHeader</span>{
-                <span class='ident'>id</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[..<span class='number'>8</span>]).<span class='ident'>into_owned</span>(),
-                <span class='ident'>sector</span>: <span class='ident'>sector</span>,
-                <span class='ident'>crc</span>: <span class='ident'>crc</span>,
-                <span class='ident'>offset</span>: <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='number'>24</span>]) <span class='op'>+</span> (<span class='ident'>x</span><span class='op'>*</span><span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>usize</span>) <span class='kw'>as</span> <span class='ident'>u32</span>,
-                <span class='ident'>label</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>24</span>..<span class='number'>32</span>]).<span class='ident'>into_owned</span>(),
-            })
         }
+
+        <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Label not found&quot;</span>))
     }
 
-    <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Label not found&quot;</span>))
+    <span class='doccomment'>/// Initialize a device with a label header.</span>
+    <span class='kw'>fn</span> <span class='ident'>initialize</span>(<span class='ident'>sec_buf</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>; <span class='ident'>SECTOR_SIZE</span>]) <span class='op'>-&gt;</span> () {
+        <span class='ident'>copy_memory</span>(<span class='string'>b&quot;LABELONE&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[..<span class='number'>8</span>]);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>u64</span>);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>LABEL_SIZE</span> <span class='kw'>as</span> <span class='ident'>u32</span>);
+        <span class='ident'>copy_memory</span>(<span class='string'>b&quot;LVM2 001&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>24</span>..<span class='number'>32</span>]);
+        <span class='kw'>let</span> <span class='ident'>crc_val</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..]);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>crc_val</span>);
+    }
+}
+
+<span class='doccomment'>/// Describes an area within a PV</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>, <span class='ident'>Copy</span>)]</span>
+<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>PvArea</span> {
+    <span class='doccomment'>/// The offset from the start of the device in bytes</span>
+    <span class='kw'>pub</span> <span class='ident'>offset</span>: <span class='ident'>u64</span>,
+    <span class='doccomment'>/// The size in bytes</span>
+    <span class='kw'>pub</span> <span class='ident'>size</span>: <span class='ident'>u64</span>,
 }
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
@@ -555,77 +708,12 @@
     }
 }
 
-<span class='comment'>//</span>
-<span class='comment'>// PV HEADER LAYOUT:</span>
-<span class='comment'>// - static header (uuid and size)</span>
-<span class='comment'>// - 0+ data areas (actually max 1, usually 1; size 0 == &quot;rest of blkdev&quot;)</span>
-<span class='comment'>// - blank entry</span>
-<span class='comment'>// - 0+ metadata areas (max 1, usually 1)</span>
-<span class='comment'>// - blank entry</span>
-<span class='comment'>// - 8 bytes of pvextension header</span>
-<span class='comment'>// - if version &gt; 0</span>
-<span class='comment'>//   - 0+ bootloader areas (usually 0)</span>
-<span class='comment'>//</span>
-<span class='kw'>fn</span> <span class='ident'>get_pv_header</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
-
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
-
-    <span class='kw'>let</span> <span class='ident'>da_vec</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
-
-    <span class='comment'>// move slice past any actual entries plus blank</span>
-    <span class='comment'>// terminating entry</span>
-    <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[(<span class='ident'>da_vec</span>.<span class='ident'>len</span>()<span class='op'>+</span><span class='number'>1</span>)<span class='op'>*</span><span class='number'>16</span>..];
-
-    <span class='kw'>let</span> <span class='ident'>md_vec</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
-
-    <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[(<span class='ident'>md_vec</span>.<span class='ident'>len</span>()<span class='op'>+</span><span class='number'>1</span>)<span class='op'>*</span><span class='number'>16</span>..];
-
-    <span class='kw'>let</span> <span class='ident'>ext_version</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[..<span class='number'>4</span>]);
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ext_flags</span> <span class='op'>=</span> <span class='number'>0</span>;
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ba_vec</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
-
-    <span class='kw'>if</span> <span class='ident'>ext_version</span> <span class='op'>!=</span> <span class='number'>0</span> {
-        <span class='ident'>ext_flags</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[<span class='number'>4</span>..<span class='number'>8</span>]);
-
-        <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[<span class='number'>8</span>..];
-
-        <span class='ident'>ba_vec</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
-    }
-
-    <span class='prelude-val'>Ok</span>(<span class='ident'>PvHeader</span>{
-        <span class='ident'>uuid</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[..<span class='ident'>ID_LEN</span>]).<span class='ident'>into_owned</span>(),
-        <span class='ident'>size</span>: <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>]),
-        <span class='ident'>ext_version</span>: <span class='ident'>ext_version</span>,
-        <span class='ident'>ext_flags</span>: <span class='ident'>ext_flags</span>,
-        <span class='ident'>data_areas</span>: <span class='ident'>da_vec</span>,
-        <span class='ident'>metadata_areas</span>: <span class='ident'>md_vec</span>,
-        <span class='ident'>bootloader_areas</span>: <span class='ident'>ba_vec</span>,
-    })
-}
-
-<span class='kw'>fn</span> <span class='ident'>crc32_ok</span>(<span class='ident'>val</span>: <span class='ident'>u32</span>, <span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='ident'>bool</span> {
-    <span class='kw'>let</span> <span class='ident'>crc32</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='ident'>buf</span>);
-
-    <span class='kw'>if</span> <span class='ident'>val</span> <span class='op'>!=</span> <span class='ident'>crc32</span> {
-        <span class='macro'>println</span><span class='macro'>!</span>(<span class='string'>&quot;CRC32: input {:x} != calculated {:x}&quot;</span>, <span class='ident'>val</span>, <span class='ident'>crc32</span>);
-    }
-    <span class='ident'>val</span> <span class='op'>==</span> <span class='ident'>crc32</span>
-}
-
-<span class='kw'>fn</span> <span class='ident'>crc32_calc</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='ident'>u32</span> {
-    <span class='kw'>let</span> <span class='ident'>table</span> <span class='op'>=</span> <span class='ident'>crc32</span>::<span class='ident'>make_table</span>(<span class='ident'>CRC_SEED</span>);
-
-    <span class='comment'>// For some reason, we need to negate the initial CRC value</span>
-    <span class='comment'>// and the result, to match what LVM2 is generating.</span>
-    <span class='op'>!</span><span class='ident'>crc32</span>::<span class='ident'>update</span>(<span class='op'>!</span><span class='ident'>INITIAL_CRC</span>, <span class='kw-2'>&amp;</span><span class='ident'>table</span>, <span class='ident'>buf</span>)
-}
-
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>, <span class='ident'>Copy</span>)]</span>
 <span class='kw'>struct</span> <span class='ident'>RawLocn</span> {
     <span class='ident'>offset</span>: <span class='ident'>u64</span>,
     <span class='ident'>size</span>: <span class='ident'>u64</span>,
     <span class='ident'>checksum</span>: <span class='ident'>u32</span>,
-    <span class='ident'>flags</span>: <span class='ident'>u32</span>,
+    <span class='ident'>ignored</span>: <span class='ident'>bool</span>,
 }
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
@@ -655,64 +743,327 @@
                 <span class='ident'>offset</span>: <span class='ident'>off</span>,
                 <span class='ident'>size</span>: <span class='ident'>size</span>,
                 <span class='ident'>checksum</span>: <span class='ident'>checksum</span>,
-                <span class='ident'>flags</span>: <span class='ident'>flags</span>,
+                <span class='ident'>ignored</span>: (<span class='ident'>flags</span> <span class='kw-2'>&amp;</span> <span class='number'>1</span>) <span class='op'>&gt;</span> <span class='number'>0</span>,
             })
         }
     }
 }
 
-<span class='kw'>fn</span> <span class='ident'>find_pv_in_dev</span>(<span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
-
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>File</span>::<span class='ident'>open</span>(<span class='ident'>path</span>));
-
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>buf</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>LABEL_SCAN_SECTORS</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>];
-
-    <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>));
-
-    <span class='kw'>let</span> <span class='ident'>label_header</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>get_label_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>));
-    <span class='kw'>let</span> <span class='ident'>pvheader</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>get_pv_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>label_header</span>.<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>usize</span>..]));
-
-    <span class='kw'>return</span> <span class='prelude-val'>Ok</span>(<span class='ident'>pvheader</span>);
+<span class='doccomment'>/// A struct containing the values in the PV header. It contains pointers to</span>
+<span class='doccomment'>/// the data area, and possibly metadata areas and bootloader area.</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
+<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>PvHeader</span> {
+    <span class='doccomment'>/// The unique identifier.</span>
+    <span class='kw'>pub</span> <span class='ident'>uuid</span>: <span class='ident'>String</span>,
+    <span class='doccomment'>/// Size in bytes of the entire PV</span>
+    <span class='kw'>pub</span> <span class='ident'>size</span>: <span class='ident'>u64</span>,
+    <span class='doccomment'>/// Extension version. If 1, we look for an extension header that may contain a reference</span>
+    <span class='doccomment'>/// to a bootloader area.</span>
+    <span class='kw'>pub</span> <span class='ident'>ext_version</span>: <span class='ident'>u32</span>,
+    <span class='doccomment'>/// Extension flags, of which there are none.</span>
+    <span class='kw'>pub</span> <span class='ident'>ext_flags</span>: <span class='ident'>u32</span>,
+    <span class='doccomment'>/// A list of the data areas.</span>
+    <span class='kw'>pub</span> <span class='ident'>data_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
+    <span class='doccomment'>/// A list of the metadata areas.</span>
+    <span class='kw'>pub</span> <span class='ident'>metadata_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
+    <span class='doccomment'>/// A list of the bootloader areas.</span>
+    <span class='kw'>pub</span> <span class='ident'>bootloader_areas</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvArea</span><span class='op'>&gt;</span>,
+    <span class='doccomment'>/// The device this pvheader is for</span>
+    <span class='kw'>pub</span> <span class='ident'>dev_path</span>: <span class='ident'>PathBuf</span>,
 }
 
-<span class='doccomment'>/// A handle to an LVM on-disk metadata area (MDA)</span>
-<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>MDA</span> {
-    <span class='ident'>file</span>: <span class='ident'>File</span>,
-    <span class='ident'>hdr</span>: [<span class='ident'>u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>],
-    <span class='ident'>area_offset</span>: <span class='ident'>u64</span>,
-    <span class='ident'>area_len</span>: <span class='ident'>u64</span>,
-}
+<span class='kw'>impl</span> <span class='ident'>PvHeader</span> {
+    <span class='comment'>//</span>
+    <span class='comment'>// PV HEADER LAYOUT:</span>
+    <span class='comment'>// - static header (uuid and size)</span>
+    <span class='comment'>// - 0+ data areas (actually max 1, usually 1; size 0 == &quot;rest of blkdev&quot;)</span>
+    <span class='comment'>//   Remember to subtract mda1 size if present.</span>
+    <span class='comment'>// - blank entry</span>
+    <span class='comment'>// - 0+ metadata areas (max 2, usually 1)</span>
+    <span class='comment'>// - blank entry</span>
+    <span class='comment'>// - 8 bytes of pvextension header</span>
+    <span class='comment'>// - if version &gt; 0</span>
+    <span class='comment'>//   - 0+ bootloader areas (usually 0)</span>
+    <span class='comment'>//</span>
+    <span class='doccomment'>/// Parse a buf containing the on-disk pvheader and create a struct</span>
+    <span class='doccomment'>/// representing it.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>from_buf</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>], <span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
 
-<span class='kw'>impl</span> <span class='ident'>MDA</span> {
-    <span class='doccomment'>/// Construct an MDA given a path to a block device containing an LVM Physical Volume (PV)</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>new</span>(<span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>MDA</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>pvheader</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>find_pv_in_dev</span>(<span class='kw-2'>&amp;</span><span class='ident'>path</span>));
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
 
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>read</span>(<span class='boolval'>true</span>).<span class='ident'>write</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='ident'>path</span>));
+        <span class='kw'>let</span> <span class='ident'>da_vec</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
 
-        <span class='kw'>let</span> <span class='ident'>mda_areas</span> <span class='op'>=</span> <span class='ident'>pvheader</span>.<span class='ident'>metadata_areas</span>.<span class='ident'>len</span>();
-        <span class='kw'>if</span> <span class='ident'>mda_areas</span> <span class='op'>!=</span> <span class='number'>1</span> {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(
-                <span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;Expecting 1 mda, found {}&quot;</span>, <span class='ident'>mda_areas</span>)));
+        <span class='comment'>// move slice past any actual entries plus blank</span>
+        <span class='comment'>// terminating entry</span>
+        <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[(<span class='ident'>da_vec</span>.<span class='ident'>len</span>()<span class='op'>+</span><span class='number'>1</span>)<span class='op'>*</span><span class='number'>16</span>..];
+
+        <span class='kw'>let</span> <span class='ident'>md_vec</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
+
+        <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[(<span class='ident'>md_vec</span>.<span class='ident'>len</span>()<span class='op'>+</span><span class='number'>1</span>)<span class='op'>*</span><span class='number'>16</span>..];
+
+        <span class='kw'>let</span> <span class='ident'>ext_version</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[..<span class='number'>4</span>]);
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ext_flags</span> <span class='op'>=</span> <span class='number'>0</span>;
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ba_vec</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+
+        <span class='kw'>if</span> <span class='ident'>ext_version</span> <span class='op'>!=</span> <span class='number'>0</span> {
+            <span class='ident'>ext_flags</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[<span class='number'>4</span>..<span class='number'>8</span>]);
+
+            <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>da_buf</span>[<span class='number'>8</span>..];
+
+            <span class='ident'>ba_vec</span> <span class='op'>=</span> <span class='ident'>iter_pv_area</span>(<span class='ident'>da_buf</span>).<span class='ident'>collect</span>();
         }
 
-        <span class='kw'>let</span> <span class='ident'>md</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>pvheader</span>.<span class='ident'>metadata_areas</span>[<span class='number'>0</span>];
-        <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>md</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>&gt;</span> <span class='ident'>MDA_HEADER_SIZE</span>);
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>md</span>.<span class='ident'>offset</span>)));
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>buf</span> <span class='op'>=</span> [<span class='number'>0</span>; <span class='ident'>MDA_HEADER_SIZE</span>];
+        <span class='prelude-val'>Ok</span>(<span class='ident'>PvHeader</span>{
+            <span class='ident'>uuid</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[..<span class='ident'>ID_LEN</span>]).<span class='ident'>into_owned</span>(),
+            <span class='ident'>size</span>: <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>]),
+            <span class='ident'>ext_version</span>: <span class='ident'>ext_version</span>,
+            <span class='ident'>ext_flags</span>: <span class='ident'>ext_flags</span>,
+            <span class='ident'>data_areas</span>: <span class='ident'>da_vec</span>,
+            <span class='ident'>metadata_areas</span>: <span class='ident'>md_vec</span>,
+            <span class='ident'>bootloader_areas</span>: <span class='ident'>ba_vec</span>,
+            <span class='ident'>dev_path</span>: <span class='ident'>path</span>.<span class='ident'>to_owned</span>(),
+        })
+    }
+
+    <span class='doccomment'>/// Find the PvHeader struct in a given device.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>find_in_dev</span>(<span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>File</span>::<span class='ident'>open</span>(<span class='ident'>path</span>));
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>buf</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>LABEL_SCAN_SECTORS</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>];
+
         <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>));
 
-        <span class='kw'>if</span> <span class='op'>!</span><span class='ident'>crc32_ok</span>(<span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[..<span class='number'>4</span>]), <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>4</span>..<span class='ident'>MDA_HEADER_SIZE</span>]) {
+        <span class='kw'>let</span> <span class='ident'>label_header</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>LabelHeader</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>));
+        <span class='kw'>let</span> <span class='ident'>pvheader</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>PvHeader</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>label_header</span>.<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>usize</span>..], <span class='ident'>path</span>));
+
+        <span class='kw'>return</span> <span class='prelude-val'>Ok</span>(<span class='ident'>pvheader</span>);
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>blkdev_size</span>(<span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='ident'>File</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>u64</span><span class='op'>&gt;</span> {
+        <span class='comment'>// BLKGETSIZE64</span>
+        <span class='kw'>let</span> <span class='ident'>op</span> <span class='op'>=</span> <span class='ident'>ioctl</span>::<span class='ident'>op_read</span>(<span class='number'>0x12</span>, <span class='number'>114</span>, <span class='number'>8</span>);
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>val</span>: <span class='ident'>u64</span> <span class='op'>=</span> <span class='number'>0</span>;
+
+        <span class='kw'>match</span> <span class='kw'>unsafe</span> { <span class='ident'>ioctl</span>::<span class='ident'>read_into</span>(<span class='ident'>file</span>.<span class='ident'>as_raw_fd</span>(), <span class='ident'>op</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>val</span>) } {
+            <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>((<span class='ident'>io</span>::<span class='ident'>Error</span>::<span class='ident'>last_os_error</span>())),
+            <span class='prelude-val'>Ok</span>(_) <span class='op'>=&gt;</span> <span class='prelude-val'>Ok</span>(<span class='ident'>val</span>),
+        }
+    }
+
+    <span class='doccomment'>/// Initialize a device as a PV with reasonable defaults: two metadata</span>
+    <span class='doccomment'>/// areas, no bootsector area, and size based on the device&#39;s size.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>initialize</span>(<span class='ident'>dev</span>: <span class='kw-2'>&amp;</span><span class='ident'>Device</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+
+        <span class='kw'>let</span> <span class='ident'>pathbuf</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>dev</span>.<span class='ident'>path</span>() {
+            <span class='prelude-val'>Some</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
+            <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Could not get path from Device&quot;</span>)),
+        };
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>write</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='ident'>pathbuf</span>));
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>sec_buf</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>SECTOR_SIZE</span>];
+
+        <span class='comment'>// Fill in pvheader</span>
+        {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='ident'>LABEL_SIZE</span>..];
+
+            <span class='ident'>copy_memory</span>(<span class='ident'>Uuid</span>::<span class='ident'>new_v4</span>().<span class='ident'>to_simple_string</span>().<span class='ident'>as_bytes</span>(),
+                        <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[..<span class='ident'>ID_LEN</span>]);
+
+            <span class='kw'>let</span> <span class='ident'>dev_size</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>blkdev_size</span>(<span class='kw-2'>&amp;</span><span class='ident'>f</span>));
+
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>], <span class='ident'>dev_size</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
+
+            <span class='comment'>// define two mdas of 1024K and one data area</span>
+            <span class='comment'>// First mda starts at 5th sector</span>
+            <span class='kw'>let</span> <span class='ident'>mda0_offset</span> <span class='op'>=</span> (<span class='ident'>LABEL_SCAN_SECTORS</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>) <span class='kw'>as</span> <span class='ident'>u64</span>;
+            <span class='kw'>let</span> <span class='ident'>mda0_length</span> <span class='op'>=</span> <span class='ident'>DEFAULT_MDA_SIZE</span>;
+
+            <span class='kw'>if</span> <span class='ident'>dev_size</span> <span class='op'>&lt;</span> ((<span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>*</span> <span class='number'>2</span>) <span class='op'>+</span> <span class='ident'>mda0_offset</span>) {
+                <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Device too small&quot;</span>));
+            }
+
+            <span class='comment'>// mda0:da0:mda1</span>
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_offset</span> <span class='op'>+</span> <span class='ident'>mda0_length</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='number'>0</span>); <span class='comment'>// da0 length is not used</span>
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+
+            <span class='comment'>// skip 16 bytes to indicate end of da list</span>
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>16</span>..];
+
+            <span class='comment'>// mda0 at start of PV</span>
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_offset</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_length</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+
+            <span class='comment'>// mda1 at end of PV</span>
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>dev_size</span> <span class='op'>-</span> <span class='ident'>DEFAULT_MDA_SIZE</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>DEFAULT_MDA_SIZE</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+
+            <span class='comment'>// skip 16 bytes to indicate end of mda list</span>
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>16</span>..];
+
+            <span class='comment'>// Extension header</span>
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='ident'>pvh</span>, <span class='ident'>EXTENSION_VERSION</span> <span class='kw'>as</span> <span class='ident'>u32</span>);
+
+            <span class='comment'>// everything else is 0 so we&#39;re finished</span>
+        }
+
+        <span class='comment'>// Must do label last since it calcs crc over everything</span>
+        <span class='ident'>LabelHeader</span>::<span class='ident'>initialize</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>);
+
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
+        <span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>)
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>get_rlocn0</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>RawLocn</span><span class='op'>&gt;</span> {
+        <span class='ident'>iter_raw_locn</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>40</span>..]).<span class='ident'>next</span>()
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>set_rlocn0</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>], <span class='ident'>rl</span>: <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span>) <span class='op'>-&gt;</span> () {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>raw_locn</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>[<span class='number'>40</span>..];
+
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[..<span class='number'>8</span>], <span class='ident'>rl</span>.<span class='ident'>offset</span>);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>rl</span>.<span class='ident'>size</span>);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>rl</span>.<span class='ident'>checksum</span>);
+
+        <span class='kw'>let</span> <span class='ident'>flags</span> <span class='op'>=</span> <span class='ident'>rl</span>.<span class='ident'>ignored</span> <span class='kw'>as</span> <span class='ident'>u32</span>;
+
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>flags</span>);
+    }
+
+    <span class='doccomment'>/// Read the metadata contained in the metadata area.</span>
+    <span class='doccomment'>/// In the case of multiple metadata areas, return the information</span>
+    <span class='doccomment'>/// from the first valid one.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>read_metadata</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>read</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>dev_path</span>));
+
+        <span class='kw'>for</span> <span class='ident'>pvarea</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>metadata_areas</span> {
+            <span class='kw'>let</span> <span class='ident'>hdr</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
+
+            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>Self</span>::<span class='ident'>get_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>) {
+                <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
+                <span class='prelude-val'>Some</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
+            };
+
+            <span class='kw'>if</span> <span class='ident'>rl</span>.<span class='ident'>ignored</span> {
+                <span class='kw'>continue</span>
+            }
+
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>text</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>0</span>; <span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span>];
+            <span class='kw'>let</span> <span class='ident'>first_read</span> <span class='op'>=</span> <span class='ident'>min</span>(<span class='ident'>pvarea</span>.<span class='ident'>size</span> <span class='op'>-</span> <span class='ident'>rl</span>.<span class='ident'>offset</span>, <span class='ident'>rl</span>.<span class='ident'>size</span>) <span class='kw'>as</span> <span class='ident'>usize</span>;
+
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>pvarea</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>rl</span>.<span class='ident'>offset</span>)));
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>text</span>[..<span class='ident'>first_read</span>]));
+
+            <span class='kw'>if</span> <span class='ident'>first_read</span> <span class='op'>!=</span> <span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> {
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(
+                    <span class='ident'>pvarea</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>text</span>[<span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>-</span> <span class='ident'>first_read</span>..]));
+            }
+
+            <span class='kw'>if</span> <span class='ident'>rl</span>.<span class='ident'>checksum</span> <span class='op'>!=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>) {
+                <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;MDA text checksum failure&quot;</span>));
+            }
+
+            <span class='kw'>return</span> <span class='ident'>buf_to_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>);
+        }
+
+        <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;No valid metadata found&quot;</span>));
+    }
+
+    <span class='doccomment'>/// Write the given metadata to all active metadata areas in the PV.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>write_metadata</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>read</span>(<span class='boolval'>true</span>).<span class='ident'>write</span>(<span class='boolval'>true</span>)
+                         .<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>dev_path</span>));
+
+        <span class='kw'>for</span> <span class='ident'>pvarea</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>metadata_areas</span> {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
+
+            <span class='comment'>// If this is the first write, supply an initial RawLocn template</span>
+            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>Self</span>::<span class='ident'>get_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>) {
+                <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='ident'>RawLocn</span> {
+                    <span class='ident'>offset</span>: <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>,
+                    <span class='ident'>size</span>: <span class='number'>0</span>,
+                    <span class='ident'>checksum</span>: <span class='number'>0</span>,
+                    <span class='ident'>ignored</span>: <span class='boolval'>false</span>,
+                },
+                <span class='prelude-val'>Some</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
+            };
+
+            <span class='kw'>if</span> <span class='ident'>rl</span>.<span class='ident'>ignored</span> {
+                <span class='kw'>continue</span>
+            }
+
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>text</span> <span class='op'>=</span> <span class='ident'>textmap_to_buf</span>(<span class='ident'>map</span>);
+            <span class='comment'>// Ends with one null</span>
+            <span class='ident'>text</span>.<span class='ident'>push</span>(<span class='string'>b&#39;\0&#39;</span>);
+
+            <span class='comment'>// start at next sector in loop, but skip 0th sector</span>
+            <span class='kw'>let</span> <span class='ident'>start_off</span> <span class='op'>=</span> <span class='ident'>min</span>(<span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>,
+                                (<span class='ident'>align_to</span>(
+                                    (<span class='ident'>rl</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>rl</span>.<span class='ident'>size</span>) <span class='kw'>as</span> <span class='ident'>usize</span>,
+                                    <span class='ident'>SECTOR_SIZE</span>)
+                                 <span class='op'>%</span> <span class='ident'>pvarea</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span>) <span class='kw'>as</span> <span class='ident'>u64</span>);
+            <span class='kw'>let</span> <span class='ident'>tail_space</span> <span class='op'>=</span> <span class='ident'>pvarea</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>-</span> <span class='ident'>start_off</span>;
+
+            <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>start_off</span> <span class='op'>%</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>, <span class='number'>0</span>);
+            <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>tail_space</span> <span class='op'>%</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>, <span class='number'>0</span>);
+
+            <span class='kw'>let</span> <span class='ident'>written</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='ident'>tail_space</span> <span class='op'>!=</span> <span class='number'>0</span> {
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(
+                    <span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>pvarea</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>start_off</span>)));
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>[..<span class='ident'>min</span>(<span class='ident'>tail_space</span> <span class='kw'>as</span> <span class='ident'>usize</span>, <span class='ident'>text</span>.<span class='ident'>len</span>())]));
+                <span class='ident'>min</span>(<span class='ident'>tail_space</span> <span class='kw'>as</span> <span class='ident'>usize</span>, <span class='ident'>text</span>.<span class='ident'>len</span>())
+            } <span class='kw'>else</span> {
+                <span class='number'>0</span>
+            };
+
+            <span class='kw'>if</span> <span class='ident'>written</span> <span class='op'>!=</span> <span class='ident'>text</span>.<span class='ident'>len</span>() {
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(
+                    <span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>pvarea</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
+                <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>[<span class='ident'>written</span> <span class='kw'>as</span> <span class='ident'>usize</span>..]));
+            }
+
+            <span class='ident'>Self</span>::<span class='ident'>set_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>,
+                <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span> {
+                    <span class='ident'>offset</span>: <span class='ident'>start_off</span>,
+                    <span class='ident'>size</span>: <span class='ident'>text</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>u64</span>,
+                    <span class='ident'>checksum</span>: <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>),
+                    <span class='ident'>ignored</span>: <span class='ident'>rl</span>.<span class='ident'>ignored</span>,
+                });
+
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>write_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
+        }
+
+        <span class='prelude-val'>Ok</span>(())
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>read_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>)
+                        <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>[<span class='ident'>u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>]<span class='op'>&gt;</span> {
+        <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>area</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>&gt;</span> <span class='ident'>MDA_HEADER_SIZE</span>);
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>];
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>));
+
+        <span class='kw'>if</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[..<span class='number'>4</span>]) <span class='op'>!=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='ident'>MDA_HEADER_SIZE</span>]) {
             <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;MDA header checksum failure&quot;</span>));
         }
 
-        <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>4</span>..<span class='number'>20</span>] <span class='op'>!=</span> <span class='ident'>MDA_MAGIC</span> {
+        <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>] <span class='op'>!=</span> <span class='ident'>MDA_MAGIC</span> {
             <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(
                 <span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;&#39;{}&#39; doesn&#39;t match MDA_MAGIC&quot;</span>,
-                               <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>4</span>..<span class='number'>20</span>]))));
+                               <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>]))));
         }
 
-        <span class='kw'>let</span> <span class='ident'>ver</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>20</span>..<span class='number'>24</span>]);
+        <span class='kw'>let</span> <span class='ident'>ver</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>20</span>..<span class='number'>24</span>]);
         <span class='kw'>if</span> <span class='ident'>ver</span> <span class='op'>!=</span> <span class='number'>1</span> {
             <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Bad version, expected 1&quot;</span>));
         }
@@ -720,112 +1071,19 @@
         <span class='comment'>// TODO: validate these somehow</span>
         <span class='comment'>//println!(&quot;mdah start {}&quot;, LittleEndian::read_u64(&amp;buf[24..32]));</span>
         <span class='comment'>//println!(&quot;mdah size {}&quot;, LittleEndian::read_u64(&amp;buf[32..40]));</span>
-
-        <span class='prelude-val'>Ok</span>(<span class='ident'>MDA</span> {
-            <span class='ident'>file</span>: <span class='ident'>f</span>,
-            <span class='ident'>hdr</span>: <span class='ident'>buf</span>,
-            <span class='ident'>area_offset</span>: <span class='ident'>md</span>.<span class='ident'>offset</span>,
-            <span class='ident'>area_len</span>: <span class='ident'>md</span>.<span class='ident'>size</span>,
-        })
+        <span class='prelude-val'>Ok</span>(<span class='ident'>hdr</span>)
     }
 
-    <span class='kw'>fn</span> <span class='ident'>write_mda_header</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>csum</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>hdr</span>[<span class='number'>4</span>..]);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>.<span class='ident'>hdr</span>[..<span class='number'>4</span>], <span class='ident'>csum</span>);
 
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='self'>self</span>.<span class='ident'>area_offset</span>)));
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>.<span class='ident'>hdr</span>));
+    <span class='kw'>fn</span> <span class='ident'>write_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>hdr</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>], <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>)
+                        <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>csum</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..]);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[..<span class='number'>4</span>], <span class='ident'>csum</span>);
+
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>write_all</span>(<span class='ident'>hdr</span>));
 
         <span class='prelude-val'>Ok</span>(())
-    }
-
-    <span class='kw'>fn</span> <span class='ident'>get_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>RawLocn</span> {
-        <span class='kw'>let</span> <span class='ident'>raw_locns</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>iter_raw_locn</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>hdr</span>[<span class='number'>40</span>..]).<span class='ident'>collect</span>();
-        <span class='kw'>let</span> <span class='ident'>rlocn_len</span> <span class='op'>=</span> <span class='ident'>raw_locns</span>.<span class='ident'>len</span>();
-        <span class='kw'>if</span> <span class='ident'>rlocn_len</span> <span class='op'>!=</span> <span class='number'>1</span> {
-            <span class='macro'>panic</span><span class='macro'>!</span>(<span class='string'>&quot;Expecting 1 rlocn, found {}&quot;</span>, <span class='ident'>rlocn_len</span>);
-        }
-
-        <span class='ident'>raw_locns</span>[<span class='number'>0</span>].<span class='ident'>clone</span>()
-    }
-
-    <span class='kw'>fn</span> <span class='ident'>set_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>rl</span>: <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span>) <span class='op'>-&gt;</span> () {
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>raw_locn</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>.<span class='ident'>hdr</span>[<span class='number'>40</span>..];
-
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[..<span class='number'>8</span>], <span class='ident'>rl</span>.<span class='ident'>offset</span>);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>rl</span>.<span class='ident'>size</span>);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>rl</span>.<span class='ident'>checksum</span>);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>rl</span>.<span class='ident'>flags</span>);
-    }
-
-    <span class='doccomment'>/// Read the metadata contained in the metadata area.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>read_metadata</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>get_rlocn0</span>();
-
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>text</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>0</span>; <span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span>];
-        <span class='kw'>let</span> <span class='ident'>first_read</span> <span class='op'>=</span> <span class='ident'>min</span>(<span class='self'>self</span>.<span class='ident'>area_len</span> <span class='op'>-</span> <span class='ident'>rl</span>.<span class='ident'>offset</span>, <span class='ident'>rl</span>.<span class='ident'>size</span>) <span class='kw'>as</span> <span class='ident'>usize</span>;
-
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='self'>self</span>.<span class='ident'>area_offset</span> <span class='op'>+</span> <span class='ident'>rl</span>.<span class='ident'>offset</span>)));
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>text</span>[..<span class='ident'>first_read</span>]));
-
-        <span class='kw'>if</span> <span class='ident'>first_read</span> <span class='op'>!=</span> <span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> {
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(
-                <span class='self'>self</span>.<span class='ident'>area_offset</span> <span class='op'>+</span> <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>text</span>[<span class='ident'>rl</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>-</span> <span class='ident'>first_read</span>..]));
-        }
-
-        <span class='kw'>if</span> <span class='op'>!</span><span class='ident'>crc32_ok</span>(<span class='ident'>rl</span>.<span class='ident'>checksum</span>, <span class='kw-2'>&amp;</span><span class='ident'>text</span>) {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;MDA text checksum failure&quot;</span>));
-        }
-
-        <span class='ident'>parser</span>::<span class='ident'>buf_to_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>)
-    }
-
-    <span class='doccomment'>/// Write a new version of the metadata to the metadata area.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>write_metadata</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>raw_locn</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>get_rlocn0</span>();
-
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>text</span> <span class='op'>=</span> <span class='ident'>textmap_to_buf</span>(<span class='ident'>map</span>);
-        <span class='comment'>// Ends with one null</span>
-        <span class='ident'>text</span>.<span class='ident'>push</span>(<span class='string'>b&#39;\0&#39;</span>);
-
-        <span class='comment'>// start at next sector in loop, but skip 0th sector</span>
-        <span class='kw'>let</span> <span class='ident'>start_off</span> <span class='op'>=</span> <span class='ident'>min</span>(<span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>,
-                            (<span class='ident'>align_to</span>(
-                                (<span class='ident'>raw_locn</span>.<span class='ident'>offset</span> <span class='op'>+</span> <span class='ident'>raw_locn</span>.<span class='ident'>size</span>) <span class='kw'>as</span> <span class='ident'>usize</span>,
-                                <span class='ident'>SECTOR_SIZE</span>)
-                             <span class='op'>%</span> <span class='self'>self</span>.<span class='ident'>area_len</span> <span class='kw'>as</span> <span class='ident'>usize</span>) <span class='kw'>as</span> <span class='ident'>u64</span>);
-        <span class='kw'>let</span> <span class='ident'>tail_space</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>area_len</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>-</span> <span class='ident'>start_off</span>;
-
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>start_off</span> <span class='op'>%</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>, <span class='number'>0</span>);
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>tail_space</span> <span class='op'>%</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>, <span class='number'>0</span>);
-
-        <span class='kw'>let</span> <span class='ident'>written</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='ident'>tail_space</span> <span class='op'>!=</span> <span class='number'>0</span> {
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>seek</span>(
-                <span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='self'>self</span>.<span class='ident'>area_offset</span> <span class='op'>+</span> <span class='ident'>start_off</span>)));
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>write_all</span>(
-                <span class='kw-2'>&amp;</span><span class='ident'>text</span>[..<span class='ident'>min</span>(<span class='ident'>tail_space</span> <span class='kw'>as</span> <span class='ident'>usize</span>, <span class='ident'>text</span>.<span class='ident'>len</span>())]));
-            <span class='ident'>min</span>(<span class='ident'>tail_space</span> <span class='kw'>as</span> <span class='ident'>usize</span>, <span class='ident'>text</span>.<span class='ident'>len</span>())
-        } <span class='kw'>else</span> {
-            <span class='number'>0</span>
-        };
-
-        <span class='kw'>if</span> <span class='ident'>written</span> <span class='op'>!=</span> <span class='ident'>text</span>.<span class='ident'>len</span>() {
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>seek</span>(
-                <span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='self'>self</span>.<span class='ident'>area_offset</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>+</span> <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>file</span>.<span class='ident'>write_all</span>(
-                <span class='kw-2'>&amp;</span><span class='ident'>text</span>[<span class='ident'>written</span> <span class='kw'>as</span> <span class='ident'>usize</span>..]));
-        }
-
-        <span class='self'>self</span>.<span class='ident'>set_rlocn0</span>(
-            <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span> {
-                <span class='ident'>offset</span>: <span class='ident'>start_off</span>,
-                <span class='ident'>size</span>: <span class='ident'>text</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>u64</span>,
-                <span class='ident'>checksum</span>: <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>),
-                <span class='ident'>flags</span>: <span class='number'>0</span>
-            });
-
-        <span class='self'>self</span>.<span class='ident'>write_mda_header</span>()
     }
 }
 
@@ -841,7 +1099,7 @@
                         { <span class='prelude-val'>Some</span>(<span class='ident'>dir_e</span>.<span class='ident'>unwrap</span>().<span class='ident'>path</span>()) } <span class='kw'>else</span> {<span class='prelude-val'>None</span>} )
             .<span class='ident'>filter</span>(<span class='op'>|</span><span class='ident'>path</span><span class='op'>|</span> {
                 (<span class='ident'>stat</span>::<span class='ident'>stat</span>(<span class='ident'>path</span>).<span class='ident'>unwrap</span>().<span class='ident'>st_mode</span> <span class='kw-2'>&amp;</span> <span class='number'>0x6000</span>) <span class='op'>==</span> <span class='number'>0x6000</span> }) <span class='comment'>// S_IFBLK</span>
-            .<span class='ident'>filter</span>(<span class='op'>|</span><span class='ident'>path</span><span class='op'>|</span> { <span class='ident'>find_pv_in_dev</span>(<span class='kw-2'>&amp;</span><span class='ident'>path</span>).<span class='ident'>is_ok</span>() })
+            .<span class='ident'>filter</span>(<span class='op'>|</span><span class='ident'>path</span><span class='op'>|</span> { <span class='ident'>PvHeader</span>::<span class='ident'>find_in_dev</span>(<span class='kw-2'>&amp;</span><span class='ident'>path</span>).<span class='ident'>is_ok</span>() })
             .<span class='ident'>collect</span>::<span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;&gt;</span>());
     }
 
@@ -854,37 +1112,44 @@
     <section class="footer"></section>
 
     <div id="help" class="hidden">
-        <div class="shortcuts">
-            <h1>Keyboard Shortcuts</h1>
-            <dl>
-                <dt>?</dt>
-                <dd>Show this help dialog</dd>
-                <dt>S</dt>
-                <dd>Focus the search field</dd>
-                <dt>&larrb;</dt>
-                <dd>Move up in search results</dd>
-                <dt>&rarrb;</dt>
-                <dd>Move down in search results</dd>
-                <dt>&#9166;</dt>
-                <dd>Go to active search result</dd>
-            </dl>
-        </div>
-        <div class="infos">
-            <h1>Search Tricks</h1>
-            <p>
-                Prefix searches with a type followed by a colon (e.g.
-                <code>fn:</code>) to restrict the search to a given type.
-            </p>
-            <p>
-                Accepted types are: <code>fn</code>, <code>mod</code>,
-                <code>struct</code>, <code>enum</code>,
-                <code>trait</code>, <code>typedef</code> (or
-                <code>tdef</code>).
-            </p>
-            <p>
-                Search functions by type signature (e.g.
-                <code>vec -> usize</code>)
-            </p>
+        <div>
+            <div class="shortcuts">
+                <h1>Keyboard Shortcuts</h1>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h1>Search Tricks</h1>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>typedef</code> (or
+                    <code>tdef</code>).
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
         </div>
     </div>
 

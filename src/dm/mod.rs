@@ -9,12 +9,14 @@ mod dm_ioctl;
 
 use std::fs::File;
 use std::io;
+use std::io::{BufReader, BufRead};
 use std::os::unix::io::AsRawFd;
 use std::mem;
 use std::slice;
 use std::slice::bytes::copy_memory;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::collections::BTreeSet;
 
 use byteorder::{LittleEndian, ByteOrder};
 
@@ -46,6 +48,29 @@ impl <'a> DM<'a> {
             file: try!(File::open(DM_CTL_PATH)),
             vg: vg,
         })
+    }
+
+    /// Determine if a major number is a major number used by DM.
+    pub fn is_dm_major(major: u32) -> bool {
+        let mut set = BTreeSet::new();
+
+        let f = File::open("/proc/devices")
+            .ok().expect("Could not open /proc/devices");
+
+        let reader = BufReader::new(f);
+
+        for line in reader.lines()
+            .filter_map(|x| x.ok())
+            .skip_while(|x| x != "Block devices:")
+            .skip(1) {
+                let spl: Vec<_> = line.split_whitespace().collect();
+
+                if spl[1] == "device-mapper" {
+                    set.insert(spl[0].parse::<u32>().unwrap());
+                }
+            }
+
+        set.contains(&major)
     }
 
     fn initialize_hdr(hdr: &mut dmi::Struct_dm_ioctl) -> () {

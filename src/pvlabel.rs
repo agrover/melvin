@@ -26,18 +26,25 @@ use std::path::{Path, PathBuf};
 use std::fs::{File, read_dir, OpenOptions};
 use std::cmp::min;
 use std::slice::bytes::copy_memory;
+use std::os::unix::io::AsRawFd;
 
 use byteorder::{LittleEndian, ByteOrder};
-use nix::sys::stat;
+use nix::sys::{stat, ioctl};
+use uuid::Uuid;
 
 use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap};
 use util::{align_to, crc32_calc};
+use pv::Device;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
 const MDA_MAGIC: &'static [u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
+const LABEL_SIZE: usize = 32;
+const LABEL_SECTOR: usize = 1;
 const SECTOR_SIZE: usize = 512;
 const MDA_HEADER_SIZE: usize = 512;
+const DEFAULT_MDA_SIZE: u64 = (1024 * 1024);
+const EXTENSION_VERSION: usize = 1;
 
 #[derive(Debug)]
 struct LabelHeader {
@@ -77,21 +84,14 @@ impl LabelHeader {
         Err(Error::new(Other, "Label not found"))
     }
 
-    fn write(&self, device: &Path) -> Result<()> {
-        let mut sec_buf = [0u8; SECTOR_SIZE];
-
-        copy_memory(self.id.as_bytes(), &mut sec_buf[..8]); // b"LABELONE"
-        LittleEndian::write_u64(&mut sec_buf[8..16], self.sector);
-        // switch back to "offset from label" from the more convenient "offset from start".
-        LittleEndian::write_u32(
-            &mut sec_buf[20..24], self.offset - (self.sector * SECTOR_SIZE as u64) as u32);
-        copy_memory(self.label.as_bytes(), &mut sec_buf[24..32]);
+    /// Initialize a device with a label header.
+    fn initialize(sec_buf: &mut [u8; SECTOR_SIZE]) -> () {
+        copy_memory(b"LABELONE", &mut sec_buf[..8]);
+        LittleEndian::write_u64(&mut sec_buf[8..16], LABEL_SECTOR as u64);
+        LittleEndian::write_u32(&mut sec_buf[20..24], LABEL_SIZE as u32);
+        copy_memory(b"LVM2 001", &mut sec_buf[24..32]);
         let crc_val = crc32_calc(&sec_buf[20..]);
         LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
-
-        let mut f = try!(OpenOptions::new().write(true).open(device));
-        try!(f.seek(SeekFrom::Start(self.sector * SECTOR_SIZE as u64)));
-        f.write_all(&mut sec_buf)
     }
 }
 
@@ -202,6 +202,7 @@ impl PvHeader {
     // PV HEADER LAYOUT:
     // - static header (uuid and size)
     // - 0+ data areas (actually max 1, usually 1; size 0 == "rest of blkdev")
+    //   Remember to subtract mda1 size if present.
     // - blank entry
     // - 0+ metadata areas (max 2, usually 1)
     // - blank entry
@@ -262,6 +263,88 @@ impl PvHeader {
         let pvheader = try!(PvHeader::from_buf(&buf[label_header.offset as usize..], path));
 
         return Ok(pvheader);
+    }
+
+    fn blkdev_size(file: &File) -> Result<u64> {
+        // BLKGETSIZE64
+        let op = ioctl::op_read(0x12, 114, 8);
+        let mut val: u64 = 0;
+
+        match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            Ok(_) => Ok(val),
+        }
+    }
+
+    /// Initialize a device as a PV with reasonable defaults: two metadata
+    /// areas, no bootsector area, and size based on the device's size.
+    pub fn initialize(dev: &Device) -> Result<()> {
+
+        let pathbuf = match dev.path() {
+            Some(x) => x,
+            None => return Err(Error::new(Other, "Could not get path from Device")),
+        };
+
+        let mut f = try!(OpenOptions::new().write(true).open(&pathbuf));
+
+        let mut sec_buf = [0u8; SECTOR_SIZE];
+
+        // Fill in pvheader
+        {
+            let mut pvh = &mut sec_buf[LABEL_SIZE..];
+
+            copy_memory(Uuid::new_v4().to_simple_string().as_bytes(),
+                        &mut pvh[..ID_LEN]);
+
+            let dev_size = try!(Self::blkdev_size(&f));
+
+            LittleEndian::write_u64(&mut pvh[ID_LEN..ID_LEN+8], dev_size);
+            let mut pvh = &mut pvh[ID_LEN+8..];
+
+            // define two mdas of 1024K and one data area
+            // First mda starts at 5th sector
+            let mda0_offset = (LABEL_SCAN_SECTORS * SECTOR_SIZE) as u64;
+            let mda0_length = DEFAULT_MDA_SIZE;
+
+            if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
+                return Err(Error::new(Other, "Device too small"));
+            }
+
+            // mda0:da0:mda1
+            LittleEndian::write_u64(pvh, mda0_offset + mda0_length);
+            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(pvh, 0); // da0 length is not used
+            let mut pvh = &mut pvh[8..];
+
+            // skip 16 bytes to indicate end of da list
+            let mut pvh = &mut pvh[16..];
+
+            // mda0 at start of PV
+            LittleEndian::write_u64(pvh, mda0_offset);
+            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(pvh, mda0_length);
+            let mut pvh = &mut pvh[8..];
+
+            // mda1 at end of PV
+            LittleEndian::write_u64(pvh, dev_size - DEFAULT_MDA_SIZE);
+            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(pvh, DEFAULT_MDA_SIZE);
+            let mut pvh = &mut pvh[8..];
+
+            // skip 16 bytes to indicate end of mda list
+            let mut pvh = &mut pvh[16..];
+
+            // Extension header
+            LittleEndian::write_u32(pvh, EXTENSION_VERSION as u32);
+
+            // everything else is 0 so we're finished
+        }
+
+        // Must do label last since it calcs crc over everything
+        LabelHeader::initialize(&mut sec_buf);
+
+        try!(f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64)));
+        f.write_all(&mut sec_buf)
     }
 
     fn get_rlocn0(buf: &[u8]) -> Option<RawLocn> {

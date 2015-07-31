@@ -11,6 +11,7 @@ use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::str::FromStr;
+use std::path::Path;
 
 use melvin::parser;
 use melvin::parser::LvmTextMap;
@@ -65,7 +66,7 @@ fn get_conf() -> Result<LvmTextMap> {
 }
 
 fn main() {
-    println!("{:?}", PvHeader::initialize(&Device::from_str("/dev/vdc1").unwrap()));
+    println!("{:?}", PvHeader::initialize(Path::new("/dev/vdc1")));
     print_pvheaders();
     // let (name, map) = get_first_vg_meta().unwrap();
     // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");

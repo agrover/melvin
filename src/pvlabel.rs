@@ -34,7 +34,6 @@ use uuid::Uuid;
 
 use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap};
 use util::{align_to, crc32_calc};
-use pv::Device;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -278,14 +277,9 @@ impl PvHeader {
 
     /// Initialize a device as a PV with reasonable defaults: two metadata
     /// areas, no bootsector area, and size based on the device's size.
-    pub fn initialize(dev: &Device) -> Result<PvHeader> {
+    pub fn initialize(path: &Path) -> Result<PvHeader> {
 
-        let pathbuf = match dev.path() {
-            Some(x) => x,
-            None => return Err(Error::new(Other, "Could not get path from Device")),
-        };
-
-        let mut f = try!(OpenOptions::new().write(true).open(&pathbuf));
+        let mut f = try!(OpenOptions::new().write(true).open(path));
 
         let mut sec_buf = [0u8; SECTOR_SIZE];
 
@@ -347,7 +341,7 @@ impl PvHeader {
         try!(f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64)));
         try!(f.write_all(&mut sec_buf));
 
-        Self::from_buf(&mut sec_buf[LABEL_SIZE..], &pathbuf)
+        Self::from_buf(&mut sec_buf[LABEL_SIZE..], path)
     }
 
     fn get_rlocn0(buf: &[u8]) -> Option<RawLocn> {

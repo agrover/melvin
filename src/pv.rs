@@ -58,7 +58,7 @@ impl FromStr for Device {
             Ok(x) => Ok(Device::from(x as u64)),
             Err(_) => {
                 match Path::new(s).metadata() {
-                    Ok(x) => Ok(Device::from(x.dev())),
+                    Ok(x) => Ok(Device::from(x.rdev())),
                     Err(_) => Err(LvmDeviceError::IoError)
                 }
             }

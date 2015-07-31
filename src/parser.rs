@@ -33,7 +33,7 @@ use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::str::FromStr;
 
-use std::collections::btree_map::BTreeMap;
+use std::collections::BTreeMap;
 
 use lv::{LV, Segment};
 use vg::VG;

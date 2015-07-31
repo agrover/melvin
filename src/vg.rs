@@ -7,7 +7,7 @@
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-use std::collections::btree_map::BTreeMap;
+use std::collections::BTreeMap;
 
 use uuid::Uuid;
 use time::now;

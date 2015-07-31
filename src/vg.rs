@@ -8,13 +8,14 @@ use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use uuid::Uuid;
 use time::now;
 use nix;
 
 use lv::{LV, Segment};
-use pv::PV;
+use pv::{PV, Device};
 use pvlabel::PvHeader;
 use parser::{LvmTextMap, Entry};
 use lvmetad::vg_update_lvmetad;
@@ -69,6 +70,31 @@ impl VG {
             .values()
             .map(|x| x.pe_count)
             .sum()
+    }
+
+    /// Add a non-affiliated PV to this VG.
+    pub fn add_pv(&mut self, pvh: &PvHeader) -> Result<()> {
+        // add_pv_to_vg
+        // check pv is not on an LV from the vg:
+        // 1) is pv's major a devicemapper major?
+        // 2) equiv. of dev_manager_device_uses_vg()
+        let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
+        if DM::is_dm_major(dev.major) {
+            println!("gotta check more against recursion");
+        }
+
+
+        // check pv is not already in the VG or another VG
+        // 1) does it have text metadata??
+
+        // figure out how many extents fit in the PV's data area
+        // pe_start = da.offset
+        // area_size = dev_size - da.offset - maybe(mda1.size)
+        // pe_count = area_size / vg.extent_size
+
+        // make a PV and add it to self
+
+        Ok(())
     }
 
     /// Create a new linear logical volume in the volume group.

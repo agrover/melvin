@@ -569,9 +569,6 @@
 <span id="527">527</span>
 <span id="528">528</span>
 <span id="529">529</span>
-<span id="530">530</span>
-<span id="531">531</span>
-<span id="532">532</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -609,7 +606,6 @@
 
 <span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>textmap_to_buf</span>, <span class='ident'>buf_to_textmap</span>};
 <span class='kw'>use</span> <span class='ident'>util</span>::{<span class='ident'>align_to</span>, <span class='ident'>crc32_calc</span>};
-<span class='kw'>use</span> <span class='ident'>pv</span>::<span class='ident'>Device</span>;
 
 <span class='kw'>const</span> <span class='ident'>LABEL_SCAN_SECTORS</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>4</span>;
 <span class='kw'>const</span> <span class='ident'>ID_LEN</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>32</span>;
@@ -785,9 +781,9 @@
     <span class='comment'>// - if version &gt; 0</span>
     <span class='comment'>//   - 0+ bootloader areas (usually 0)</span>
     <span class='comment'>//</span>
-    <span class='doccomment'>/// Parse a buf containing the on-disk pvheader and create a struct</span>
-    <span class='doccomment'>/// representing it.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>from_buf</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>], <span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
+    <span class='comment'>// Parse a buf containing the on-disk pvheader and create a struct</span>
+    <span class='comment'>// representing it.</span>
+    <span class='kw'>fn</span> <span class='ident'>from_buf</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>], <span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
 
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>da_buf</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
 
@@ -835,7 +831,7 @@
         <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>));
 
         <span class='kw'>let</span> <span class='ident'>label_header</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>LabelHeader</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>));
-        <span class='kw'>let</span> <span class='ident'>pvheader</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>PvHeader</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>label_header</span>.<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>usize</span>..], <span class='ident'>path</span>));
+        <span class='kw'>let</span> <span class='ident'>pvheader</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>label_header</span>.<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>usize</span>..], <span class='ident'>path</span>));
 
         <span class='kw'>return</span> <span class='prelude-val'>Ok</span>(<span class='ident'>pvheader</span>);
     }
@@ -853,14 +849,9 @@
 
     <span class='doccomment'>/// Initialize a device as a PV with reasonable defaults: two metadata</span>
     <span class='doccomment'>/// areas, no bootsector area, and size based on the device&#39;s size.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>initialize</span>(<span class='ident'>dev</span>: <span class='kw-2'>&amp;</span><span class='ident'>Device</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>initialize</span>(<span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> {
 
-        <span class='kw'>let</span> <span class='ident'>pathbuf</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>dev</span>.<span class='ident'>path</span>() {
-            <span class='prelude-val'>Some</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
-            <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Could not get path from Device&quot;</span>)),
-        };
-
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>write</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='ident'>pathbuf</span>));
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>write</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='ident'>path</span>));
 
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>sec_buf</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>SECTOR_SIZE</span>];
 
@@ -876,16 +867,17 @@
             <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>], <span class='ident'>dev_size</span>);
             <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
 
-            <span class='comment'>// define two mdas of 1024K and one data area</span>
-            <span class='comment'>// First mda starts at 5th sector</span>
+            <span class='comment'>// mda0 starts at 5th sector</span>
             <span class='kw'>let</span> <span class='ident'>mda0_offset</span> <span class='op'>=</span> (<span class='ident'>LABEL_SCAN_SECTORS</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>) <span class='kw'>as</span> <span class='ident'>u64</span>;
-            <span class='kw'>let</span> <span class='ident'>mda0_length</span> <span class='op'>=</span> <span class='ident'>DEFAULT_MDA_SIZE</span>;
+            <span class='comment'>// mda0&#39;s length is reduced a little by the header length,</span>
+            <span class='comment'>// maybe to keep the data area aligned to 1MB?</span>
+            <span class='kw'>let</span> <span class='ident'>mda0_length</span> <span class='op'>=</span> <span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>-</span> <span class='ident'>mda0_offset</span>;
 
             <span class='kw'>if</span> <span class='ident'>dev_size</span> <span class='op'>&lt;</span> ((<span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>*</span> <span class='number'>2</span>) <span class='op'>+</span> <span class='ident'>mda0_offset</span>) {
                 <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Device too small&quot;</span>));
             }
 
-            <span class='comment'>// mda0:da0:mda1</span>
+            <span class='comment'>// da0 defined first, but &quot;in the middle&quot;</span>
             <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_offset</span> <span class='op'>+</span> <span class='ident'>mda0_length</span>);
             <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
             <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='number'>0</span>); <span class='comment'>// da0 length is not used</span>
@@ -919,7 +911,9 @@
         <span class='ident'>LabelHeader</span>::<span class='ident'>initialize</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>);
 
         <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
-        <span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>)
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>));
+
+        <span class='ident'>Self</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='ident'>LABEL_SIZE</span>..], <span class='ident'>path</span>)
     }
 
     <span class='kw'>fn</span> <span class='ident'>get_rlocn0</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>RawLocn</span><span class='op'>&gt;</span> {

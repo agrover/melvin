@@ -45,7 +45,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-11050' class='srclink' href='../../src/melvin/vg.rs.html#25-50' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-11163' class='srclink' href='../../src/melvin/vg.rs.html#26-51' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct VG {
     pub name: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
     pub id: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
@@ -91,6 +91,8 @@
 <div class='docblock'><p>The total number of free extents in the volume group.</p>
 </div><h4 id='method.extents' class='method'><code>fn <a href='#method.extents' class='fnname'>extents</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a></code></h4>
 <div class='docblock'><p>The total number of extents in the volume group.</p>
+</div><h4 id='method.add_pv' class='method'><code>fn <a href='#method.add_pv' class='fnname'>add_pv</a>(&amp;mut self, pvh: &amp;<a class='struct' href='../../melvin/pvlabel/struct.PvHeader.html' title='melvin::pvlabel::PvHeader'>PvHeader</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Add a non-affiliated PV to this VG.</p>
 </div><h4 id='method.new_linear_lv' class='method'><code>fn <a href='#method.new_linear_lv' class='fnname'>new_linear_lv</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, extent_size: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Create a new linear logical volume in the volume group.</p>
 </div><h4 id='method.lv_remove' class='method'><code>fn <a href='#method.lv_remove' class='fnname'>lv_remove</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>

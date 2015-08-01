@@ -306,6 +306,42 @@
 <span id="264">264</span>
 <span id="265">265</span>
 <span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -316,14 +352,15 @@
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>Error</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
-<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>btree_map</span>::<span class='ident'>BTreeMap</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>BTreeMap</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>str</span>::<span class='ident'>FromStr</span>;
 
 <span class='kw'>use</span> <span class='ident'>uuid</span>::<span class='ident'>Uuid</span>;
 <span class='kw'>use</span> <span class='ident'>time</span>::<span class='ident'>now</span>;
 <span class='kw'>use</span> <span class='ident'>nix</span>;
 
 <span class='kw'>use</span> <span class='ident'>lv</span>::{<span class='ident'>LV</span>, <span class='ident'>Segment</span>};
-<span class='kw'>use</span> <span class='ident'>pv</span>::<span class='ident'>PV</span>;
+<span class='kw'>use</span> <span class='ident'>pv</span>::{<span class='ident'>PV</span>, <span class='ident'>Device</span>};
 <span class='kw'>use</span> <span class='ident'>pvlabel</span>::<span class='ident'>PvHeader</span>;
 <span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>Entry</span>};
 <span class='kw'>use</span> <span class='ident'>lvmetad</span>::<span class='ident'>vg_update_lvmetad</span>;
@@ -378,6 +415,31 @@
             .<span class='ident'>values</span>()
             .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>x</span>.<span class='ident'>pe_count</span>)
             .<span class='ident'>sum</span>()
+    }
+
+    <span class='doccomment'>/// Add a non-affiliated PV to this VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>add_pv</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>pvh</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvHeader</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+        <span class='comment'>// add_pv_to_vg</span>
+        <span class='comment'>// check pv is not on an LV from the vg:</span>
+        <span class='comment'>// 1) is pv&#39;s major a devicemapper major?</span>
+        <span class='comment'>// 2) equiv. of dev_manager_device_uses_vg()</span>
+        <span class='kw'>let</span> <span class='ident'>dev</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Device</span>::<span class='ident'>from_str</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>.<span class='ident'>dev_path</span>.<span class='ident'>to_string_lossy</span>()));
+        <span class='kw'>if</span> <span class='ident'>DM</span>::<span class='ident'>is_dm_major</span>(<span class='ident'>dev</span>.<span class='ident'>major</span>) {
+            <span class='macro'>println</span><span class='macro'>!</span>(<span class='string'>&quot;gotta check more against recursion&quot;</span>);
+        }
+
+
+        <span class='comment'>// check pv is not already in the VG or another VG</span>
+        <span class='comment'>// 1) does it have text metadata??</span>
+
+        <span class='comment'>// figure out how many extents fit in the PV&#39;s data area</span>
+        <span class='comment'>// pe_start = da.offset</span>
+        <span class='comment'>// area_size = dev_size - da.offset - maybe(mda1.size)</span>
+        <span class='comment'>// pe_count = area_size / vg.extent_size</span>
+
+        <span class='comment'>// make a PV and add it to self</span>
+
+        <span class='prelude-val'>Ok</span>(())
     }
 
     <span class='doccomment'>/// Create a new linear logical volume in the volume group.</span>
@@ -462,7 +524,12 @@
         <span class='ident'>vg_update_lvmetad</span>(<span class='kw-2'>&amp;</span><span class='ident'>map</span>)
     }
 
-    <span class='comment'>// Returns e.g. {&quot;pv0&quot;: {0: 45, 47: 100} }</span>
+    <span class='comment'>// Returns e.g. {&quot;pv0&quot;: {0: 45, 47: 100, 100: 200} }</span>
+    <span class='comment'>// This means extents 0-44 are used, 45 and 46 are not,</span>
+    <span class='comment'>// 47-99 are used, then 100-199 are used.</span>
+    <span class='comment'>//</span>
+    <span class='comment'>// Adjacent used areas are not merged.</span>
+    <span class='comment'>//</span>
     <span class='comment'>// PVs with no used areas are not in the outer map at all.</span>
     <span class='comment'>//</span>
     <span class='kw'>fn</span> <span class='ident'>used_areas</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>u64</span>, <span class='ident'>u64</span><span class='op'>&gt;&gt;</span> {
@@ -481,6 +548,11 @@
         <span class='ident'>used_map</span>
     }
 
+    <span class='comment'>// Returns e.g. {&quot;pv0&quot;: {45: 47, 200: 1000} }</span>
+    <span class='comment'>// (assuming pv0 has 1000 extents)</span>
+    <span class='comment'>//</span>
+    <span class='comment'>// PVs with no used areas are not in the outer map at all.</span>
+    <span class='comment'>//</span>
     <span class='kw'>fn</span> <span class='ident'>free_areas</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>u64</span>, <span class='ident'>u64</span><span class='op'>&gt;&gt;</span> {
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>free_map</span> <span class='op'>=</span> <span class='ident'>BTreeMap</span>::<span class='ident'>new</span>();
 

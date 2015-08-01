@@ -321,6 +321,31 @@
 <span id="279">279</span>
 <span id="280">280</span>
 <span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -333,12 +358,14 @@
 
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>fs</span>::<span class='ident'>File</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::{<span class='ident'>BufReader</span>, <span class='ident'>BufRead</span>};
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>os</span>::<span class='ident'>unix</span>::<span class='ident'>io</span>::<span class='ident'>AsRawFd</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>mem</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>slice</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>slice</span>::<span class='ident'>bytes</span>::<span class='ident'>copy_memory</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>Error</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>BTreeSet</span>;
 
 <span class='kw'>use</span> <span class='ident'>byteorder</span>::{<span class='ident'>LittleEndian</span>, <span class='ident'>ByteOrder</span>};
 
@@ -370,6 +397,29 @@
             <span class='ident'>file</span>: <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>File</span>::<span class='ident'>open</span>(<span class='ident'>DM_CTL_PATH</span>)),
             <span class='ident'>vg</span>: <span class='ident'>vg</span>,
         })
+    }
+
+    <span class='doccomment'>/// Determine if a major number is a major number used by DM.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>is_dm_major</span>(<span class='ident'>major</span>: <span class='ident'>u32</span>) <span class='op'>-&gt;</span> <span class='ident'>bool</span> {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>set</span> <span class='op'>=</span> <span class='ident'>BTreeSet</span>::<span class='ident'>new</span>();
+
+        <span class='kw'>let</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='ident'>File</span>::<span class='ident'>open</span>(<span class='string'>&quot;/proc/devices&quot;</span>)
+            .<span class='ident'>ok</span>().<span class='ident'>expect</span>(<span class='string'>&quot;Could not open /proc/devices&quot;</span>);
+
+        <span class='kw'>let</span> <span class='ident'>reader</span> <span class='op'>=</span> <span class='ident'>BufReader</span>::<span class='ident'>new</span>(<span class='ident'>f</span>);
+
+        <span class='kw'>for</span> <span class='ident'>line</span> <span class='kw'>in</span> <span class='ident'>reader</span>.<span class='ident'>lines</span>()
+            .<span class='ident'>filter_map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>x</span>.<span class='ident'>ok</span>())
+            .<span class='ident'>skip_while</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>x</span> <span class='op'>!=</span> <span class='string'>&quot;Block devices:&quot;</span>)
+            .<span class='ident'>skip</span>(<span class='number'>1</span>) {
+                <span class='kw'>let</span> <span class='ident'>spl</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>line</span>.<span class='ident'>split_whitespace</span>().<span class='ident'>collect</span>();
+
+                <span class='kw'>if</span> <span class='ident'>spl</span>[<span class='number'>1</span>] <span class='op'>==</span> <span class='string'>&quot;device-mapper&quot;</span> {
+                    <span class='ident'>set</span>.<span class='ident'>insert</span>(<span class='ident'>spl</span>[<span class='number'>0</span>].<span class='ident'>parse</span>::<span class='op'>&lt;</span><span class='ident'>u32</span><span class='op'>&gt;</span>().<span class='ident'>unwrap</span>());
+                }
+            }
+
+        <span class='ident'>set</span>.<span class='ident'>contains</span>(<span class='kw-2'>&amp;</span><span class='ident'>major</span>)
     }
 
     <span class='kw'>fn</span> <span class='ident'>initialize_hdr</span>(<span class='ident'>hdr</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>dmi</span>::<span class='ident'>Struct_dm_ioctl</span>) <span class='op'>-&gt;</span> () {

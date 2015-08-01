@@ -45,12 +45,14 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-8864' class='srclink' href='../../src/melvin/dm/mod.rs.html#37-40' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-8874' class='srclink' href='../../src/melvin/dm/mod.rs.html#39-42' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct DM&lt;'a&gt; {
     // some fields omitted
 }</pre><div class='docblock'><p>Context needed for communicating with devicemapper.</p>
 </div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;'a&gt; <a class='struct' href='../../melvin/dm/struct.DM.html' title='melvin::dm::DM'>DM</a>&lt;'a&gt;</code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>(vg: &amp;'a <a class='struct' href='../../melvin/vg/struct.VG.html' title='melvin::vg::VG'>VG</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;Self&gt;</code></h4>
 <div class='docblock'><p>Create a new context for communicating about a given VG with DM.</p>
+</div><h4 id='method.is_dm_major' class='method'><code>fn <a href='#method.is_dm_major' class='fnname'>is_dm_major</a>(major: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<div class='docblock'><p>Determine if a major number is a major number used by DM.</p>
 </div><h4 id='method.get_version' class='method'><code>fn <a href='#method.get_version' class='fnname'>get_version</a>(&amp;self) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(<a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>)</a>&gt;</code></h4>
 <div class='docblock'><p>Devicemapper version information: Major, Minor, and patchlevel versions.</p>
 </div><h4 id='method.list_devices' class='method'><code>fn <a href='#method.list_devices' class='fnname'>list_devices</a>(&amp;self) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(<a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='struct' href='../../melvin/pv/struct.Device.html' title='melvin::pv::Device'>Device</a>)</a>&gt;&gt;</code></h4>

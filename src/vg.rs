@@ -206,8 +206,6 @@ impl VG {
     // Returns e.g. {"pv0": {45: 47, 200: 1000} }
     // (assuming pv0 has 1000 extents)
     //
-    // PVs with no used areas are not in the outer map at all.
-    //
     fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 

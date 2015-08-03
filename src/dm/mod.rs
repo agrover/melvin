@@ -176,6 +176,15 @@ impl <'a> DM<'a> {
         // Construct targets first, since we need to know how many & size
         // before initializing the header.
         for seg in &lv.segments {
+
+            let seg_ty = {
+                if seg.ty == "striped" && seg.stripes.len() == 1 {
+                    &b"linear"[..]
+                } else {
+                    seg.ty.as_bytes()
+                }
+            };
+
             for &(ref pvname, ref loc) in &seg.stripes {
                 let err = || Error::new(Other, "dm load_device error");
                 let pv = try!(self.vg.pvs.get(pvname).ok_or(err()));
@@ -188,7 +197,7 @@ impl <'a> DM<'a> {
                 let mut dst: &mut [u8] = unsafe {
                     mem::transmute(&mut targ.target_type[..])
                 };
-                copy_memory(seg.ty.as_bytes(), &mut dst);
+                copy_memory(seg_ty, &mut dst);
 
                 let mut params = Vec::new();
                 // TODO: only works for linear

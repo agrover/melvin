@@ -35,6 +35,11 @@ const DM_VERSION_MAJOR: u32 = 4;
 const DM_VERSION_MINOR: u32 = 30;
 const DM_VERSION_PATCHLEVEL: u32 = 0;
 
+// Status bits
+//const DM_READONLY_FLAG: u32 = 1;
+const DM_SUSPEND_FLAG: u32 = 2;
+//const DM_PERSISTENT_DEV_FLAG: u32 = 8;
+
 /// Context needed for communicating with devicemapper.
 pub struct DM<'a> {
     file: File,
@@ -169,6 +174,22 @@ impl <'a> DM<'a> {
         Ok(())
     }
 
+    fn remove_device(&self, lv: &LV) -> io::Result<()> {
+        let mut hdr: dmi::Struct_dm_ioctl = Default::default();
+
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = hdr.data_start;
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_REMOVE_CMD as u8,
+                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => Ok(())
+        }
+    }
+
     fn load_device(&self, lv: &LV) -> io::Result<()> {
         let sectors_per_extent = self.vg.extent_size;
         let mut targs = Vec::new();
@@ -294,33 +315,15 @@ impl <'a> DM<'a> {
     ///
     /// Also populates the LV's device field.
     pub fn activate_device(&self, lv: &mut LV) -> io::Result<()> {
-
-        // TODO: name/uuid mangle?
-
         try!(self.create_device(lv));
-
         try!(self.load_device(lv));
-
         self.resume_device(lv)
     }
 
-    /// Remove a Logical Volume.
-    // UNTESTED
-    pub fn remove_device(&self, lv: LV) -> io::Result<()> {
-        let mut hdr: dmi::Struct_dm_ioctl = Default::default();
-
-        Self::initialize_hdr(&mut hdr);
-        hdr.data_size = hdr.data_start;
-        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
-
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_REMOVE_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
-
-        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
-            _ => Ok(())
-        }
-
+    /// Deactivate a Logical Volume.
+    pub fn deactivate_device(&self, lv: &mut LV) -> io::Result<()> {
+        try!(self.suspend_device(lv));
+        self.remove_device(lv)
     }
 }
 

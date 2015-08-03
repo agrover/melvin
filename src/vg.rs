@@ -154,8 +154,12 @@ impl VG {
     /// Destroy a logical volume.
     pub fn lv_remove(&mut self, name: &str) -> Result<()> {
         match self.lvs.remove(name) {
-            Some(_) => {
-                // TODO: poke dm; remove device
+            Some(mut lv) => {
+                {
+                    let dm = try!(DM::new(self));
+                    try!(dm.deactivate_device(&mut lv));
+                }
+
                 self.commit()
             },
             None => Err(Error::new(Other, "LV not found in VG")),

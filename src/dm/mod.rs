@@ -81,14 +81,17 @@ impl <'a> DM<'a> {
         hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
     }
 
-    fn hdr_set_name(hdr: &mut dmi::Struct_dm_ioctl, name: &[u8]) -> () {
+    fn hdr_set_name(hdr: &mut dmi::Struct_dm_ioctl, vg_name: &str, lv_name: &str) -> () {
+        let name = format!("{}-{}", vg_name.replace("-", "--"),
+                           lv_name.replace("-", "--"));
         let name_dest: &mut [u8; 128] = unsafe { mem::transmute(&mut hdr.name) };
-        copy_memory(name, &mut name_dest[..]);
+        copy_memory(name.as_bytes(), &mut name_dest[..]);
     }
 
-    fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, uuid: &[u8]) -> () {
+    fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, vg_uuid: &str, lv_uuid: &str) -> () {
+        let uuid = format!("LVM-{}{}", vg_uuid.replace("-", ""), lv_uuid.replace("-", ""));
         let uuid_dest: &mut [u8; 129] = unsafe { mem::transmute(&mut hdr.uuid) };
-        copy_memory(uuid, &mut uuid_dest[..]);
+        copy_memory(uuid.as_bytes(), &mut uuid_dest[..]);
     }
 
     /// Devicemapper version information: Major, Minor, and patchlevel versions.
@@ -149,9 +152,8 @@ impl <'a> DM<'a> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
-        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
-        // TODO: concat uuid or something?
-        //Self::hdr_set_uuid(&mut hdr, lv.uuid);
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        Self::hdr_set_uuid(&mut hdr, &self.vg.id, &lv.id);
         hdr.data_size = hdr.data_start;
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_CREATE_CMD as u8,
@@ -210,7 +212,7 @@ impl <'a> DM<'a> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
-        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
 
         hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
         hdr.data_size = hdr.data_start + targs.iter()
@@ -245,12 +247,30 @@ impl <'a> DM<'a> {
         }
     }
 
+    fn suspend_device(&self, lv: &LV) -> io::Result<()> {
+        let mut hdr: dmi::Struct_dm_ioctl = Default::default();
+
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = hdr.data_start;
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        hdr.flags = DM_SUSPEND_FLAG;
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
+                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => Ok(())
+        }
+    }
+
     fn resume_device(&self, lv: &LV) -> io::Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = hdr.data_start;
-        Self::hdr_set_name(&mut hdr, lv.name.as_bytes());
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        // DM_SUSPEND_FLAG not set = resume
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
                                       mem::size_of::<dmi::Struct_dm_ioctl>());

@@ -153,6 +153,39 @@ impl <'a> DM<'a> {
         Ok(devs)
     }
 
+    pub fn list_deps(&self) -> io::Result<Vec<Device>> {
+        let mut buf = [0u8; 16 * 1024];
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = buf.len() as u32;
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_DEPS_CMD as u8, buf.len());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
+            Err(_) => return Err((io::Error::last_os_error())),
+            _ => {},
+        };
+
+        // TODO: Check DM_BUFFER_FULL_FLAG for:
+        // DM_DEVICE_LIST_VERSIONS, DM_DEVICE_LIST, DM_DEVICE_DEPS,
+        // DM_DEVICE_STATUS, DM_DEVICE_TABLE, DM_DEVICE_WAITEVENT,
+        // DM_DEVICE_TARGET_MSG
+
+        let mut devs = Vec::new();
+        if (hdr.data_size - hdr.data_start as u32) != 0 {
+            let result = &buf[hdr.data_start as usize..];
+            let entries = LittleEndian::read_u32(&result[..4]) as usize;
+
+            for entry in 0..entries {
+                let dev = &result[(8*entry)+8..(8*entry)+16];
+                devs.push(Device::from(LittleEndian::read_u64(&dev)));
+            }
+        }
+
+        Ok(devs)
+    }
+
     fn create_device(&self, lv: &mut LV) -> io::Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 

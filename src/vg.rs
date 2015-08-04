@@ -8,7 +8,9 @@ use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::str::FromStr;
+use std::borrow::Cow;
 
 use uuid::Uuid;
 use time::now;
@@ -72,20 +74,61 @@ impl VG {
             .sum()
     }
 
+    // Recursively walk DM deps to see if device is present
+    fn depends_on(dev: Device, dm_majors: &BTreeSet<u32>, dm: &DM) -> bool {
+        if !dm_majors.contains(&dev.major) {
+            return false;
+        }
+
+        match dm.list_deps(dev) {
+            Err(_) => return false,
+            Ok(dep_list) => {
+                for d in dep_list {
+                    if d == dev {
+                        return true;
+                    } else if Self::depends_on(d, dm_majors, dm) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     /// Add a non-affiliated PV to this VG.
     pub fn add_pv(&mut self, pvh: &PvHeader) -> Result<()> {
         // add_pv_to_vg
         // check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
         // 2) equiv. of dev_manager_device_uses_vg()
+
+        let dm_majors = DM::dm_majors();
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
-        if DM::dm_majors().contains(&dev.major) {
-            println!("gotta check more against recursion");
+        let dm = try!(DM::new(&self));
+        if Self::depends_on(dev, &dm_majors, &dm) {
+            return Err(Error::new(Other, "Dependency loops prohibited"));
         }
 
-
         // check pv is not already in the VG or another VG
-        // 1) does it have text metadata??
+        // Does it have text metadata??
+        if let Ok(metadata) = pvh.read_metadata() {
+
+            // Find the textmap for the vg, among all the other stuff.
+            // (It's the only textmap.)
+            let mut vg_name = Cow::Borrowed("<unknown>");
+            for (key, value) in metadata {
+                match value {
+                    Entry::TextMap(_) => {
+                        vg_name = Cow::Owned(key);
+                        break
+                    },
+                    _ => {}
+                }
+            }
+
+            return Err(Error::new(Other, format!("PV already in VG {}", vg_name)));
+        }
 
         // figure out how many extents fit in the PV's data area
         // pe_start = da.offset

@@ -18,7 +18,7 @@ use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::collections::BTreeSet;
 
-use byteorder::{LittleEndian, ByteOrder};
+use byteorder::{NativeEndian, ByteOrder};
 
 use nix::sys::ioctl;
 
@@ -140,10 +140,10 @@ impl <'a> DM<'a> {
 
             loop {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
-                let devno = LittleEndian::read_u64(&result[..8]);
+                let devno = NativeEndian::read_u64(&result[..8]);
                 devs.push((String::from_utf8_lossy(slc).into_owned(), Device::from(devno)));
 
-                let next = LittleEndian::read_u32(&result[8..12]);
+                let next = NativeEndian::read_u32(&result[8..12]);
                 if next == 0 { break }
 
                 result = &result[next as usize..];
@@ -175,11 +175,11 @@ impl <'a> DM<'a> {
         let mut devs = Vec::new();
         if (hdr.data_size - hdr.data_start as u32) != 0 {
             let result = &buf[hdr.data_start as usize..];
-            let entries = LittleEndian::read_u32(&result[..4]) as usize;
+            let entries = NativeEndian::read_u32(&result[..4]) as usize;
 
             for entry in 0..entries {
                 let dev = &result[(8*entry)+8..(8*entry)+16];
-                devs.push(Device::from(LittleEndian::read_u64(&dev)));
+                devs.push(Device::from(NativeEndian::read_u64(&dev)));
             }
         }
 

@@ -38,6 +38,7 @@ use std::collections::BTreeMap;
 use lv::{LV, Segment};
 use vg::VG;
 use pv::{PV, Device};
+use dm::DM;
 
 #[derive(Debug, PartialEq, Clone)]
 enum Token<'a> {
@@ -536,7 +537,7 @@ fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->io::Result<Vec<
             stripes.push((name, val as u64));
         }
 
-        segments.push(Segment{
+        segments.push(Segment {
             name: name,
             start_extent: try!(
                 seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
@@ -623,7 +624,7 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
         None => BTreeMap::new(),
     };
 
-    let vg = VG {
+    let mut vg = VG {
         name: name.to_string(),
         id: id.to_string(),
         seqno: seqno as u64,
@@ -637,6 +638,17 @@ pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
         pvs: pvs,
         lvs: lvs,
     };
+
+    let dm_devices = {
+        let dm = try!(DM::new(&vg));
+        try!(dm.list_devices())
+    };
+
+    for (lvname, dev) in dm_devices {
+        if let Some(lv) = vg.lvs.get_mut(&lvname) {
+            lv.device = Some(dev.into());
+        }
+    }
 
     Ok(vg)
 }

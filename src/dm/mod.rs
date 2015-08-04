@@ -118,8 +118,8 @@ impl <'a> DM<'a> {
         Ok((hdr.version[0], hdr.version[1], hdr.version[2]))
     }
 
-    /// Returns a list of tuples containing DM device names and their major/minor
-    /// device numbers.
+    /// Returns a list of tuples containing DM device names within this VG,
+    /// and their major/minor device numbers.
     pub fn list_devices(&self) -> io::Result<Vec<(String, Device)>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
@@ -141,7 +141,15 @@ impl <'a> DM<'a> {
             loop {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
                 let devno = NativeEndian::read_u64(&result[..8]);
-                devs.push((String::from_utf8_lossy(slc).into_owned(), Device::from(devno)));
+                let dm_name = String::from_utf8_lossy(slc);
+                let mut vg_name = self.vg.name.replace("-", "--");
+                vg_name.push('-');
+
+                // Return only devices within this VG
+                if dm_name.starts_with(&vg_name) {
+                    let lv_name = dm_name.trim_left_matches(&vg_name).replace("--", "-");
+                    devs.push((lv_name, devno.into()));
+                }
 
                 let next = NativeEndian::read_u32(&result[8..12]);
                 if next == 0 { break }

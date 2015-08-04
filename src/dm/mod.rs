@@ -153,12 +153,13 @@ impl <'a> DM<'a> {
         Ok(devs)
     }
 
-    pub fn list_deps(&self) -> io::Result<Vec<Device>> {
+    pub fn list_deps(&self, lv: &LV) -> io::Result<Vec<Device>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = buf.len() as u32;
+        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_DEPS_CMD as u8, buf.len());
 

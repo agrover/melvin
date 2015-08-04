@@ -56,7 +56,7 @@ impl <'a> DM<'a> {
     }
 
     /// Determine if a major number is a major number used by DM.
-    pub fn is_dm_major(major: u32) -> bool {
+    pub fn dm_majors() -> BTreeSet<u32> {
         let mut set = BTreeSet::new();
 
         let f = File::open("/proc/devices")
@@ -75,7 +75,7 @@ impl <'a> DM<'a> {
                 }
             }
 
-        set.contains(&major)
+        set
     }
 
     fn initialize_hdr(hdr: &mut dmi::Struct_dm_ioctl) -> () {

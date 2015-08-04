@@ -79,7 +79,7 @@ impl VG {
         // 1) is pv's major a devicemapper major?
         // 2) equiv. of dev_manager_device_uses_vg()
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
-        if DM::is_dm_major(dev.major) {
+        if DM::dm_majors().contains(&dev.major) {
             println!("gotta check more against recursion");
         }
 

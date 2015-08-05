@@ -111,7 +111,7 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
 }
 
 /// Query `lvmetad` for a list of Volume Groups on the system.
-pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
+pub fn vg_list() -> Result<Vec<vg::VG>> {
     let err = || Error::new(Other, "response parsing error");
     let mut v = Vec::new();
 
@@ -141,7 +141,7 @@ pub fn vgs_from_lvmetad() -> Result<Vec<vg::VG>> {
 }
 
 /// Tell `lvmetad` about the current state of a Volume Group.
-pub fn vg_update_lvmetad(map: &LvmTextMap) -> Result<()> {
+pub fn vg_update(map: &LvmTextMap) -> Result<()> {
 
     assert_eq!(map.len(), 1);
 

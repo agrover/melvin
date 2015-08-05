@@ -20,7 +20,7 @@ use lv::{LV, Segment};
 use pv::{PV, Device};
 use pvlabel::PvHeader;
 use parser::{LvmTextMap, Entry};
-use lvmetad::vg_update_lvmetad;
+use lvmetad;
 use dm::DM;
 
 /// A Volume Group.
@@ -224,8 +224,7 @@ impl VG {
             }
         }
 
-        // tell lvmetad
-        vg_update_lvmetad(&map)
+        lvmetad::vg_update(&map)
     }
 
     // Returns e.g. {"pv0": {0: 45, 47: 100, 100: 200} }

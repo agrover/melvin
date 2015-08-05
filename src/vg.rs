@@ -105,9 +105,11 @@ impl VG {
 
         let dm_majors = DM::dm_majors();
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
-        let dm = try!(DM::new(&self));
-        if Self::depends_on(dev, &dm_majors, &dm) {
-            return Err(Error::new(Other, "Dependency loops prohibited"));
+        {
+            let dm = try!(DM::new(&self));
+            if Self::depends_on(dev, &dm_majors, &dm) {
+                return Err(Error::new(Other, "Dependency loops prohibited"));
+            }
         }
 
         // check pv is not already in the VG or another VG

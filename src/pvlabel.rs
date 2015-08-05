@@ -43,7 +43,7 @@ const LABEL_SECTOR: usize = 1;
 const SECTOR_SIZE: usize = 512;
 const MDA_HEADER_SIZE: usize = 512;
 const DEFAULT_MDA_SIZE: u64 = (1024 * 1024);
-const EXTENSION_VERSION: usize = 1;
+const EXTENSION_VERSION: u32 = 1;
 
 #[derive(Debug)]
 struct LabelHeader {
@@ -281,58 +281,73 @@ impl PvHeader {
 
         let mut f = try!(OpenOptions::new().write(true).open(path));
 
+        // mda0 starts at 9th sector
+        let mda0_offset = (8 * SECTOR_SIZE) as u64;
+        // mda0's length is reduced a little by the header length,
+        // maybe to keep the data area aligned to 1MB?
+        let mda0_length = DEFAULT_MDA_SIZE - mda0_offset;
+        let dev_size = try!(Self::blkdev_size(&f));
+
+        let pvh = PvHeader{
+            uuid: Uuid::new_v4().to_simple_string(),
+            size: dev_size,
+            ext_version: EXTENSION_VERSION,
+            ext_flags: 0,
+            data_areas: vec![
+                // da0 length is not used
+                PvArea { offset: mda0_offset + mda0_length, size: 0 },
+                ],
+            metadata_areas: vec![
+                PvArea { offset: mda0_offset, size: mda0_length },
+                PvArea { offset: dev_size - DEFAULT_MDA_SIZE, size: DEFAULT_MDA_SIZE },
+                ],
+            bootloader_areas: Vec::new(),
+            dev_path: path.to_owned(),
+        };
+
         let mut sec_buf = [0u8; SECTOR_SIZE];
 
-        // Fill in pvheader
+        // Translate to on-disk format
         {
-            let mut pvh = &mut sec_buf[LABEL_SIZE..];
+            let mut slc = &mut sec_buf[LABEL_SIZE..];
 
-            copy_memory(Uuid::new_v4().to_simple_string().as_bytes(),
-                        &mut pvh[..ID_LEN]);
+            copy_memory(pvh.uuid.as_bytes(), &mut slc[..ID_LEN]);
 
-            let dev_size = try!(Self::blkdev_size(&f));
-
-            LittleEndian::write_u64(&mut pvh[ID_LEN..ID_LEN+8], dev_size);
-            let mut pvh = &mut pvh[ID_LEN+8..];
-
-            // mda0 starts at 5th sector
-            let mda0_offset = (LABEL_SCAN_SECTORS * SECTOR_SIZE) as u64;
-            // mda0's length is reduced a little by the header length,
-            // maybe to keep the data area aligned to 1MB?
-            let mda0_length = DEFAULT_MDA_SIZE - mda0_offset;
+            LittleEndian::write_u64(&mut slc[ID_LEN..ID_LEN+8], dev_size);
+            let mut slc = &mut slc[ID_LEN+8..];
 
             if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
                 return Err(Error::new(Other, "Device too small"));
             }
 
             // da0 defined first, but "in the middle"
-            LittleEndian::write_u64(pvh, mda0_offset + mda0_length);
-            let mut pvh = &mut pvh[8..];
-            LittleEndian::write_u64(pvh, 0); // da0 length is not used
-            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(slc, pvh.data_areas[0].offset);
+            let mut slc = &mut slc[8..];
+            LittleEndian::write_u64(slc, pvh.data_areas[0].size);
+            let mut slc = &mut slc[8..];
 
             // skip 16 bytes to indicate end of da list
-            let mut pvh = &mut pvh[16..];
+            let mut slc = &mut slc[16..];
 
             // mda0 at start of PV
-            LittleEndian::write_u64(pvh, mda0_offset);
-            let mut pvh = &mut pvh[8..];
-            LittleEndian::write_u64(pvh, mda0_length);
-            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(slc, pvh.metadata_areas[0].offset);
+            let mut slc = &mut slc[8..];
+            LittleEndian::write_u64(slc, pvh.metadata_areas[0].size);
+            let mut slc = &mut slc[8..];
 
             // mda1 at end of PV
-            LittleEndian::write_u64(pvh, dev_size - DEFAULT_MDA_SIZE);
-            let mut pvh = &mut pvh[8..];
-            LittleEndian::write_u64(pvh, DEFAULT_MDA_SIZE);
-            let mut pvh = &mut pvh[8..];
+            LittleEndian::write_u64(slc, pvh.metadata_areas[1].offset);
+            let mut slc = &mut slc[8..];
+            LittleEndian::write_u64(slc, pvh.metadata_areas[1].size);
+            let mut slc = &mut slc[8..];
 
             // skip 16 bytes to indicate end of mda list
-            let mut pvh = &mut pvh[16..];
+            let mut slc = &mut slc[16..];
 
             // Extension header
-            LittleEndian::write_u32(pvh, EXTENSION_VERSION as u32);
+            LittleEndian::write_u32(slc, pvh.ext_version);
 
-            // everything else is 0 so we're finished
+            // everything else is 0 (no bas) so we're finished
         }
 
         // Must do label last since it calcs crc over everything
@@ -341,13 +356,23 @@ impl PvHeader {
         try!(f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64)));
         try!(f.write_all(&mut sec_buf));
 
-        Self::from_buf(&mut sec_buf[LABEL_SIZE..], path)
+        for area in &pvh.metadata_areas {
+            let new_rl = RawLocn {
+                offset: 0,
+                size: 0,
+                checksum: 0,
+                ignored: false,
+            };
+            try!(Self::write_mda_header(area, &mut f, &new_rl));
+        }
+
+        Ok(pvh)
     }
 
     // For the moment, the only important thing in the MDA header is rlocn0,
     // so we don't need separate functions that return anything in it except
     // rlocn0.
-    fn read_rlocn0(area: &PvArea, file: &mut File) -> io::Result<Option<RawLocn>> {
+    fn read_mda_header(area: &PvArea, file: &mut File) -> io::Result<Option<RawLocn>> {
         assert!(area.size as usize > MDA_HEADER_SIZE);
         try!(file.seek(SeekFrom::Start(area.offset)));
         let mut hdr = [0u8; MDA_HEADER_SIZE];
@@ -383,7 +408,7 @@ impl PvHeader {
         Ok(iter_raw_locn(&hdr[40..]).next())
     }
 
-    fn write_rlocn0(area: &PvArea, file: &mut File, rl: &RawLocn) -> io::Result<()> {
+    fn write_mda_header(area: &PvArea, file: &mut File, rl: &RawLocn) -> io::Result<()> {
         let mut hdr = [0u8; MDA_HEADER_SIZE];
 
         copy_memory(MDA_MAGIC, &mut hdr[4..20]);
@@ -416,7 +441,7 @@ impl PvHeader {
         let mut f = try!(OpenOptions::new().read(true).open(&self.dev_path));
 
         for pvarea in &self.metadata_areas {
-            let rl = match try!(Self::read_rlocn0(&pvarea, &mut f)) {
+            let rl = match try!(Self::read_mda_header(&pvarea, &mut f)) {
                 None => continue,
                 Some(x) => x,
             };
@@ -455,7 +480,7 @@ impl PvHeader {
 
         for pvarea in &self.metadata_areas {
             // If this is the first write, supply an initial RawLocn template
-            let rl = match try!(Self::read_rlocn0(&pvarea, &mut f)) {
+            let rl = match try!(Self::read_mda_header(&pvarea, &mut f)) {
                 None => RawLocn {
                     offset: MDA_HEADER_SIZE as u64,
                     size: 0,
@@ -499,13 +524,13 @@ impl PvHeader {
                 try!(f.write_all(&text[written as usize..]));
             }
 
-            try!(Self::write_rlocn0(&pvarea, &mut f,
-                &RawLocn {
-                    offset: start_off,
-                    size: text.len() as u64,
-                    checksum: crc32_calc(&text),
-                    ignored: rl.ignored,
-                }));
+            let new_rl = RawLocn {
+                offset: start_off,
+                size: text.len() as u64,
+                checksum: crc32_calc(&text),
+                ignored: rl.ignored,
+            };
+            try!(Self::write_mda_header(&pvarea, &mut f, &new_rl));
         }
 
         Ok(())

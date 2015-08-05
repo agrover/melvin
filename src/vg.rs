@@ -12,7 +12,6 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::borrow::Cow;
 
-use uuid::Uuid;
 use time::now;
 use nix;
 
@@ -22,6 +21,7 @@ use pvlabel::PvHeader;
 use parser::{LvmTextMap, Entry};
 use lvmetad;
 use dm::DM;
+use util::{align_to, make_uuid};
 
 /// A Volume Group.
 #[derive(Debug, PartialEq, Clone)]
@@ -174,7 +174,7 @@ impl VG {
 
         let mut lv = LV {
             name: name.to_string(),
-            id: Uuid::new_v4().to_hyphenated_string(),
+            id: make_uuid(),
             status: vec!["READ".to_string(),
                          "WRITE".to_string(),
                          "VISIBLE".to_string()],

@@ -30,10 +30,9 @@ use std::os::unix::io::AsRawFd;
 
 use byteorder::{LittleEndian, ByteOrder};
 use nix::sys::{stat, ioctl};
-use uuid::Uuid;
 
 use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap};
-use util::{align_to, crc32_calc};
+use util::{align_to, crc32_calc, make_uuid, hyphenate_uuid};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -238,7 +237,7 @@ impl PvHeader {
         }
 
         Ok(PvHeader{
-            uuid: String::from_utf8_lossy(&buf[..ID_LEN]).into_owned(),
+            uuid: hyphenate_uuid(&buf[..ID_LEN]),
             size: LittleEndian::read_u64(&buf[ID_LEN..ID_LEN+8]),
             ext_version: ext_version,
             ext_flags: ext_flags,

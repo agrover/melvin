@@ -132,14 +132,36 @@ impl VG {
             return Err(Error::new(Other, format!("PV already in VG {}", vg_name)));
         }
 
+        let da = try!(pvh.data_areas.get(0)
+                      .ok_or(Error::new(Other, "Could not find data area in PV")));
+
         // figure out how many extents fit in the PV's data area
-        // pe_start = da.offset
-        // area_size = dev_size - da.offset - maybe(mda1.size)
-        // pe_count = area_size / vg.extent_size
+        // pe_start aligned to extent size
+        let pe_start = align_to(da.offset as usize, self.extent_size as usize) as u64;
+        let mda1_size = match pvh.metadata_areas.get(1) {
+            Some(pvarea) => pvarea.size,
+            None => 0,
+        };
+        let area_size = pvh.size - pe_start - mda1_size;
+        let pe_count = area_size / self.extent_size;
+
+        let name = format!("pv{}", self.pvs.len());
 
         // make a PV and add it to self
+        let pv = PV {
+            name: name.clone(),
+            id: pvh.uuid.clone(),
+            device: dev,
+            status: vec!["ALLOCATABLE".to_string()],
+            flags: Vec::new(),
+            dev_size: pvh.size,
+            pe_start: pe_start,
+            pe_count: pe_count,
+        };
 
-        Ok(())
+        self.pvs.insert(name, pv);
+
+        self.commit()
     }
 
     /// Create a new linear logical volume in the volume group.
@@ -199,6 +221,7 @@ impl VG {
     /// Destroy a logical volume.
     pub fn lv_remove(&mut self, name: &str) -> Result<()> {
         match self.lvs.remove(name) {
+            None => Err(Error::new(Other, "LV not found in VG")),
             Some(mut lv) => {
                 {
                     let dm = try!(DM::new(self));
@@ -207,7 +230,6 @@ impl VG {
 
                 self.commit()
             },
-            None => Err(Error::new(Other, "LV not found in VG")),
         }
     }
 

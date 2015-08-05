@@ -161,3 +161,18 @@ pub fn vg_update(map: &LvmTextMap) -> Result<()> {
 
     Ok(())
 }
+
+/// Tell `lvmetad` about a new PV.
+pub fn pv_found(map: &LvmTextMap) -> Result<()> {
+
+    let mut option = Vec::new();
+    option.extend(b"pvmeta {");
+    option.extend(textmap_to_buf(map));
+    option.extend(b"}");
+
+    let options = vec![&option[..]];
+
+    try!(request(b"pv_found", Some(options)));
+
+    Ok(())
+}

@@ -27,12 +27,15 @@ use std::fs::{File, read_dir, OpenOptions};
 use std::cmp::min;
 use std::slice::bytes::copy_memory;
 use std::os::unix::io::AsRawFd;
+use std::str::FromStr;
 
 use byteorder::{LittleEndian, ByteOrder};
 use nix::sys::{stat, ioctl};
 
-use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap};
+use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap, Entry};
 use util::{align_to, crc32_calc, make_uuid, hyphenate_uuid};
+use pv::Device;
+use lvmetad;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -287,8 +290,12 @@ impl PvHeader {
         let mda0_length = DEFAULT_MDA_SIZE - mda0_offset;
         let dev_size = try!(Self::blkdev_size(&f));
 
+        if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
+            return Err(Error::new(Other, "Device too small"));
+        }
+
         let pvh = PvHeader{
-            uuid: Uuid::new_v4().to_simple_string(),
+            uuid: make_uuid(),
             size: dev_size,
             ext_version: EXTENSION_VERSION,
             ext_flags: 0,
@@ -310,14 +317,12 @@ impl PvHeader {
         {
             let mut slc = &mut sec_buf[LABEL_SIZE..];
 
-            copy_memory(pvh.uuid.as_bytes(), &mut slc[..ID_LEN]);
+            let uuid = pvh.uuid.replace("-", "");
+            copy_memory(uuid.as_bytes(), &mut slc[..ID_LEN]);
+            let mut slc = &mut slc[ID_LEN..];
 
-            LittleEndian::write_u64(&mut slc[ID_LEN..ID_LEN+8], dev_size);
-            let mut slc = &mut slc[ID_LEN+8..];
-
-            if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
-                return Err(Error::new(Other, "Device too small"));
-            }
+            LittleEndian::write_u64(slc, dev_size);
+            let mut slc = &mut slc[8..];
 
             // da0 defined first, but "in the middle"
             LittleEndian::write_u64(slc, pvh.data_areas[0].offset);
@@ -364,6 +369,33 @@ impl PvHeader {
             };
             try!(Self::write_mda_header(area, &mut f, &new_rl));
         }
+
+        let mut pvmeta = LvmTextMap::new();
+        let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
+        let devno: u64 = dev.into();
+        pvmeta.insert("device".to_string(), Entry::Number(devno as i64));
+        pvmeta.insert("dev_size".to_string(), Entry::Number(pvh.size as i64));
+        pvmeta.insert("format".to_string(), Entry::String("lvm2".to_string()));
+        pvmeta.insert("label_sector".to_string(), Entry::Number(LABEL_SECTOR as i64));
+        pvmeta.insert("id".to_string(), Entry::String(pvh.uuid.clone()));
+
+        let mut da0 = Box::new(LvmTextMap::new());
+        da0.insert("offset".to_string(), Entry::Number(pvh.data_areas[0].offset as i64));
+        da0.insert("size".to_string(), Entry::Number(pvh.data_areas[0].size as i64));
+        pvmeta.insert("da0".to_string(), Entry::TextMap(da0));
+
+        for mda_num in 0..2 {
+            let mut mda = Box::new(LvmTextMap::new());
+            mda.insert("offset".to_string(),
+                       Entry::Number(pvh.metadata_areas[mda_num].offset as i64));
+            mda.insert("size".to_string(),
+                       Entry::Number(pvh.metadata_areas[mda_num].size as i64));
+            mda.insert("ignore".to_string(), Entry::Number(0i64));
+            mda.insert("free_sectors".to_string(), Entry::Number(0i64));
+            pvmeta.insert(format!("mda{}", mda_num), Entry::TextMap(mda));
+        }
+
+        try!(lvmetad::pv_found(&pvmeta));
 
         Ok(pvh)
     }

@@ -344,20 +344,69 @@ impl PvHeader {
         Self::from_buf(&mut sec_buf[LABEL_SIZE..], path)
     }
 
-    fn get_rlocn0(buf: &[u8]) -> Option<RawLocn> {
-        iter_raw_locn(&buf[40..]).next()
+    // For the moment, the only important thing in the MDA header is rlocn0,
+    // so we don't need separate functions that return anything in it except
+    // rlocn0.
+    fn read_rlocn0(area: &PvArea, file: &mut File) -> io::Result<Option<RawLocn>> {
+        assert!(area.size as usize > MDA_HEADER_SIZE);
+        try!(file.seek(SeekFrom::Start(area.offset)));
+        let mut hdr = [0u8; MDA_HEADER_SIZE];
+        try!(file.read(&mut hdr));
+
+        if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
+            return Err(Error::new(Other, "MDA header checksum failure"));
+        }
+
+        if &hdr[4..20] != MDA_MAGIC {
+            return Err(Error::new(
+                Other, format!("'{}' doesn't match MDA_MAGIC",
+                               String::from_utf8_lossy(&hdr[4..20]))));
+        }
+
+        let ver = LittleEndian::read_u32(&hdr[20..24]);
+        if ver != 1 {
+            return Err(Error::new(Other, "Bad version, expected 1"));
+        }
+
+        let start = LittleEndian::read_u64(&hdr[24..32]);
+        if start != area.offset {
+            return Err(Error::new(Other, format!("mdah start {} does not equal pvarea start {}",
+                                                 start, area.offset)));
+        }
+
+        let size = LittleEndian::read_u64(&hdr[32..40]);
+        if size != area.size {
+            return Err(Error::new(Other, format!("mdah size {} does not equal pvarea size {}",
+                                                 size, area.size)));
+        }
+
+        Ok(iter_raw_locn(&hdr[40..]).next())
     }
 
-    fn set_rlocn0(buf: &mut [u8], rl: &RawLocn) -> () {
-        let mut raw_locn = &mut buf[40..];
+    fn write_rlocn0(area: &PvArea, file: &mut File, rl: &RawLocn) -> io::Result<()> {
+        let mut hdr = [0u8; MDA_HEADER_SIZE];
 
-        LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
-        LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
-        LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+        copy_memory(MDA_MAGIC, &mut hdr[4..20]);
+        LittleEndian::write_u32(&mut hdr[20..24], 1);
+        LittleEndian::write_u64(&mut hdr[24..32], area.offset);
+        LittleEndian::write_u64(&mut hdr[32..40], area.size);
 
-        let flags = rl.ignored as u32;
+        {
+            let mut raw_locn = &mut hdr[40..];
 
-        LittleEndian::write_u32(&mut raw_locn[20..24], flags);
+            LittleEndian::write_u64(&mut raw_locn[..8], rl.offset);
+            LittleEndian::write_u64(&mut raw_locn[8..16], rl.size);
+            LittleEndian::write_u32(&mut raw_locn[16..20], rl.checksum);
+
+            let flags = rl.ignored as u32;
+            LittleEndian::write_u32(&mut raw_locn[20..24], flags);
+        }
+
+        let csum = crc32_calc(&hdr[4..]);
+        LittleEndian::write_u32(&mut hdr[..4], csum);
+
+        try!(file.seek(SeekFrom::Start(area.offset)));
+        file.write_all(&hdr)
     }
 
     /// Read the metadata contained in the metadata area.
@@ -367,9 +416,7 @@ impl PvHeader {
         let mut f = try!(OpenOptions::new().read(true).open(&self.dev_path));
 
         for pvarea in &self.metadata_areas {
-            let hdr = try!(Self::read_mda_header(&pvarea, &mut f));
-
-            let rl = match Self::get_rlocn0(&hdr) {
+            let rl = match try!(Self::read_rlocn0(&pvarea, &mut f)) {
                 None => continue,
                 Some(x) => x,
             };
@@ -407,10 +454,8 @@ impl PvHeader {
                          .open(&self.dev_path));
 
         for pvarea in &self.metadata_areas {
-            let mut hdr = try!(Self::read_mda_header(&pvarea, &mut f));
-
             // If this is the first write, supply an initial RawLocn template
-            let rl = match Self::get_rlocn0(&hdr) {
+            let rl = match try!(Self::read_rlocn0(&pvarea, &mut f)) {
                 None => RawLocn {
                     offset: MDA_HEADER_SIZE as u64,
                     size: 0,
@@ -454,56 +499,14 @@ impl PvHeader {
                 try!(f.write_all(&text[written as usize..]));
             }
 
-            Self::set_rlocn0(&mut hdr,
+            try!(Self::write_rlocn0(&pvarea, &mut f,
                 &RawLocn {
                     offset: start_off,
                     size: text.len() as u64,
                     checksum: crc32_calc(&text),
                     ignored: rl.ignored,
-                });
-
-            try!(Self::write_mda_header(&pvarea, &mut hdr, &mut f));
+                }));
         }
-
-        Ok(())
-    }
-
-    fn read_mda_header(area: &PvArea, file: &mut File)
-                        -> io::Result<[u8; MDA_HEADER_SIZE]> {
-        assert!(area.size as usize > MDA_HEADER_SIZE);
-        try!(file.seek(SeekFrom::Start(area.offset)));
-        let mut hdr = [0u8; MDA_HEADER_SIZE];
-        try!(file.read(&mut hdr));
-
-        if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
-            return Err(Error::new(Other, "MDA header checksum failure"));
-        }
-
-        if &hdr[4..20] != MDA_MAGIC {
-            return Err(Error::new(
-                Other, format!("'{}' doesn't match MDA_MAGIC",
-                               String::from_utf8_lossy(&hdr[4..20]))));
-        }
-
-        let ver = LittleEndian::read_u32(&hdr[20..24]);
-        if ver != 1 {
-            return Err(Error::new(Other, "Bad version, expected 1"));
-        }
-
-        // TODO: validate these somehow
-        //println!("mdah start {}", LittleEndian::read_u64(&buf[24..32]));
-        //println!("mdah size {}", LittleEndian::read_u64(&buf[32..40]));
-        Ok(hdr)
-    }
-
-
-    fn write_mda_header(area: &PvArea, hdr: &mut [u8; MDA_HEADER_SIZE], file: &mut File)
-                        -> io::Result<()> {
-        let csum = crc32_calc(&hdr[4..]);
-        LittleEndian::write_u32(&mut hdr[..4], csum);
-
-        try!(file.seek(SeekFrom::Start(area.offset)));
-        try!(file.write_all(hdr));
 
         Ok(())
     }

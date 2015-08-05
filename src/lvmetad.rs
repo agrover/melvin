@@ -155,10 +155,7 @@ pub fn vg_update(map: &LvmTextMap) -> Result<()> {
     option2.extend(textmap_to_buf(v));
     option2.extend(b"}");
 
-    let mut options: Vec<&[u8]> = Vec::new();
-
-    options.push(&option.as_bytes());
-    options.push(&option2);
+    let options = vec![option.as_bytes(), &option2];
 
     try!(request(b"vg_update", Some(options)));
 

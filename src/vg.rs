@@ -24,6 +24,8 @@ use dm;
 use dm::DM;
 use util::{align_to, make_uuid};
 
+const DEFAULT_EXTENT_SIZE: u64 = 8192;  // 4MiB
+
 /// A Volume Group.
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
@@ -54,6 +56,43 @@ pub struct VG {
 }
 
 impl VG {
+    /// Create a Volume Group from one or more initialized PvHeaders.
+    pub fn create(name: &str, pvhs: Vec<PvHeader>) -> Result<VG> {
+        if pvhs.len() == 0 {
+            return Err(Error::new(Other, "One or more PvHeaders required"));
+        }
+
+        let metadata_areas = pvhs.iter()
+            .map(|x| x.metadata_areas.len())
+            .sum::<usize>();
+        if metadata_areas == 0 {
+            return Err(Error::new(Other, "PVs must have at least one metadata area"));
+        }
+
+        let mut vg = VG {
+            name: name.to_string(),
+            id: make_uuid(),
+            seqno: 0,
+            format: "lvm2".to_string(),
+            status: vec!["READ".to_string(),
+                         "WRITE".to_string(),
+                         "RESIZEABLE".to_string()],
+            flags: Vec::new(),
+            extent_size: DEFAULT_EXTENT_SIZE,
+            max_lv: 0,
+            max_pv: 0,
+            metadata_copies: 0,
+            pvs: BTreeMap::new(),
+            lvs: BTreeMap::new(),
+        };
+
+        for pv in &pvhs {
+            try!(vg.add_pv(pv));
+        }
+
+        Ok(vg)
+    }
+
     /// The total number of extents in use in the volume group.
     pub fn extents_in_use(&self) -> u64 {
         self.lvs

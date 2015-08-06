@@ -485,6 +485,10 @@ impl PvHeader {
         let mut f = try!(OpenOptions::new().read(true).write(true)
                          .open(&self.dev_path));
 
+        let mut text = textmap_to_buf(map);
+        // Ends with one null
+        text.push(b'\0');
+
         for pvarea in &self.metadata_areas {
             // If this is the first write, supply an initial RawLocn template
             let rl = match try!(Self::read_mda_header(&pvarea, &mut f)) {
@@ -500,10 +504,6 @@ impl PvHeader {
             if rl.ignored {
                 continue
             }
-
-            let mut text = textmap_to_buf(map);
-            // Ends with one null
-            text.push(b'\0');
 
             // start at next sector in loop, but skip 0th sector
             let start_off = min(MDA_HEADER_SIZE as u64,

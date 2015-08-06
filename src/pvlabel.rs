@@ -185,9 +185,9 @@ pub struct PvHeader {
     pub size: u64,
     /// Extension version. If 1, we look for an extension header that may contain a reference
     /// to a bootloader area.
-    pub ext_version: u32,
+    ext_version: u32,
     /// Extension flags, of which there are none.
-    pub ext_flags: u32,
+    ext_flags: u32,
     /// A list of the data areas.
     pub data_areas: Vec<PvArea>,
     /// A list of the metadata areas.

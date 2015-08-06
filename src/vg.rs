@@ -232,6 +232,8 @@ impl VG {
     }
 
     fn commit(&mut self) -> Result<()> {
+        self.seqno += 1;
+
         let map: LvmTextMap = self.clone().into();
 
         let mut disk_map = LvmTextMap::new();
@@ -326,7 +328,7 @@ impl From<VG> for LvmTextMap {
 
         map.insert("id".to_string(), Entry::String(vg.id));
         map.insert("seqno".to_string(),
-                   Entry::Number(vg.seqno as i64 + 1));
+                   Entry::Number(vg.seqno as i64));
         map.insert("format".to_string(), Entry::String(vg.format));
 
         map.insert("max_pv".to_string(), Entry::Number(0));

@@ -86,7 +86,7 @@ pub struct PV {
     pub status: Vec<String>,
     /// Flags
     pub flags: Vec<String>,
-    /// The device's size, in bytes
+    /// The device's size, in sectors
     pub dev_size: u64,
     /// The offset in sectors of where the first extent starts
     pub pe_start: u64,

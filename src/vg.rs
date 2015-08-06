@@ -17,7 +17,7 @@ use nix::sys::utsname::uname;
 
 use lv::{LV, Segment};
 use pv::{PV, Device};
-use pvlabel::PvHeader;
+use pvlabel::{PvHeader, SECTOR_SIZE};
 use parser::{LvmTextMap, Entry};
 use lvmetad;
 use dm::DM;
@@ -131,13 +131,16 @@ impl VG {
 
         // figure out how many extents fit in the PV's data area
         // pe_start aligned to extent size
-        let pe_start = align_to(da.offset as usize, self.extent_size as usize) as u64;
-        let mda1_size = match pvh.metadata_areas.get(1) {
-            Some(pvarea) => pvarea.size,
+        let dev_size_sectors = pvh.size / SECTOR_SIZE as u64;
+        let pe_start_sectors = align_to(
+            (da.offset / SECTOR_SIZE as u64) as usize,
+            self.extent_size as usize) as u64;
+        let mda1_size_sectors = match pvh.metadata_areas.get(1) {
+            Some(pvarea) => pvarea.size / SECTOR_SIZE as u64,
             None => 0,
         };
-        let area_size = pvh.size - pe_start - mda1_size;
-        let pe_count = area_size / self.extent_size;
+        let area_size_sectors = dev_size_sectors - pe_start_sectors - mda1_size_sectors;
+        let pe_count = area_size_sectors / self.extent_size;
 
         let name = format!("pv{}", self.pvs.len());
 
@@ -148,8 +151,8 @@ impl VG {
             device: dev,
             status: vec!["ALLOCATABLE".to_string()],
             flags: Vec::new(),
-            dev_size: pvh.size,
-            pe_start: pe_start,
+            dev_size: dev_size_sectors,
+            pe_start: pe_start_sectors,
             pe_count: pe_count,
         };
 

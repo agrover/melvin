@@ -40,6 +40,29 @@ const DM_VERSION_PATCHLEVEL: u32 = 0;
 const DM_SUSPEND_FLAG: u32 = 2;
 //const DM_PERSISTENT_DEV_FLAG: u32 = 8;
 
+/// Major numbers used by DM.
+pub fn dev_majors() -> BTreeSet<u32> {
+    let mut set = BTreeSet::new();
+
+    let f = File::open("/proc/devices")
+        .ok().expect("Could not open /proc/devices");
+
+    let reader = BufReader::new(f);
+
+    for line in reader.lines()
+        .filter_map(|x| x.ok())
+        .skip_while(|x| x != "Block devices:")
+        .skip(1) {
+            let spl: Vec<_> = line.split_whitespace().collect();
+
+            if spl[1] == "device-mapper" {
+                set.insert(spl[0].parse::<u32>().unwrap());
+            }
+        }
+
+    set
+}
+
 /// Context needed for communicating with devicemapper.
 pub struct DM<'a> {
     file: File,
@@ -53,29 +76,6 @@ impl <'a> DM<'a> {
             file: try!(File::open(DM_CTL_PATH)),
             vg: vg,
         })
-    }
-
-    /// Determine if a major number is a major number used by DM.
-    pub fn dm_majors() -> BTreeSet<u32> {
-        let mut set = BTreeSet::new();
-
-        let f = File::open("/proc/devices")
-            .ok().expect("Could not open /proc/devices");
-
-        let reader = BufReader::new(f);
-
-        for line in reader.lines()
-            .filter_map(|x| x.ok())
-            .skip_while(|x| x != "Block devices:")
-            .skip(1) {
-                let spl: Vec<_> = line.split_whitespace().collect();
-
-                if spl[1] == "device-mapper" {
-                    set.insert(spl[0].parse::<u32>().unwrap());
-                }
-            }
-
-        set
     }
 
     fn initialize_hdr(hdr: &mut dmi::Struct_dm_ioctl) -> () {

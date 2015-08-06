@@ -20,6 +20,7 @@ use pv::{PV, Device};
 use pvlabel::{PvHeader, SECTOR_SIZE};
 use parser::{LvmTextMap, Entry};
 use lvmetad;
+use dm;
 use dm::DM;
 use util::{align_to, make_uuid};
 
@@ -98,7 +99,7 @@ impl VG {
         // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
         // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
-        let dm_majors = DM::dm_majors();
+        let dm_majors = dm::dev_majors();
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
         {
             let dm = try!(DM::new(&self));

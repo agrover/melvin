@@ -80,15 +80,12 @@ impl VG {
             return false;
         }
 
-        match dm.list_deps(dev) {
-            Err(_) => return false,
-            Ok(dep_list) => {
-                for d in dep_list {
-                    if d == dev {
-                        return true;
-                    } else if Self::depends_on(d, dm_majors, dm) {
-                        return true;
-                    }
+        if let Ok(dep_list) = dm.list_deps(dev) {
+            for d in dep_list {
+                if d == dev {
+                    return true;
+                } else if Self::depends_on(d, dm_majors, dm) {
+                    return true;
                 }
             }
         }

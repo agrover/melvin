@@ -361,14 +361,16 @@ impl From<VG> for LvmTextMap {
                                     (k, Entry::TextMap(Box::new(v.into()))))
                                .collect())));
 
-        map.insert("logical_volumes".to_string(),
-                   Entry::TextMap(
-                       Box::new(
-                           vg.lvs
-                               .into_iter()
-                               .map(|(k, v)|
-                                    (k, Entry::TextMap(Box::new(v.into()))))
-                               .collect())));
+        if !vg.lvs.is_empty() {
+            map.insert("logical_volumes".to_string(),
+                       Entry::TextMap(
+                           Box::new(
+                               vg.lvs
+                                   .into_iter()
+                                   .map(|(k, v)|
+                                        (k, Entry::TextMap(Box::new(v.into()))))
+                                   .collect())));
+        }
 
         map
     }

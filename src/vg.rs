@@ -95,11 +95,9 @@ impl VG {
 
     /// Add a non-affiliated PV to this VG.
     pub fn add_pv(&mut self, pvh: &PvHeader) -> Result<()> {
-        // add_pv_to_vg
-        // check pv is not on an LV from the vg:
+        // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
-        // 2) equiv. of dev_manager_device_uses_vg()
-
+        // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
         let dm_majors = DM::dm_majors();
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
         {
@@ -112,7 +110,6 @@ impl VG {
         // check pv is not already in the VG or another VG
         // Does it have text metadata??
         if let Ok(metadata) = pvh.read_metadata() {
-
             // Find the textmap for the vg, among all the other stuff.
             // (It's the only textmap.)
             let mut vg_name = Cow::Borrowed("<unknown>");

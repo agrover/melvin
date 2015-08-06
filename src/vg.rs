@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::borrow::Cow;
 
 use time::now;
-use nix;
+use nix::sys::utsname::uname;
 
 use lv::{LV, Segment};
 use pv::{PV, Device};
@@ -201,7 +201,7 @@ impl VG {
                          "WRITE".to_string(),
                          "VISIBLE".to_string()],
             flags: Vec::new(),
-            creation_host: nix::sys::utsname::uname().nodename().to_string(),
+            creation_host: uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
             segments: vec![segment],
             device: None,

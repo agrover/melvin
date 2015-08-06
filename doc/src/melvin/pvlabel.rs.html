@@ -569,6 +569,71 @@
 <span id="527">527</span>
 <span id="528">528</span>
 <span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -599,13 +664,15 @@
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>cmp</span>::<span class='ident'>min</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>slice</span>::<span class='ident'>bytes</span>::<span class='ident'>copy_memory</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>os</span>::<span class='ident'>unix</span>::<span class='ident'>io</span>::<span class='ident'>AsRawFd</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>str</span>::<span class='ident'>FromStr</span>;
 
 <span class='kw'>use</span> <span class='ident'>byteorder</span>::{<span class='ident'>LittleEndian</span>, <span class='ident'>ByteOrder</span>};
 <span class='kw'>use</span> <span class='ident'>nix</span>::<span class='ident'>sys</span>::{<span class='ident'>stat</span>, <span class='ident'>ioctl</span>};
-<span class='kw'>use</span> <span class='ident'>uuid</span>::<span class='ident'>Uuid</span>;
 
-<span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>textmap_to_buf</span>, <span class='ident'>buf_to_textmap</span>};
-<span class='kw'>use</span> <span class='ident'>util</span>::{<span class='ident'>align_to</span>, <span class='ident'>crc32_calc</span>};
+<span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>textmap_to_buf</span>, <span class='ident'>buf_to_textmap</span>, <span class='ident'>Entry</span>};
+<span class='kw'>use</span> <span class='ident'>util</span>::{<span class='ident'>align_to</span>, <span class='ident'>crc32_calc</span>, <span class='ident'>make_uuid</span>, <span class='ident'>hyphenate_uuid</span>};
+<span class='kw'>use</span> <span class='ident'>pv</span>::<span class='ident'>Device</span>;
+<span class='kw'>use</span> <span class='ident'>lvmetad</span>;
 
 <span class='kw'>const</span> <span class='ident'>LABEL_SCAN_SECTORS</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>4</span>;
 <span class='kw'>const</span> <span class='ident'>ID_LEN</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>32</span>;
@@ -615,7 +682,7 @@
 <span class='kw'>const</span> <span class='ident'>SECTOR_SIZE</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>512</span>;
 <span class='kw'>const</span> <span class='ident'>MDA_HEADER_SIZE</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>512</span>;
 <span class='kw'>const</span> <span class='ident'>DEFAULT_MDA_SIZE</span>: <span class='ident'>u64</span> <span class='op'>=</span> (<span class='number'>1024</span> <span class='op'>*</span> <span class='number'>1024</span>);
-<span class='kw'>const</span> <span class='ident'>EXTENSION_VERSION</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>1</span>;
+<span class='kw'>const</span> <span class='ident'>EXTENSION_VERSION</span>: <span class='ident'>u32</span> <span class='op'>=</span> <span class='number'>1</span>;
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
 <span class='kw'>struct</span> <span class='ident'>LabelHeader</span> {
@@ -747,7 +814,7 @@
 
 <span class='doccomment'>/// A struct containing the values in the PV header. It contains pointers to</span>
 <span class='doccomment'>/// the data area, and possibly metadata areas and bootloader area.</span>
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>)]</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>PvHeader</span> {
     <span class='doccomment'>/// The unique identifier.</span>
     <span class='kw'>pub</span> <span class='ident'>uuid</span>: <span class='ident'>String</span>,
@@ -810,7 +877,7 @@
         }
 
         <span class='prelude-val'>Ok</span>(<span class='ident'>PvHeader</span>{
-            <span class='ident'>uuid</span>: <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[..<span class='ident'>ID_LEN</span>]).<span class='ident'>into_owned</span>(),
+            <span class='ident'>uuid</span>: <span class='ident'>hyphenate_uuid</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[..<span class='ident'>ID_LEN</span>]),
             <span class='ident'>size</span>: <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>]),
             <span class='ident'>ext_version</span>: <span class='ident'>ext_version</span>,
             <span class='ident'>ext_flags</span>: <span class='ident'>ext_flags</span>,
@@ -853,58 +920,75 @@
 
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>write</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='ident'>path</span>));
 
+        <span class='comment'>// mda0 starts at 9th sector</span>
+        <span class='kw'>let</span> <span class='ident'>mda0_offset</span> <span class='op'>=</span> (<span class='number'>8</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>) <span class='kw'>as</span> <span class='ident'>u64</span>;
+        <span class='comment'>// mda0&#39;s length is reduced a little by the header length,</span>
+        <span class='comment'>// maybe to keep the data area aligned to 1MB?</span>
+        <span class='kw'>let</span> <span class='ident'>mda0_length</span> <span class='op'>=</span> <span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>-</span> <span class='ident'>mda0_offset</span>;
+        <span class='kw'>let</span> <span class='ident'>dev_size</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>blkdev_size</span>(<span class='kw-2'>&amp;</span><span class='ident'>f</span>));
+
+        <span class='kw'>if</span> <span class='ident'>dev_size</span> <span class='op'>&lt;</span> ((<span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>*</span> <span class='number'>2</span>) <span class='op'>+</span> <span class='ident'>mda0_offset</span>) {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Device too small&quot;</span>));
+        }
+
+        <span class='kw'>let</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='ident'>PvHeader</span>{
+            <span class='ident'>uuid</span>: <span class='ident'>make_uuid</span>(),
+            <span class='ident'>size</span>: <span class='ident'>dev_size</span>,
+            <span class='ident'>ext_version</span>: <span class='ident'>EXTENSION_VERSION</span>,
+            <span class='ident'>ext_flags</span>: <span class='number'>0</span>,
+            <span class='ident'>data_areas</span>: <span class='macro'>vec</span><span class='macro'>!</span>[
+                <span class='comment'>// da0 length is not used</span>
+                <span class='ident'>PvArea</span> { <span class='ident'>offset</span>: <span class='ident'>mda0_offset</span> <span class='op'>+</span> <span class='ident'>mda0_length</span>, <span class='ident'>size</span>: <span class='number'>0</span> },
+                ],
+            <span class='ident'>metadata_areas</span>: <span class='macro'>vec</span><span class='macro'>!</span>[
+                <span class='ident'>PvArea</span> { <span class='ident'>offset</span>: <span class='ident'>mda0_offset</span>, <span class='ident'>size</span>: <span class='ident'>mda0_length</span> },
+                <span class='ident'>PvArea</span> { <span class='ident'>offset</span>: <span class='ident'>dev_size</span> <span class='op'>-</span> <span class='ident'>DEFAULT_MDA_SIZE</span>, <span class='ident'>size</span>: <span class='ident'>DEFAULT_MDA_SIZE</span> },
+                ],
+            <span class='ident'>bootloader_areas</span>: <span class='ident'>Vec</span>::<span class='ident'>new</span>(),
+            <span class='ident'>dev_path</span>: <span class='ident'>path</span>.<span class='ident'>to_owned</span>(),
+        };
+
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>sec_buf</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>SECTOR_SIZE</span>];
 
-        <span class='comment'>// Fill in pvheader</span>
+        <span class='comment'>// Translate to on-disk format</span>
         {
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='ident'>LABEL_SIZE</span>..];
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='ident'>LABEL_SIZE</span>..];
 
-            <span class='ident'>copy_memory</span>(<span class='ident'>Uuid</span>::<span class='ident'>new_v4</span>().<span class='ident'>to_simple_string</span>().<span class='ident'>as_bytes</span>(),
-                        <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[..<span class='ident'>ID_LEN</span>]);
+            <span class='kw'>let</span> <span class='ident'>uuid</span> <span class='op'>=</span> <span class='ident'>pvh</span>.<span class='ident'>uuid</span>.<span class='ident'>replace</span>(<span class='string'>&quot;-&quot;</span>, <span class='string'>&quot;&quot;</span>);
+            <span class='ident'>copy_memory</span>(<span class='ident'>uuid</span>.<span class='ident'>as_bytes</span>(), <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[..<span class='ident'>ID_LEN</span>]);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='ident'>ID_LEN</span>..];
 
-            <span class='kw'>let</span> <span class='ident'>dev_size</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>blkdev_size</span>(<span class='kw-2'>&amp;</span><span class='ident'>f</span>));
-
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span>..<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>], <span class='ident'>dev_size</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='ident'>ID_LEN</span><span class='op'>+</span><span class='number'>8</span>..];
-
-            <span class='comment'>// mda0 starts at 5th sector</span>
-            <span class='kw'>let</span> <span class='ident'>mda0_offset</span> <span class='op'>=</span> (<span class='ident'>LABEL_SCAN_SECTORS</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span>) <span class='kw'>as</span> <span class='ident'>u64</span>;
-            <span class='comment'>// mda0&#39;s length is reduced a little by the header length,</span>
-            <span class='comment'>// maybe to keep the data area aligned to 1MB?</span>
-            <span class='kw'>let</span> <span class='ident'>mda0_length</span> <span class='op'>=</span> <span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>-</span> <span class='ident'>mda0_offset</span>;
-
-            <span class='kw'>if</span> <span class='ident'>dev_size</span> <span class='op'>&lt;</span> ((<span class='ident'>DEFAULT_MDA_SIZE</span> <span class='op'>*</span> <span class='number'>2</span>) <span class='op'>+</span> <span class='ident'>mda0_offset</span>) {
-                <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Device too small&quot;</span>));
-            }
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>dev_size</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
 
             <span class='comment'>// da0 defined first, but &quot;in the middle&quot;</span>
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_offset</span> <span class='op'>+</span> <span class='ident'>mda0_length</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='number'>0</span>); <span class='comment'>// da0 length is not used</span>
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>data_areas</span>[<span class='number'>0</span>].<span class='ident'>offset</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>data_areas</span>[<span class='number'>0</span>].<span class='ident'>size</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
 
             <span class='comment'>// skip 16 bytes to indicate end of da list</span>
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>16</span>..];
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>16</span>..];
 
             <span class='comment'>// mda0 at start of PV</span>
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_offset</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>mda0_length</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span>[<span class='number'>0</span>].<span class='ident'>offset</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span>[<span class='number'>0</span>].<span class='ident'>size</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
 
             <span class='comment'>// mda1 at end of PV</span>
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>dev_size</span> <span class='op'>-</span> <span class='ident'>DEFAULT_MDA_SIZE</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>pvh</span>, <span class='ident'>DEFAULT_MDA_SIZE</span>);
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span>[<span class='number'>1</span>].<span class='ident'>offset</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span>[<span class='number'>1</span>].<span class='ident'>size</span>);
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>8</span>..];
 
             <span class='comment'>// skip 16 bytes to indicate end of mda list</span>
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>pvh</span>[<span class='number'>16</span>..];
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>slc</span>[<span class='number'>16</span>..];
 
             <span class='comment'>// Extension header</span>
-            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='ident'>pvh</span>, <span class='ident'>EXTENSION_VERSION</span> <span class='kw'>as</span> <span class='ident'>u32</span>);
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='ident'>slc</span>, <span class='ident'>pvh</span>.<span class='ident'>ext_version</span>);
 
-            <span class='comment'>// everything else is 0 so we&#39;re finished</span>
+            <span class='comment'>// everything else is 0 (no bas) so we&#39;re finished</span>
         }
 
         <span class='comment'>// Must do label last since it calcs crc over everything</span>
@@ -913,23 +997,85 @@
         <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>u64</span> <span class='op'>*</span> <span class='ident'>SECTOR_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>)));
         <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>));
 
-        <span class='ident'>Self</span>::<span class='ident'>from_buf</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='ident'>LABEL_SIZE</span>..], <span class='ident'>path</span>)
+        <span class='kw'>for</span> <span class='ident'>area</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span> {
+            <span class='kw'>let</span> <span class='ident'>new_rl</span> <span class='op'>=</span> <span class='ident'>RawLocn</span> {
+                <span class='ident'>offset</span>: <span class='number'>0</span>,
+                <span class='ident'>size</span>: <span class='number'>0</span>,
+                <span class='ident'>checksum</span>: <span class='number'>0</span>,
+                <span class='ident'>ignored</span>: <span class='boolval'>false</span>,
+            };
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>write_mda_header</span>(<span class='ident'>area</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>, <span class='kw-2'>&amp;</span><span class='ident'>new_rl</span>));
+        }
+
+        <span class='kw'>let</span> <span class='ident'>map</span> <span class='op'>=</span> <span class='ident'>pvh</span>.<span class='ident'>clone</span>().<span class='ident'>into</span>();
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>lvmetad</span>::<span class='ident'>pv_found</span>(<span class='kw-2'>&amp;</span><span class='ident'>map</span>));
+
+        <span class='prelude-val'>Ok</span>(<span class='ident'>pvh</span>)
     }
 
-    <span class='kw'>fn</span> <span class='ident'>get_rlocn0</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>RawLocn</span><span class='op'>&gt;</span> {
-        <span class='ident'>iter_raw_locn</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>[<span class='number'>40</span>..]).<span class='ident'>next</span>()
+    <span class='comment'>// For the moment, the only important thing in the MDA header is rlocn0,</span>
+    <span class='comment'>// so we don&#39;t need separate functions that return anything in it except</span>
+    <span class='comment'>// rlocn0.</span>
+    <span class='kw'>fn</span> <span class='ident'>read_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>RawLocn</span><span class='op'>&gt;&gt;</span> {
+        <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>area</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>&gt;</span> <span class='ident'>MDA_HEADER_SIZE</span>);
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>];
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>));
+
+        <span class='kw'>if</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[..<span class='number'>4</span>]) <span class='op'>!=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='ident'>MDA_HEADER_SIZE</span>]) {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;MDA header checksum failure&quot;</span>));
+        }
+
+        <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>] <span class='op'>!=</span> <span class='ident'>MDA_MAGIC</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(
+                <span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;&#39;{}&#39; doesn&#39;t match MDA_MAGIC&quot;</span>,
+                               <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>]))));
+        }
+
+        <span class='kw'>let</span> <span class='ident'>ver</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>20</span>..<span class='number'>24</span>]);
+        <span class='kw'>if</span> <span class='ident'>ver</span> <span class='op'>!=</span> <span class='number'>1</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Bad version, expected 1&quot;</span>));
+        }
+
+        <span class='kw'>let</span> <span class='ident'>start</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>24</span>..<span class='number'>32</span>]);
+        <span class='kw'>if</span> <span class='ident'>start</span> <span class='op'>!=</span> <span class='ident'>area</span>.<span class='ident'>offset</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;mdah start {} does not equal pvarea start {}&quot;</span>,
+                                                 <span class='ident'>start</span>, <span class='ident'>area</span>.<span class='ident'>offset</span>)));
+        }
+
+        <span class='kw'>let</span> <span class='ident'>size</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>32</span>..<span class='number'>40</span>]);
+        <span class='kw'>if</span> <span class='ident'>size</span> <span class='op'>!=</span> <span class='ident'>area</span>.<span class='ident'>size</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;mdah size {} does not equal pvarea size {}&quot;</span>,
+                                                 <span class='ident'>size</span>, <span class='ident'>area</span>.<span class='ident'>size</span>)));
+        }
+
+        <span class='prelude-val'>Ok</span>(<span class='ident'>iter_raw_locn</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>40</span>..]).<span class='ident'>next</span>())
     }
 
-    <span class='kw'>fn</span> <span class='ident'>set_rlocn0</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>], <span class='ident'>rl</span>: <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span>) <span class='op'>-&gt;</span> () {
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>raw_locn</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>[<span class='number'>40</span>..];
+    <span class='kw'>fn</span> <span class='ident'>write_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>, <span class='ident'>rl</span>: <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>];
 
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[..<span class='number'>8</span>], <span class='ident'>rl</span>.<span class='ident'>offset</span>);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>rl</span>.<span class='ident'>size</span>);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>rl</span>.<span class='ident'>checksum</span>);
+        <span class='ident'>copy_memory</span>(<span class='ident'>MDA_MAGIC</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>]);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='number'>1</span>);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[<span class='number'>24</span>..<span class='number'>32</span>], <span class='ident'>area</span>.<span class='ident'>offset</span>);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[<span class='number'>32</span>..<span class='number'>40</span>], <span class='ident'>area</span>.<span class='ident'>size</span>);
 
-        <span class='kw'>let</span> <span class='ident'>flags</span> <span class='op'>=</span> <span class='ident'>rl</span>.<span class='ident'>ignored</span> <span class='kw'>as</span> <span class='ident'>u32</span>;
+        {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>raw_locn</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[<span class='number'>40</span>..];
 
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>flags</span>);
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[..<span class='number'>8</span>], <span class='ident'>rl</span>.<span class='ident'>offset</span>);
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>rl</span>.<span class='ident'>size</span>);
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>rl</span>.<span class='ident'>checksum</span>);
+
+            <span class='kw'>let</span> <span class='ident'>flags</span> <span class='op'>=</span> <span class='ident'>rl</span>.<span class='ident'>ignored</span> <span class='kw'>as</span> <span class='ident'>u32</span>;
+            <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>raw_locn</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>flags</span>);
+        }
+
+        <span class='kw'>let</span> <span class='ident'>csum</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..]);
+        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[..<span class='number'>4</span>], <span class='ident'>csum</span>);
+
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
+        <span class='ident'>file</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>)
     }
 
     <span class='doccomment'>/// Read the metadata contained in the metadata area.</span>
@@ -939,9 +1085,7 @@
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>f</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>OpenOptions</span>::<span class='ident'>new</span>().<span class='ident'>read</span>(<span class='boolval'>true</span>).<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>dev_path</span>));
 
         <span class='kw'>for</span> <span class='ident'>pvarea</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>metadata_areas</span> {
-            <span class='kw'>let</span> <span class='ident'>hdr</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
-
-            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>Self</span>::<span class='ident'>get_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>) {
+            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>)) {
                 <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
                 <span class='prelude-val'>Some</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
             };
@@ -979,10 +1123,8 @@
                          .<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>dev_path</span>));
 
         <span class='kw'>for</span> <span class='ident'>pvarea</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>metadata_areas</span> {
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
-
             <span class='comment'>// If this is the first write, supply an initial RawLocn template</span>
-            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>Self</span>::<span class='ident'>get_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>) {
+            <span class='kw'>let</span> <span class='ident'>rl</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>read_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>)) {
                 <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='ident'>RawLocn</span> {
                     <span class='ident'>offset</span>: <span class='ident'>MDA_HEADER_SIZE</span> <span class='kw'>as</span> <span class='ident'>u64</span>,
                     <span class='ident'>size</span>: <span class='number'>0</span>,
@@ -1026,58 +1168,46 @@
                 <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>f</span>.<span class='ident'>write_all</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>[<span class='ident'>written</span> <span class='kw'>as</span> <span class='ident'>usize</span>..]));
             }
 
-            <span class='ident'>Self</span>::<span class='ident'>set_rlocn0</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>,
-                <span class='kw-2'>&amp;</span><span class='ident'>RawLocn</span> {
-                    <span class='ident'>offset</span>: <span class='ident'>start_off</span>,
-                    <span class='ident'>size</span>: <span class='ident'>text</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>u64</span>,
-                    <span class='ident'>checksum</span>: <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>),
-                    <span class='ident'>ignored</span>: <span class='ident'>rl</span>.<span class='ident'>ignored</span>,
-                });
-
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>write_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>));
+            <span class='kw'>let</span> <span class='ident'>new_rl</span> <span class='op'>=</span> <span class='ident'>RawLocn</span> {
+                <span class='ident'>offset</span>: <span class='ident'>start_off</span>,
+                <span class='ident'>size</span>: <span class='ident'>text</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>u64</span>,
+                <span class='ident'>checksum</span>: <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>text</span>),
+                <span class='ident'>ignored</span>: <span class='ident'>rl</span>.<span class='ident'>ignored</span>,
+            };
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>write_mda_header</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvarea</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>, <span class='kw-2'>&amp;</span><span class='ident'>new_rl</span>));
         }
 
         <span class='prelude-val'>Ok</span>(())
     }
+}
 
-    <span class='kw'>fn</span> <span class='ident'>read_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>)
-                        <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>[<span class='ident'>u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>]<span class='op'>&gt;</span> {
-        <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>area</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>usize</span> <span class='op'>&gt;</span> <span class='ident'>MDA_HEADER_SIZE</span>);
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span> <span class='op'>=</span> [<span class='number'>0u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>];
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>));
+<span class='kw'>impl</span> <span class='ident'>From</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span> <span class='kw'>for</span> <span class='ident'>LvmTextMap</span> {
+    <span class='kw'>fn</span> <span class='ident'>from</span>(<span class='ident'>pvh</span>: <span class='ident'>PvHeader</span>) <span class='op'>-&gt;</span> <span class='kw'>Self</span> {
+        <span class='kw'>let</span> <span class='ident'>dev</span> <span class='op'>=</span> <span class='ident'>Device</span>::<span class='ident'>from_str</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>.<span class='ident'>dev_path</span>.<span class='ident'>to_string_lossy</span>()).<span class='ident'>unwrap</span>();
+        <span class='kw'>let</span> <span class='ident'>devno</span>: <span class='ident'>u64</span> <span class='op'>=</span> <span class='ident'>dev</span>.<span class='ident'>into</span>();
 
-        <span class='kw'>if</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[..<span class='number'>4</span>]) <span class='op'>!=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='ident'>MDA_HEADER_SIZE</span>]) {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;MDA header checksum failure&quot;</span>));
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pvmeta</span> <span class='op'>=</span> <span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>();
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;device&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>devno</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;dev_size&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>pvh</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;format&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='string'>&quot;lvm2&quot;</span>.<span class='ident'>to_string</span>()));
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;label_sector&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;id&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>pvh</span>.<span class='ident'>uuid</span>.<span class='ident'>clone</span>()));
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>da0</span> <span class='op'>=</span> <span class='ident'>Box</span>::<span class='ident'>new</span>(<span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>());
+        <span class='ident'>da0</span>.<span class='ident'>insert</span>(<span class='string'>&quot;offset&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>pvh</span>.<span class='ident'>data_areas</span>[<span class='number'>0</span>].<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+        <span class='ident'>da0</span>.<span class='ident'>insert</span>(<span class='string'>&quot;size&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>pvh</span>.<span class='ident'>data_areas</span>[<span class='number'>0</span>].<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+        <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='string'>&quot;da0&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>TextMap</span>(<span class='ident'>da0</span>));
+
+        <span class='kw'>for</span> (<span class='ident'>num</span>, <span class='ident'>pvarea</span>) <span class='kw'>in</span> <span class='ident'>pvh</span>.<span class='ident'>metadata_areas</span>.<span class='ident'>iter</span>().<span class='ident'>enumerate</span>() {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>mda</span> <span class='op'>=</span> <span class='ident'>Box</span>::<span class='ident'>new</span>(<span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>());
+            <span class='ident'>mda</span>.<span class='ident'>insert</span>(<span class='string'>&quot;offset&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>pvarea</span>.<span class='ident'>offset</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+            <span class='ident'>mda</span>.<span class='ident'>insert</span>(<span class='string'>&quot;size&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>pvarea</span>.<span class='ident'>size</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+            <span class='ident'>mda</span>.<span class='ident'>insert</span>(<span class='string'>&quot;ignore&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='number'>0i64</span>));
+            <span class='ident'>mda</span>.<span class='ident'>insert</span>(<span class='string'>&quot;free_sectors&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='number'>0i64</span>));
+            <span class='ident'>pvmeta</span>.<span class='ident'>insert</span>(<span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;mda{}&quot;</span>, <span class='ident'>num</span>), <span class='ident'>Entry</span>::<span class='ident'>TextMap</span>(<span class='ident'>mda</span>));
         }
 
-        <span class='kw'>if</span> <span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>] <span class='op'>!=</span> <span class='ident'>MDA_MAGIC</span> {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(
-                <span class='ident'>Other</span>, <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;&#39;{}&#39; doesn&#39;t match MDA_MAGIC&quot;</span>,
-                               <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..<span class='number'>20</span>]))));
-        }
-
-        <span class='kw'>let</span> <span class='ident'>ver</span> <span class='op'>=</span> <span class='ident'>LittleEndian</span>::<span class='ident'>read_u32</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>20</span>..<span class='number'>24</span>]);
-        <span class='kw'>if</span> <span class='ident'>ver</span> <span class='op'>!=</span> <span class='number'>1</span> {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;Bad version, expected 1&quot;</span>));
-        }
-
-        <span class='comment'>// TODO: validate these somehow</span>
-        <span class='comment'>//println!(&quot;mdah start {}&quot;, LittleEndian::read_u64(&amp;buf[24..32]));</span>
-        <span class='comment'>//println!(&quot;mdah size {}&quot;, LittleEndian::read_u64(&amp;buf[32..40]));</span>
-        <span class='prelude-val'>Ok</span>(<span class='ident'>hdr</span>)
-    }
-
-
-    <span class='kw'>fn</span> <span class='ident'>write_mda_header</span>(<span class='ident'>area</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvArea</span>, <span class='ident'>hdr</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>; <span class='ident'>MDA_HEADER_SIZE</span>], <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>File</span>)
-                        <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>csum</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>hdr</span>[<span class='number'>4</span>..]);
-        <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>[..<span class='number'>4</span>], <span class='ident'>csum</span>);
-
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>seek</span>(<span class='ident'>SeekFrom</span>::<span class='ident'>Start</span>(<span class='ident'>area</span>.<span class='ident'>offset</span>)));
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>file</span>.<span class='ident'>write_all</span>(<span class='ident'>hdr</span>));
-
-        <span class='prelude-val'>Ok</span>(())
+        <span class='ident'>pvmeta</span>
     }
 }
 

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["request","Make a request to the running lvmetad daemon."],["vg_update_lvmetad","Tell `lvmetad` about the current state of a Volume Group."],["vgs_from_lvmetad","Query `lvmetad` for a list of Volume Groups on the system."]]});
+initSidebarItems({"fn":[["pv_found","Tell `lvmetad` about a new PV."],["request","Make a request to the running lvmetad daemon."],["vg_list","Query `lvmetad` for a list of Volume Groups on the system."],["vg_update","Tell `lvmetad` about the current state of a Volume Group."]]});

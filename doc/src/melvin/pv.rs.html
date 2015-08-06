@@ -186,7 +186,7 @@
 <span class='doccomment'>/// A struct containing the device&#39;s major and minor numbers</span>
 <span class='doccomment'>///</span>
 <span class='doccomment'>/// Also allows conversion to/from a single 64bit value.</span>
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>, <span class='ident'>Copy</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Device</span> {
     <span class='doccomment'>/// Device major number</span>
     <span class='kw'>pub</span> <span class='ident'>major</span>: <span class='ident'>u32</span>,

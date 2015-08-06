@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `pvlabel` mod in crate `melvin`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, pvlabel">
+    <meta name="description" content="API documentation for the Rust `vg_list` fn in crate `melvin`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, vg_list">
 
-    <title>melvin::pvlabel - Rust</title>
+    <title>melvin::lvmetad::vg_list - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../../main.css">
 
@@ -26,7 +26,7 @@
 
     <section class="sidebar">
         
-        <p class='location'><a href='../index.html'>melvin</a></p><script>window.sidebarCurrent = {name: 'pvlabel', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script>
+        <p class='location'><a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a></p><script>window.sidebarCurrent = {name: 'vg_list', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </section>
 
     <nav class="sub">
@@ -40,44 +40,14 @@
         </form>
     </nav>
 
-    <section id='main' class="content mod">
-<h1 class='fqn'><span class='in-band'>Module <a href='../index.html'>melvin</a>::<wbr><a class='mod' href=''>pvlabel</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content fn">
+<h1 class='fqn'><span class='in-band'>Function <a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a>::<wbr><a class='fn' href=''>vg_list</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-5429' class='srclink' href='../../src/melvin/pvlabel.rs.html#5-594' title='goto source code'>[src]</a></span></h1>
-<div class='docblock'><p>Reading and writing LVM on-disk labels and metadata.</p>
-</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
-<table>
-                    <tr class=' module-item'>
-                        <td><a class='struct' href='struct.PvArea.html'
-                               title='melvin::pvlabel::PvArea'>PvArea</a></td>
-                        <td class='docblock short'>
-                             <p>Describes an area within a PV</p>
-
-                        </td>
-                    </tr>
-                
-                    <tr class=' module-item'>
-                        <td><a class='struct' href='struct.PvHeader.html'
-                               title='melvin::pvlabel::PvHeader'>PvHeader</a></td>
-                        <td class='docblock short'>
-                             <p>A struct containing the values in the PV header. It contains pointers to
-the data area, and possibly metadata areas and bootloader area.</p>
-
-                        </td>
-                    </tr>
-                </table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
-<table>
-                    <tr class=' module-item'>
-                        <td><a class='fn' href='fn.scan_for_pvs.html'
-                               title='melvin::pvlabel::scan_for_pvs'>scan_for_pvs</a></td>
-                        <td class='docblock short'>
-                             <p>Scan a list of directories for block devices containing LVM PV labels.</p>
-
-                        </td>
-                    </tr>
-                </table></section>
+        </span><a id='src-4947' class='srclink' href='../../src/melvin/lvmetad.rs.html#114-141' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn vg_list() -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../../melvin/vg/struct.VG.html' title='melvin::vg::VG'>VG</a>&gt;&gt;</pre><div class='docblock'><p>Query <code>lvmetad</code> for a list of Volume Groups on the system.</p>
+</div></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

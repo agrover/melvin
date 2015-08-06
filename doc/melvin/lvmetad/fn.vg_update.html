@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `LvmDeviceError` enum in crate `melvin`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, LvmDeviceError">
+    <meta name="description" content="API documentation for the Rust `vg_update` fn in crate `melvin`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, vg_update">
 
-    <title>melvin::pv::LvmDeviceError - Rust</title>
+    <title>melvin::lvmetad::vg_update - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../../main.css">
 
@@ -26,7 +26,7 @@
 
     <section class="sidebar">
         
-        <p class='location'><a href='../index.html'>melvin</a>::<wbr><a href='index.html'>pv</a></p><script>window.sidebarCurrent = {name: 'LvmDeviceError', ty: 'enum', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a></p><script>window.sidebarCurrent = {name: 'vg_update', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </section>
 
     <nav class="sub">
@@ -40,18 +40,13 @@
         </form>
     </nav>
 
-    <section id='main' class="content enum">
-<h1 class='fqn'><span class='in-band'>Enum <a href='../index.html'>melvin</a>::<wbr><a href='index.html'>pv</a>::<wbr><a class='enum' href=''>LvmDeviceError</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content fn">
+<h1 class='fqn'><span class='in-band'>Function <a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a>::<wbr><a class='fn' href=''>vg_update</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-12780' class='srclink' href='../../src/melvin/pv.rs.html#50-53' title='goto source code'>[src]</a></span></h1>
-<pre class='rust enum'>pub enum LvmDeviceError {
-    IoError,
-}</pre><div class='docblock'><p>Errors that can occur when converting from a String into a Device</p>
-</div><h2 class='variants'>Variants</h2>
-<table><tr><td id='variant.IoError'><code>IoError</code></td><td><div class='docblock'><p>IO Error</p>
-</div></td></tr></table><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='enum' href='../../melvin/pv/enum.LvmDeviceError.html' title='melvin::pv::LvmDeviceError'>LvmDeviceError</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class='struct' href='http://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+        </span><a id='src-5166' class='srclink' href='../../src/melvin/lvmetad.rs.html#144-163' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn vg_update(map: &amp;<a class='type' href='../../melvin/parser/type.LvmTextMap.html' title='melvin::parser::LvmTextMap'>LvmTextMap</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</pre><div class='docblock'><p>Tell <code>lvmetad</code> about the current state of a Volume Group.</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 

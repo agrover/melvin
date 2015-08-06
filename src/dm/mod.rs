@@ -364,7 +364,7 @@ impl <'a> DM<'a> {
     }
 
     /// Deactivate a Logical Volume.
-    pub fn deactivate_device(&self, lv: &mut LV) -> io::Result<()> {
+    pub fn deactivate_device(&self, lv: &LV) -> io::Result<()> {
         try!(self.suspend_device(lv));
         self.remove_device(lv)
     }

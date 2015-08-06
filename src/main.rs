@@ -39,7 +39,6 @@ fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
 
     for path in try!(pvlabel::scan_for_pvs(&dirs)) {
         let pvheader = try!(PvHeader::find_in_dev(&path));
-        println!("pvheader {:#?}", pvheader);
         let map = try!(pvheader.read_metadata());
 
         // Find the textmap for the vg, among all the other stuff.
@@ -68,26 +67,40 @@ fn get_conf() -> Result<LvmTextMap> {
 }
 
 fn main() {
-    println!("{:?}", PvHeader::initialize(Path::new("/dev/vdc1")));
-    print_pvheaders();
+    // println!("{:?}", PvHeader::initialize(Path::new("/dev/vdc1")));
+    // print_pvheaders();
     // let (name, map) = get_first_vg_meta().unwrap();
     // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
-    // println!("heyo {} {}", vg.extents(), vg.extent_size);
-    // println!("output {:?}", vg);
+    let mut vgs = lvmetad::vg_list().expect("could not get vgs from lvmetad");
+    let mut vg = vgs.pop().expect("no vgs in vgs");
 
-    // {
-    //     let dm = dm::DM::new(&vg).unwrap();
-    //     match dm.list_devices() {
-    //         Ok(x) => println!("{:?}", x),
-    //         Err(x) => println!("error {}", x),
-    //     }
-    // }
+    let pvh1 = PvHeader::initialize(Path::new("/dev/vdc1")).expect("pvheader not found");
+    // let pvh2 = PvHeader::initialize(Path::new("/dev/vdc2")).expect("pvheader not found");
+
+    // vg.add_pv(&pvh1).unwrap();
+    // vg.add_pv(&pvh2).unwrap();
+
+
+
 
     // let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
     // let mut vg = vgs.pop().expect("no vgs in vgs");
 
-    // vg.new_linear_lv("grover125", 100);
-    // vg.new_linear_lv("grover126", 200);
+    // match vg.new_linear_lv("grover125", 2021) {
+    //     Ok(_) => {},
+    //     Err(x) => {
+    //         println!("err {:?}", x);
+    //         return;
+    //     }
+    // };
+
+    // match vg.lv_remove("grover125") {
+    //     Ok(_) => {println!("yay")},
+    //     Err(x) => {
+    //         println!("err {:?}", x);
+    //         return;
+    //     }
+    // };
 
     // for (lvname, lv) in &vg.lvs {
     //     println!("lv2 {:?}", lv);

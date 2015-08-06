@@ -231,7 +231,18 @@ impl VG {
     }
 
     fn commit(&mut self) -> Result<()> {
-        let map = self.clone().into();
+        let map: LvmTextMap = self.clone().into();
+
+        let mut disk_map = LvmTextMap::new();
+        disk_map.insert("contents".to_string(),
+                        Entry::String("Text Format Volume Group".to_string()));
+        disk_map.insert("version".to_string(), Entry::Number(1));
+        disk_map.insert("description".to_string(), Entry::String("".to_string()));
+        disk_map.insert("creation_host".to_string(),
+                        Entry::String(uname().nodename().to_string()));
+        disk_map.insert("creation_time".to_string(),
+                        Entry::Number(now().to_timespec().sec));
+        disk_map.insert(self.name.clone(), Entry::TextMap(Box::new(map.clone())));
 
         // TODO: atomicity of updating pvs, metad, dm
         for pv in self.pvs.values() {
@@ -239,11 +250,11 @@ impl VG {
                 let mut pvheader = PvHeader::find_in_dev(&path)
                     .expect("could not find pvheader");
 
-                try!(pvheader.write_metadata(&map));
+                try!(pvheader.write_metadata(&disk_map));
             }
         }
 
-        lvmetad::vg_update(&map)
+        lvmetad::vg_update(&self.name, &map)
     }
 
     // Returns e.g. {"pv0": {0: 45, 47: 100, 100: 200} }
@@ -358,10 +369,6 @@ impl From<VG> for LvmTextMap {
                                     (k, Entry::TextMap(Box::new(v.into()))))
                                .collect())));
 
-        let mut outer_map = LvmTextMap::new();
-
-        outer_map.insert(vg.name, Entry::TextMap(Box::new(map)));
-
-        outer_map
+        map
     }
 }

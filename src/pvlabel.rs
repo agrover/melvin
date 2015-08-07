@@ -175,13 +175,13 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-/// A struct containing the values in the PV header. It contains pointers to
-/// the data area, and possibly metadata areas and bootloader area.
+/// A block device that has been initialized to be a LVM Physical
+/// Volume, but that may not be part of a VG yet.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PvHeader {
     /// The unique identifier.
     pub uuid: String,
-    /// Size in bytes of the entire PV
+    /// Size in bytes of the entire PV.
     pub size: u64,
     /// Extension version. If 1, we look for an extension header that may contain a reference
     /// to a bootloader area.
@@ -194,7 +194,7 @@ pub struct PvHeader {
     pub metadata_areas: Vec<PvArea>,
     /// A list of the bootloader areas.
     pub bootloader_areas: Vec<PvArea>,
-    /// The device this pvheader is for
+    /// The path to the device this pvheader is within.
     pub dev_path: PathBuf,
 }
 

@@ -73,7 +73,7 @@ impl From<Device> for u64 {
     }
 }
 
-/// A Physical Volume.
+/// A Physical Volume that is part of a Volume Group.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PV {
     /// The mostly-useless name

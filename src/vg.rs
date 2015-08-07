@@ -26,7 +26,8 @@ use util::{align_to, make_uuid};
 
 const DEFAULT_EXTENT_SIZE: u64 = 8192;  // 4MiB
 
-/// A Volume Group.
+/// A Volume Group allows multiple Physical Volumes to be treated as a
+/// storage pool that can then be used to allocate Logical Volumes.
 #[derive(Debug, PartialEq, Clone)]
 pub struct VG {
     /// Name.

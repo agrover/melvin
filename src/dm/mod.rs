@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Communicating with the running kernel using devicemapper.
+//! Low-level devicemapper configuration of the running kernel.
 
 #[allow(dead_code, non_camel_case_types)]
 mod dm_ioctl;

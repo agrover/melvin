@@ -7,7 +7,7 @@
 use parser::{LvmTextMap, Entry};
 use pv::Device;
 
-/// A Logical Volume.
+/// A Logical Volume that is created from a Volume Group.
 #[derive(Debug, PartialEq, Clone)]
 pub struct LV {
     /// The name.

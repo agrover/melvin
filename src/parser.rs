@@ -31,14 +31,8 @@
 use std::io;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-use std::str::FromStr;
 
 use std::collections::BTreeMap;
-
-use lv::{LV, Segment};
-use vg::VG;
-use pv::{PV, Device};
-use dm::DM;
 
 #[derive(Debug, PartialEq, Clone)]
 enum Token<'a> {
@@ -438,8 +432,9 @@ pub fn buf_to_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
     get_textmap(&tokens)
 }
 
-// status may be either a string or a list of strings
-fn status_from_textmap(map: &LvmTextMap) -> io::Result<Vec<String>> {
+/// Status may be either a string or a list of strings. Convert either
+/// into a list of strings.
+pub fn status_from_textmap(map: &LvmTextMap) -> io::Result<Vec<String>> {
     match map.get("status") {
         Some(&Entry::String(ref x)) => Ok(vec!(x.clone())),
         Some(&Entry::List(ref x)) =>
@@ -452,205 +447,6 @@ fn status_from_textmap(map: &LvmTextMap) -> io::Result<Vec<String>> {
             }),
         _ => Err(Error::new(Other, "status textmap parsing error")),
     }
-}
-
-fn device_from_textmap(map: &LvmTextMap) -> io::Result<Device> {
-    match map.get("device") {
-        Some(&Entry::String(ref x)) => {
-            match Device::from_str(x) {
-                Ok(x) => Ok(x),
-                Err(_) => Err(Error::new(Other, "could not parse string"))
-            }
-        },
-        Some(&Entry::Number(x)) => Ok(Device::from(x as u64)),
-        _ => Err(Error::new(Other, "device textmap parsing error")),
-    }
-}
-
-fn pvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, PV>> {
-    let err = || Error::new(Other, "pv textmap parsing error");
-
-    let mut ret_vec = BTreeMap::new();
-
-    for (key, value) in map {
-        let pv_dict = match value {
-            &Entry::TextMap(ref x) => x,
-            _ => return Err(
-                Error::new(Other, "expected textmap when parsing PV")),
-        };
-
-        let id = try!(pv_dict.string_from_textmap("id").ok_or(err()));
-        let device = try!(device_from_textmap(pv_dict));
-        let dev_size = try!(pv_dict.i64_from_textmap("dev_size").ok_or(err()));
-        let pe_start = try!(pv_dict.i64_from_textmap("pe_start").ok_or(err()));
-        let pe_count = try!(pv_dict.i64_from_textmap("pe_count").ok_or(err()));
-
-        let status = try!(status_from_textmap(pv_dict));
-
-        let flags: Vec<_> = try!(pv_dict.list_from_textmap("flags").ok_or(err()))
-            .into_iter()
-            .filter_map(|item| match item {
-                &Entry::String(ref x) => Some(x.clone()),
-                _ => {None}
-            })
-            .collect();
-
-        // If textmap came from lvmetad, it may also include sections
-        // for data area (da0) and metadata area (mda0). These are not
-        // in the on-disk text metadata, but in the binary PV header.
-        // Don't know if we need them, omitting for now.
-
-        ret_vec.insert(key.clone(), PV {
-            name: key.clone(),
-            id: id.to_string(),
-            device: device,
-            status: status,
-            flags: flags,
-            dev_size: dev_size as u64,
-            pe_start: pe_start as u64,
-            pe_count: pe_count as u64,
-            });
-    }
-
-    Ok(ret_vec)
-}
-
-fn segments_from_textmap(segment_count: u64, map: &LvmTextMap) ->io::Result<Vec<Segment>> {
-    let err = || Error::new(Other, "segment textmap parsing error");
-
-    let mut segments = Vec::new();
-    for i in 0..segment_count {
-        let name = format!("segment{}", i+1);
-        let seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
-        let stripe_list = try!(seg_dict.list_from_textmap("stripes").ok_or(err()));
-
-        let mut stripes: Vec<_> = Vec::new();
-        for slc in stripe_list.chunks(2) {
-            let name = match &slc[0] {
-                &Entry::String(ref x) => x.clone(),
-                _ => return Err(err())
-            };
-            let val = match slc[1] {
-                Entry::Number(x) => x,
-                _ => return Err(err())
-            };
-            stripes.push((name, val as u64));
-        }
-
-        segments.push(Segment {
-            name: name,
-            start_extent: try!(
-                seg_dict.i64_from_textmap("start_extent").ok_or(err())) as u64,
-            extent_count: try!(
-                seg_dict.i64_from_textmap("extent_count").ok_or(err())) as u64,
-            ty: try!(
-                seg_dict.string_from_textmap("type").ok_or(err())).to_string(),
-            stripes: stripes,
-        });
-    }
-
-    Ok(segments)
-}
-
-fn lvs_from_textmap(map: &LvmTextMap) -> io::Result<BTreeMap<String, LV>> {
-    let err = || Error::new(Other, "lv textmap parsing error");
-
-    let mut ret_vec = BTreeMap::new();
-
-    for (key, value) in map {
-        let lv_dict = match value {
-            &Entry::TextMap(ref x) => x,
-            _ => return Err(
-                Error::new(Other,"expected textmap when parsing LV")),
-        };
-
-        let id = try!(lv_dict.string_from_textmap("id").ok_or(err()));
-        let creation_host = try!(lv_dict.string_from_textmap("creation_host")
-                                 .ok_or(err()));
-        let creation_time = try!(lv_dict.i64_from_textmap("creation_time")
-                                 .ok_or(err()));
-        let segment_count = try!(lv_dict.i64_from_textmap("segment_count")
-                                 .ok_or(err()));
-
-        let segments = try!(segments_from_textmap(segment_count as u64, &lv_dict));
-
-        let status = try!(status_from_textmap(lv_dict));
-
-        let flags: Vec<_> = try!(lv_dict.list_from_textmap("flags").ok_or(err()))
-            .into_iter()
-            .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
-            .collect();
-
-        ret_vec.insert(key.clone(), LV {
-            name: key.clone(),
-            id: id.to_string(),
-            status: status,
-            flags: flags,
-            creation_host: creation_host.to_string(),
-            creation_time: creation_time,
-            segments: segments,
-            device: None,
-            });
-    }
-
-    Ok(ret_vec)
-}
-
-/// Construct a `VG` from its name and an `LvmTextMap`.
-pub fn vg_from_textmap(name: &str, map: &LvmTextMap) -> io::Result<VG> {
-
-    let err = || Error::new(Other, "vg textmap parsing error");
-
-    let id = try!(map.string_from_textmap("id").ok_or(err()));
-    let seqno = try!(map.i64_from_textmap("seqno").ok_or(err()));
-    let format = try!(map.string_from_textmap("format").ok_or(err()));
-    let extent_size = try!(map.i64_from_textmap("extent_size").ok_or(err()));
-    let max_lv = try!(map.i64_from_textmap("max_lv").ok_or(err()));
-    let max_pv = try!(map.i64_from_textmap("max_pv").ok_or(err()));
-    let metadata_copies = try!(map.i64_from_textmap("metadata_copies").ok_or(err()));
-
-    let status = try!(status_from_textmap(map));
-
-    let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
-        .into_iter()
-        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
-        .collect();
-
-    let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
-                   .and_then(|tm| pvs_from_textmap(tm)));
-
-    let lvs = match map.textmap_from_textmap("logical_volumes") {
-        Some(ref x) => try!(lvs_from_textmap(x)),
-        None => BTreeMap::new(),
-    };
-
-    let mut vg = VG {
-        name: name.to_string(),
-        id: id.to_string(),
-        seqno: seqno as u64,
-        format: format.to_string(),
-        status: status,
-        flags: flags,
-        extent_size: extent_size as u64,
-        max_lv: max_lv as u64,
-        max_pv: max_pv as u64,
-        metadata_copies: metadata_copies as u64,
-        pvs: pvs,
-        lvs: lvs,
-    };
-
-    let dm_devices = {
-        let dm = try!(DM::new(&vg));
-        try!(dm.list_devices())
-    };
-
-    for (lvname, dev) in dm_devices {
-        if let Some(lv) = vg.lvs.get_mut(&lvname) {
-            lv.device = Some(dev.into());
-        }
-    }
-
-    Ok(vg)
 }
 
 /// Generate a textual LVM configuration string from an LvmTextMap.

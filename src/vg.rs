@@ -8,17 +8,25 @@ use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::borrow::Cow;
 
 use time::now;
 use nix::sys::utsname::uname;
 
-use lv::{LV, Segment};
-use pv::{PV, Device};
+use lv;
+use lv::LV;
+use lv::segment::Segment;
+use pv;
+use pv::PV;
+use Device;
 use pvlabel::{PvHeader, SECTOR_SIZE};
-use parser::{LvmTextMap, Entry};
+use parser::{
+    LvmTextMap,
+    TextMapOps,
+    Entry,
+    status_from_textmap,
+};
 use lvmetad;
 use dm;
 use dm::DM;
@@ -37,7 +45,7 @@ pub struct VG {
     /// The generation of metadata this VG represents.
     pub seqno: u64,
     /// Always "LVM2".
-    pub format: String,
+    format: String,
     /// Status.
     pub status: Vec<String>,
     /// Flags.
@@ -94,46 +102,6 @@ impl VG {
         Ok(vg)
     }
 
-    /// The total number of extents in use in the volume group.
-    pub fn extents_in_use(&self) -> u64 {
-        self.lvs
-            .values()
-            .map(|x| x.used_extents())
-            .sum()
-    }
-
-    /// The total number of free extents in the volume group.
-    pub fn extents_free(&self) -> u64 {
-        self.extents() - self.extents_in_use()
-    }
-
-    /// The total number of extents in the volume group.
-    pub fn extents(&self) -> u64 {
-        self.pvs
-            .values()
-            .map(|x| x.pe_count)
-            .sum()
-    }
-
-    // Recursively walk DM deps to see if device is present
-    fn depends_on(dev: Device, dm_majors: &BTreeSet<u32>, dm: &DM) -> bool {
-        if !dm_majors.contains(&dev.major) {
-            return false;
-        }
-
-        if let Ok(dep_list) = dm.list_deps(dev) {
-            for d in dep_list {
-                if d == dev {
-                    return true;
-                } else if Self::depends_on(d, dm_majors, dm) {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-
     /// Add a non-affiliated PV to this VG.
     pub fn add_pv(&mut self, pvh: &PvHeader) -> Result<()> {
         // Check pv is not on an LV from the vg:
@@ -143,7 +111,7 @@ impl VG {
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
         {
             let dm = try!(DM::new(&self));
-            if Self::depends_on(dev, &dm_majors, &dm) {
+            if dm::depends_on(dev, &dm_majors, &dm) {
                 return Err(Error::new(Other, "Dependency loops prohibited"));
             }
         }
@@ -187,7 +155,6 @@ impl VG {
 
         // make a PV and add it to self
         let pv = PV {
-            name: name.clone(),
             id: pvh.uuid.clone(),
             device: dev,
             status: vec!["ALLOCATABLE".to_string()],
@@ -225,7 +192,6 @@ impl VG {
         };
 
         let segment = Segment {
-            name: "segment1".to_string(),
             start_extent: 0,
             extent_count: extent_size,
             ty: "striped".to_string(),
@@ -269,6 +235,27 @@ impl VG {
                 self.commit()
             },
         }
+    }
+
+    /// The total number of extents in use in the volume group.
+    pub fn extents_in_use(&self) -> u64 {
+        self.lvs
+            .values()
+            .map(|x| x.used_extents())
+            .sum()
+    }
+
+    /// The total number of free extents in the volume group.
+    pub fn extents_free(&self) -> u64 {
+        self.extents() - self.extents_in_use()
+    }
+
+    /// The total number of extents in the volume group.
+    pub fn extents(&self) -> u64 {
+        self.pvs
+            .values()
+            .map(|x| x.pe_count)
+            .sum()
     }
 
     fn commit(&mut self) -> Result<()> {
@@ -416,4 +403,94 @@ impl From<VG> for LvmTextMap {
 
         map
     }
+}
+
+/// Construct a `VG` from its name and an `LvmTextMap`.
+pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
+
+    let err = || Error::new(Other, "vg textmap parsing error");
+
+    let id = try!(map.string_from_textmap("id").ok_or(err()));
+    let seqno = try!(map.i64_from_textmap("seqno").ok_or(err()));
+    let format = try!(map.string_from_textmap("format").ok_or(err()));
+    let extent_size = try!(map.i64_from_textmap("extent_size").ok_or(err()));
+    let max_lv = try!(map.i64_from_textmap("max_lv").ok_or(err()));
+    let max_pv = try!(map.i64_from_textmap("max_pv").ok_or(err()));
+    let metadata_copies = try!(map.i64_from_textmap("metadata_copies").ok_or(err()));
+
+    let status = try!(status_from_textmap(map));
+
+    let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
+        .into_iter()
+        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
+        .collect();
+
+    let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
+                   .and_then(|tm| {
+                       let mut ret_map = BTreeMap::new();
+
+                       for (key, value) in tm {
+                           match value {
+                               &Entry::TextMap(ref pv_dict) => {
+                                   ret_map.insert(
+                                       key.to_string(),
+                                       try!(pv::from_textmap(pv_dict)));
+                               },
+                               _ => return Err(
+                                   Error::new(Other, "expected PV textmap")),
+                           };
+                       }
+
+                       Ok(ret_map)
+                   }));
+
+    // "logical_volumes" may be absent
+    let lvs = match map.textmap_from_textmap("logical_volumes") {
+        Some(tm) => {
+            let mut ret_map = BTreeMap::new();
+
+            for (key, value) in tm {
+                match value {
+                    &Entry::TextMap(ref lv_dict) => {
+                        ret_map.insert(
+                            key.to_string(),
+                            try!(lv::from_textmap(key, lv_dict)));
+                    },
+                    _ => return Err(
+                        Error::new(Other, "expected LV textmap")),
+                }
+            }
+
+            ret_map
+        },
+        None => BTreeMap::new(),
+    };
+
+    let mut vg = VG {
+        name: name.to_string(),
+        id: id.to_string(),
+        seqno: seqno as u64,
+        format: format.to_string(),
+        status: status,
+        flags: flags,
+        extent_size: extent_size as u64,
+        max_lv: max_lv as u64,
+        max_pv: max_pv as u64,
+        metadata_copies: metadata_copies as u64,
+        pvs: pvs,
+        lvs: lvs,
+    };
+
+    let dm_devices = {
+        let dm = try!(DM::new(&vg));
+        try!(dm.list_devices())
+    };
+
+    for (lvname, dev) in dm_devices {
+        if let Some(lv) = vg.lvs.get_mut(&lvname) {
+            lv.device = Some(dev.into());
+        }
+    }
+
+    Ok(vg)
 }

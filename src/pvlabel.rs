@@ -34,7 +34,7 @@ use nix::sys::{stat, ioctl};
 
 use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap, Entry};
 use util::{align_to, crc32_calc, make_uuid, hyphenate_uuid};
-use pv::Device;
+use Device;
 use lvmetad;
 
 const LABEL_SCAN_SECTORS: usize = 4;

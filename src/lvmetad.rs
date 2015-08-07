@@ -14,10 +14,10 @@ use parser::{
     LvmTextMap,
     TextMapOps,
     buf_to_textmap,
-    vg_from_textmap,
     textmap_to_buf,
 };
 use vg;
+use vg::VG;
 
 
 const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
@@ -111,7 +111,7 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
 }
 
 /// Query `lvmetad` for a list of Volume Groups on the system.
-pub fn vg_list() -> Result<Vec<vg::VG>> {
+pub fn vg_list() -> Result<Vec<VG>> {
     let err = || Error::new(Other, "response parsing error");
     let mut v = Vec::new();
 
@@ -132,7 +132,7 @@ pub fn vg_list() -> Result<Vec<vg::VG>> {
         let vg_info = try!(request(b"vg_lookup", Some(options)));
         let md = try!(vg_info.textmap_from_textmap("metadata").ok_or(err()));
 
-        let vg = vg_from_textmap(&name, md).expect("didn't get vg!");
+        let vg = vg::from_textmap(&name, md).expect("didn't get vg!");
 
         v.push(vg);
     }

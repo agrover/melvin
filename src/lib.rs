@@ -24,8 +24,9 @@ mod vg;
 mod pv;
 mod util;
 
-pub use pvlabel::{PvHeader, pvheader_scan};
 pub use vg::VG;
 pub use pv::PV;
+pub use pv::dev::Device;
 pub use lv::LV;
 pub use lvmetad::vg_list;
+pub use pvlabel::{PvHeader, pvheader_scan};

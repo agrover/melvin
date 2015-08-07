@@ -26,7 +26,7 @@ use dm::dm_ioctl as dmi;
 use lv::LV;
 use vg::VG;
 use util::align_to;
-use pv::Device;
+use ::Device;
 
 const DM_IOCTL: u8 = 0xfd;
 const DM_CTL_PATH: &'static str= "/dev/mapper/control";
@@ -61,6 +61,25 @@ pub fn dev_majors() -> BTreeSet<u32> {
         }
 
     set
+}
+
+/// Recursively walk DM deps to see if device is present
+pub fn depends_on(dev: Device, dm_majors: &BTreeSet<u32>, dm: &DM) -> bool {
+    if !dm_majors.contains(&dev.major) {
+        return false;
+    }
+
+    if let Ok(dep_list) = dm.list_deps(dev) {
+        for d in dep_list {
+            if d == dev {
+                return true;
+            } else if depends_on(d, dm_majors, dm) {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 /// Context needed for communicating with devicemapper.

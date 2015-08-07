@@ -111,7 +111,7 @@ impl VG {
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
         {
             let dm = try!(DM::new(&self));
-            if dm::depends_on(dev, &dm_majors, &dm) {
+            if dm.depends_on(dev, &dm_majors) {
                 return Err(Error::new(Other, "Dependency loops prohibited"));
             }
         }

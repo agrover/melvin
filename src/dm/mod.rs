@@ -63,25 +63,6 @@ pub fn dev_majors() -> BTreeSet<u32> {
     set
 }
 
-/// Recursively walk DM deps to see if device is present
-pub fn depends_on(dev: Device, dm_majors: &BTreeSet<u32>, dm: &DM) -> bool {
-    if !dm_majors.contains(&dev.major) {
-        return false;
-    }
-
-    if let Ok(dep_list) = dm.list_deps(dev) {
-        for d in dep_list {
-            if d == dev {
-                return true;
-            } else if depends_on(d, dm_majors, dm) {
-                return true;
-            }
-        }
-    }
-
-    false
-}
-
 /// Context needed for communicating with devicemapper.
 pub struct DM<'a> {
     file: File,
@@ -213,6 +194,25 @@ impl <'a> DM<'a> {
         }
 
         Ok(devs)
+    }
+
+    /// Recursively walk DM deps to see if device is present
+    pub fn depends_on(&self, dev: Device, dm_majors: &BTreeSet<u32>) -> bool {
+        if !dm_majors.contains(&dev.major) {
+            return false;
+        }
+
+        if let Ok(dep_list) = self.list_deps(dev) {
+            for d in dep_list {
+                if d == dev {
+                    return true;
+                } else if self.depends_on(d, dm_majors) {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     fn create_device(&self, lv: &mut LV) -> io::Result<()> {

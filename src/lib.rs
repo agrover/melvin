@@ -15,11 +15,17 @@ extern crate libc;
 extern crate uuid;
 extern crate time;
 
-pub mod parser;
-pub mod lvmetad;
-pub mod pvlabel;
 pub mod dm;
-pub mod lv;
-pub mod vg;
-pub mod pv;
+pub mod parser;
+mod lvmetad;
+mod pvlabel;
+mod lv;
+mod vg;
+mod pv;
 mod util;
+
+pub use pvlabel::{PvHeader, pvheader_scan};
+pub use vg::VG;
+pub use pv::PV;
+pub use lv::LV;
+pub use lvmetad::vg_list;

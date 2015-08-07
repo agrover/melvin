@@ -25,8 +25,7 @@ use melvin::dm;
 fn print_pvheaders() -> Result<()> {
     let dirs = vec![path::Path::new("/dev")];
 
-    for path in try!(pvlabel::scan_for_pvs(&dirs)) {
-        let pvheader = try!(PvHeader::find_in_dev(&path));
+    for pvheader in try!(pvlabel::scan_for_pvs(&dirs)) {
         println!("pvheader {:#?}", pvheader);
     }
 
@@ -37,8 +36,7 @@ fn print_pvheaders() -> Result<()> {
 fn get_first_vg_meta() -> Result<(String, LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
 
-    for path in try!(pvlabel::scan_for_pvs(&dirs)) {
-        let pvheader = try!(PvHeader::find_in_dev(&path));
+    for pvheader in try!(pvlabel::scan_for_pvs(&dirs)) {
         let map = try!(pvheader.read_metadata());
 
         // Find the textmap for the vg, among all the other stuff.

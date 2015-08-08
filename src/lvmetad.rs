@@ -70,14 +70,6 @@ fn _request(req: &[u8],
 }
 
 /// Make a request to the running lvmetad daemon.
-///
-/// # Examples
-///
-/// ```
-///    use melvin::lvmetad::request;
-///
-///    let vg_list = request(b"vg_list", None);
-/// ```
 pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");
     let token = b"0";
@@ -111,6 +103,14 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
 }
 
 /// Query `lvmetad` for a list of Volume Groups on the system.
+///
+/// # Examples
+///
+/// ```
+///    use melvin::vg_list;
+///
+///    let vgs = vg_list();
+/// ```
 pub fn vg_list() -> Result<Vec<VG>> {
     let err = || Error::new(Other, "response parsing error");
     let mut v = Vec::new();

@@ -109,7 +109,7 @@ impl VG {
         // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
         let dm_majors = dm::dev_majors();
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
-        {
+        if dm_majors.contains(&dev.major) {
             let dm = try!(DM::new(&self));
             if dm.depends_on(dev, &dm_majors) {
                 return Err(Error::new(Other, "Dependency loops prohibited"));

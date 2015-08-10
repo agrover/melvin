@@ -44,7 +44,7 @@ pub struct VG {
     pub id: String,
     /// The generation of metadata this VG represents.
     pub seqno: u64,
-    /// Always "LVM2".
+    /// Always "lvm2".
     format: String,
     /// Status.
     pub status: Vec<String>,

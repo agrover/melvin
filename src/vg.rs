@@ -167,6 +167,27 @@ impl VG {
         self.commit()
     }
 
+    /// Remove a PV. It must be unused by any LVs.
+    pub fn remove_pv(&mut self, pvh: &PvHeader) -> Result<()> {
+        let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
+
+        for (lvname, lv) in &self.lvs {
+            for seg in &lv.segments {
+                for &(seg_dev, _) in &seg.stripes {
+                    if seg_dev == dev {
+                        return Err(Error::new(
+                            Other, format!("PV in use by LV {}", lvname)));
+                    }
+                }
+            }
+        }
+
+        try!(self.pvs.remove(&dev)
+             .ok_or(Error::new(Other, "Could not remove PV")));
+
+        self.commit()
+    }
+
     /// Create a new linear logical volume in the volume group.
     pub fn new_linear_lv(&mut self, name: &str, extent_size: u64) -> Result<()> {
         if self.lvs.contains_key(name) {

@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `vg_update_lvmetad` fn in crate `melvin`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, vg_update_lvmetad">
+    <meta name="description" content="API documentation for the Rust `depends_on` fn in crate `melvin`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, depends_on">
 
-    <title>melvin::lvmetad::vg_update_lvmetad - Rust</title>
+    <title>melvin::dm::depends_on - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../../main.css">
 
@@ -26,7 +26,7 @@
 
     <section class="sidebar">
         
-        <p class='location'><a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a></p><script>window.sidebarCurrent = {name: 'vg_update_lvmetad', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='../index.html'>melvin</a>::<wbr><a href='index.html'>dm</a></p><script>window.sidebarCurrent = {name: 'depends_on', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </section>
 
     <nav class="sub">
@@ -41,12 +41,12 @@
     </nav>
 
     <section id='main' class="content fn">
-<h1 class='fqn'><span class='in-band'>Function <a href='../index.html'>melvin</a>::<wbr><a href='index.html'>lvmetad</a>::<wbr><a class='fn' href=''>vg_update_lvmetad</a></span><span class='out-of-band'><span id='render-detail'>
+<h1 class='fqn'><span class='in-band'>Function <a href='../index.html'>melvin</a>::<wbr><a href='index.html'>dm</a>::<wbr><a class='fn' href=''>depends_on</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-5166' class='srclink' href='../../src/melvin/lvmetad.rs.html#144-163' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn vg_update_lvmetad(map: &amp;<a class='type' href='../../melvin/parser/type.LvmTextMap.html' title='melvin::parser::LvmTextMap'>LvmTextMap</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</pre><div class='docblock'><p>Tell <code>lvmetad</code> about the current state of a Volume Group.</p>
+        </span><a id='src-684' class='srclink' href='../../src/melvin/dm/mod.rs.html#67-83' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn depends_on(dev: <a class='struct' href='../../melvin/struct.Device.html' title='melvin::Device'>Device</a>, dm_majors: &amp;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/btree/set/struct.BTreeSet.html' title='collections::btree::set::BTreeSet'>BTreeSet</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>&gt;, dm: &amp;<a class='struct' href='../../melvin/dm/struct.DM.html' title='melvin::dm::DM'>DM</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></pre><div class='docblock'><p>Recursively walk DM deps to see if device is present</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Device","A struct containing the device's major and minor numbers"],["PV","A Physical Volume."]]});
+initSidebarItems({"mod":[["dev",""]],"struct":[["PV","A Physical Volume that is part of a Volume Group."]]});

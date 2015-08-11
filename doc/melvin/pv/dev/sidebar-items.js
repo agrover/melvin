@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Device","A struct containing the device's major and minor numbers"]]});

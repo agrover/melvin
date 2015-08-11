@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["VG","A Volume Group."]]});
+initSidebarItems({"struct":[["VG","A Volume Group allows multiple Physical Volumes to be treated as a storage pool that can then be used to allocate Logical Volumes."]]});

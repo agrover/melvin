@@ -164,6 +164,107 @@
 <span id="122">122</span>
 <span id="123">123</span>
 <span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -171,10 +272,21 @@
 
 <span class='doccomment'>//! Logical Volumes</span>
 
-<span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>Entry</span>};
-<span class='kw'>use</span> <span class='ident'>pv</span>::<span class='ident'>Device</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>Error</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>BTreeMap</span>;
 
-<span class='doccomment'>/// A Logical Volume.</span>
+<span class='kw'>use</span> <span class='ident'>parser</span>::{
+    <span class='ident'>LvmTextMap</span>,
+    <span class='ident'>TextMapOps</span>,
+    <span class='ident'>Entry</span>,
+    <span class='ident'>status_from_textmap</span>,
+};
+<span class='kw'>use</span> <span class='ident'>Device</span>;
+<span class='kw'>use</span> <span class='ident'>PV</span>;
+
+<span class='doccomment'>/// A Logical Volume that is created from a Volume Group.</span>
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>LV</span> {
     <span class='doccomment'>/// The name.</span>
@@ -190,7 +302,7 @@
     <span class='doccomment'>/// Created at this Unix time.</span>
     <span class='kw'>pub</span> <span class='ident'>creation_time</span>: <span class='ident'>i64</span>,
     <span class='doccomment'>/// A list of the segments comprising the LV.</span>
-    <span class='kw'>pub</span> <span class='ident'>segments</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Segment</span><span class='op'>&gt;</span>,
+    <span class='kw'>pub</span> <span class='ident'>segments</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>segment</span>::<span class='ident'>Segment</span><span class='op'>&gt;</span>,
     <span class='doccomment'>/// The major/minor number of the LV.</span>
     <span class='kw'>pub</span> <span class='ident'>device</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>Device</span><span class='op'>&gt;</span>,
 }
@@ -205,63 +317,118 @@
     }
 }
 
-<span class='kw'>impl</span> <span class='ident'>From</span><span class='op'>&lt;</span><span class='ident'>LV</span><span class='op'>&gt;</span> <span class='kw'>for</span> <span class='ident'>LvmTextMap</span> {
-    <span class='kw'>fn</span> <span class='ident'>from</span>(<span class='ident'>lv</span>: <span class='ident'>LV</span>) <span class='op'>-&gt;</span> <span class='ident'>LvmTextMap</span> {
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>map</span> <span class='op'>=</span> <span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>();
+<span class='doccomment'>/// Construct an LV from an LvmTextMap.</span>
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>from_textmap</span>(<span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>, <span class='ident'>pvs</span>: <span class='kw-2'>&amp;</span><span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>PV</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LV</span><span class='op'>&gt;</span> {
+    <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;lv textmap parsing error&quot;</span>);
 
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;id&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>lv</span>.<span class='ident'>id</span>));
+    <span class='kw'>let</span> <span class='ident'>id</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>string_from_textmap</span>(<span class='string'>&quot;id&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+    <span class='kw'>let</span> <span class='ident'>creation_host</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>string_from_textmap</span>(<span class='string'>&quot;creation_host&quot;</span>)
+                             .<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+    <span class='kw'>let</span> <span class='ident'>creation_time</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>i64_from_textmap</span>(<span class='string'>&quot;creation_time&quot;</span>)
+                             .<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+    <span class='kw'>let</span> <span class='ident'>segment_count</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>i64_from_textmap</span>(<span class='string'>&quot;segment_count&quot;</span>)
+                             .<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
 
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;status&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>List</span>(
-                       <span class='ident'>Box</span>::<span class='ident'>new</span>(
-                           <span class='ident'>lv</span>.<span class='ident'>status</span>
-                               .<span class='ident'>into_iter</span>()
-                               .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>x</span>))
-                               .<span class='ident'>collect</span>())));
+    <span class='comment'>// let segments = try!(segments_from_textmap(segment_count as u64, &amp;map));</span>
+    <span class='kw'>let</span> <span class='ident'>segments</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> (<span class='number'>0</span>..<span class='ident'>segment_count</span>)
+        .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>num</span><span class='op'>|</span> {
+            <span class='kw'>let</span> <span class='ident'>name</span> <span class='op'>=</span> <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;segment{}&quot;</span>, <span class='ident'>num</span><span class='op'>+</span><span class='number'>1</span>);
+            <span class='kw'>let</span> <span class='ident'>seg_dict</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>textmap_from_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>name</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+            <span class='ident'>segment</span>::<span class='ident'>from_textmap</span>(<span class='ident'>seg_dict</span>, <span class='ident'>pvs</span>)
+        })
+        .<span class='ident'>filter_map</span>(<span class='op'>|</span><span class='ident'>seg</span><span class='op'>|</span> <span class='ident'>seg</span>.<span class='ident'>ok</span>())
+        .<span class='ident'>collect</span>();
 
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;flags&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>List</span>(
-                       <span class='ident'>Box</span>::<span class='ident'>new</span>(
-                           <span class='ident'>lv</span>.<span class='ident'>flags</span>
-                               .<span class='ident'>into_iter</span>()
-                               .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>x</span>))
-                               .<span class='ident'>collect</span>())));
 
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;creation_host&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>lv</span>.<span class='ident'>creation_host</span>));
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;creation_time&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>lv</span>.<span class='ident'>creation_time</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+    <span class='kw'>let</span> <span class='ident'>status</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>status_from_textmap</span>(<span class='ident'>map</span>));
 
-        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;segment_count&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>lv</span>.<span class='ident'>segments</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>i64</span>));
+    <span class='kw'>let</span> <span class='ident'>flags</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>list_from_textmap</span>(<span class='string'>&quot;flags&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()))
+        .<span class='ident'>iter</span>()
+        .<span class='ident'>filter_map</span>(<span class='op'>|</span><span class='ident'>item</span><span class='op'>|</span> <span class='kw'>match</span> <span class='ident'>item</span> {
+            <span class='kw-2'>&amp;</span><span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='kw-2'>ref</span> <span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='prelude-val'>Some</span>(<span class='ident'>x</span>.<span class='ident'>clone</span>()),
+            _ <span class='op'>=&gt;</span> {<span class='prelude-val'>None</span>},
+        })
+        .<span class='ident'>collect</span>();
 
-        <span class='kw'>for</span> (<span class='ident'>i</span>, <span class='ident'>seg</span>) <span class='kw'>in</span> <span class='ident'>lv</span>.<span class='ident'>segments</span>.<span class='ident'>into_iter</span>().<span class='ident'>enumerate</span>() {
-            <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;segment{}&quot;</span>, <span class='ident'>i</span><span class='op'>+</span><span class='number'>1</span>),
-                       <span class='ident'>Entry</span>::<span class='ident'>TextMap</span>(
-                           <span class='ident'>Box</span>::<span class='ident'>new</span>(<span class='ident'>seg</span>.<span class='ident'>into</span>())));
-        }
+    <span class='prelude-val'>Ok</span>(<span class='ident'>LV</span> {
+        <span class='ident'>name</span>: <span class='ident'>name</span>.<span class='ident'>to_string</span>(),
+        <span class='ident'>id</span>: <span class='ident'>id</span>.<span class='ident'>to_string</span>(),
+        <span class='ident'>status</span>: <span class='ident'>status</span>,
+        <span class='ident'>flags</span>: <span class='ident'>flags</span>,
+        <span class='ident'>creation_host</span>: <span class='ident'>creation_host</span>.<span class='ident'>to_string</span>(),
+        <span class='ident'>creation_time</span>: <span class='ident'>creation_time</span>,
+        <span class='ident'>segments</span>: <span class='ident'>segments</span>,
+        <span class='ident'>device</span>: <span class='prelude-val'>None</span>,
+    })
+}
 
-        <span class='ident'>map</span>
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>to_textmap</span>(<span class='ident'>lv</span>: <span class='kw-2'>&amp;</span><span class='ident'>LV</span>, <span class='ident'>dev_to_idx</span>: <span class='kw-2'>&amp;</span><span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>Device</span>, <span class='ident'>usize</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='ident'>LvmTextMap</span> {
+    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>map</span> <span class='op'>=</span> <span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>();
+
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;id&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>lv</span>.<span class='ident'>id</span>.<span class='ident'>clone</span>()));
+
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;status&quot;</span>.<span class='ident'>to_string</span>(),
+               <span class='ident'>Entry</span>::<span class='ident'>List</span>(
+                   <span class='ident'>Box</span>::<span class='ident'>new</span>(
+                       <span class='ident'>lv</span>.<span class='ident'>status</span>
+                           .<span class='ident'>iter</span>()
+                           .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>x</span>.<span class='ident'>clone</span>()))
+                           .<span class='ident'>collect</span>())));
+
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;flags&quot;</span>.<span class='ident'>to_string</span>(),
+               <span class='ident'>Entry</span>::<span class='ident'>List</span>(
+                   <span class='ident'>Box</span>::<span class='ident'>new</span>(
+                       <span class='ident'>lv</span>.<span class='ident'>flags</span>
+                           .<span class='ident'>iter</span>()
+                           .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>x</span>.<span class='ident'>clone</span>()))
+                           .<span class='ident'>collect</span>())));
+
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;creation_host&quot;</span>.<span class='ident'>to_string</span>(),
+               <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>lv</span>.<span class='ident'>creation_host</span>.<span class='ident'>clone</span>()));
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;creation_time&quot;</span>.<span class='ident'>to_string</span>(),
+               <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>lv</span>.<span class='ident'>creation_time</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
+
+    <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;segment_count&quot;</span>.<span class='ident'>to_string</span>(),
+               <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>lv</span>.<span class='ident'>segments</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>i64</span>));
+
+    <span class='kw'>for</span> (<span class='ident'>i</span>, <span class='ident'>seg</span>) <span class='kw'>in</span> <span class='ident'>lv</span>.<span class='ident'>segments</span>.<span class='ident'>iter</span>().<span class='ident'>enumerate</span>() {
+        <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;segment{}&quot;</span>, <span class='ident'>i</span><span class='op'>+</span><span class='number'>1</span>),
+                   <span class='ident'>Entry</span>::<span class='ident'>TextMap</span>(
+                       <span class='ident'>Box</span>::<span class='ident'>new</span>(<span class='ident'>segment</span>::<span class='ident'>to_textmap</span>(<span class='ident'>seg</span>, <span class='ident'>dev_to_idx</span>))));
     }
+
+    <span class='ident'>map</span>
 }
 
-<span class='doccomment'>/// A Logical Volume Segment.</span>
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
-<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Segment</span> {
-    <span class='doccomment'>/// A mostly-useless name.</span>
-    <span class='kw'>pub</span> <span class='ident'>name</span>: <span class='ident'>String</span>,
-    <span class='doccomment'>/// The first extent within the LV this segment comprises.</span>
-    <span class='kw'>pub</span> <span class='ident'>start_extent</span>: <span class='ident'>u64</span>,
-    <span class='doccomment'>/// How many extents this segment comprises</span>
-    <span class='kw'>pub</span> <span class='ident'>extent_count</span>: <span class='ident'>u64</span>,
-    <span class='doccomment'>/// The segment type.</span>
-    <span class='kw'>pub</span> <span class='ident'>ty</span>: <span class='ident'>String</span>,
-    <span class='doccomment'>/// If &gt;1, Segment is striped across multiple PVs.</span>
-    <span class='kw'>pub</span> <span class='ident'>stripes</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>(<span class='ident'>String</span>, <span class='ident'>u64</span>)<span class='op'>&gt;</span>,
-}
+<span class='kw'>pub</span> <span class='kw'>mod</span> <span class='ident'>segment</span> {
+    <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span>;
+    <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>Error</span>;
+    <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
+    <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>BTreeMap</span>;
 
-<span class='kw'>impl</span> <span class='ident'>From</span><span class='op'>&lt;</span><span class='ident'>Segment</span><span class='op'>&gt;</span> <span class='kw'>for</span> <span class='ident'>LvmTextMap</span> {
-    <span class='kw'>fn</span> <span class='ident'>from</span>(<span class='ident'>seg</span>: <span class='ident'>Segment</span>) <span class='op'>-&gt;</span> <span class='ident'>LvmTextMap</span> {
+    <span class='kw'>use</span> <span class='ident'>parser</span>::{
+        <span class='ident'>LvmTextMap</span>,
+        <span class='ident'>TextMapOps</span>,
+        <span class='ident'>Entry</span>,
+    };
+    <span class='kw'>use</span> <span class='ident'>PV</span>;
+    <span class='kw'>use</span> <span class='ident'>Device</span>;
+
+    <span class='doccomment'>/// A Logical Volume Segment.</span>
+    <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
+    <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Segment</span> {
+        <span class='doccomment'>/// The first extent within the LV this segment comprises.</span>
+        <span class='kw'>pub</span> <span class='ident'>start_extent</span>: <span class='ident'>u64</span>,
+        <span class='doccomment'>/// How many extents this segment comprises</span>
+        <span class='kw'>pub</span> <span class='ident'>extent_count</span>: <span class='ident'>u64</span>,
+        <span class='doccomment'>/// The segment type.</span>
+        <span class='kw'>pub</span> <span class='ident'>ty</span>: <span class='ident'>String</span>,
+        <span class='doccomment'>/// If 1 stripe, Segment is type &quot;linear&quot;, else &quot;striped&quot;</span>
+        <span class='doccomment'>/// Stripes contain the Device and the starting PV extent.</span>
+        <span class='kw'>pub</span> <span class='ident'>stripes</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>(<span class='ident'>Device</span>, <span class='ident'>u64</span>)<span class='op'>&gt;</span>,
+    }
+
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>to_textmap</span>(<span class='ident'>seg</span>: <span class='kw-2'>&amp;</span><span class='ident'>Segment</span>, <span class='ident'>dev_to_idx</span>: <span class='kw-2'>&amp;</span><span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>Device</span>, <span class='ident'>usize</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='ident'>LvmTextMap</span> {
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>map</span> <span class='op'>=</span> <span class='ident'>LvmTextMap</span>::<span class='ident'>new</span>();
 
         <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;start_extent&quot;</span>.<span class='ident'>to_string</span>(),
@@ -269,7 +436,7 @@
         <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;extent_count&quot;</span>.<span class='ident'>to_string</span>(),
                    <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>seg</span>.<span class='ident'>extent_count</span> <span class='kw'>as</span> <span class='ident'>i64</span>));
         <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;type&quot;</span>.<span class='ident'>to_string</span>(),
-                   <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>seg</span>.<span class='ident'>ty</span>));
+                   <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>seg</span>.<span class='ident'>ty</span>.<span class='ident'>clone</span>()));
         <span class='ident'>map</span>.<span class='ident'>insert</span>(<span class='string'>&quot;stripe_count&quot;</span>.<span class='ident'>to_string</span>(),
                    <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>seg</span>.<span class='ident'>stripes</span>.<span class='ident'>len</span>() <span class='kw'>as</span> <span class='ident'>i64</span>));
 
@@ -277,16 +444,51 @@
                    <span class='ident'>Entry</span>::<span class='ident'>List</span>(
                        <span class='ident'>Box</span>::<span class='ident'>new</span>(
                            <span class='ident'>seg</span>.<span class='ident'>stripes</span>
-                               .<span class='ident'>into_iter</span>()
-                               .<span class='ident'>map</span>(<span class='op'>|</span>(<span class='ident'>k</span>, <span class='ident'>v</span>)<span class='op'>|</span>
-                                    <span class='macro'>vec</span><span class='macro'>!</span>[
-                                        <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>k</span>),
-                                        <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>v</span> <span class='kw'>as</span> <span class='ident'>i64</span>)
-                                            ]
-                                    .<span class='ident'>into_iter</span>())
+                               .<span class='ident'>iter</span>()
+                               .<span class='ident'>map</span>(<span class='op'>|</span><span class='kw-2'>&amp;</span>(<span class='ident'>k</span>, <span class='ident'>v</span>)<span class='op'>|</span> {
+                                   <span class='kw'>let</span> <span class='ident'>name</span> <span class='op'>=</span> <span class='macro'>format</span><span class='macro'>!</span>(
+                                       <span class='string'>&quot;pv{}&quot;</span>, <span class='ident'>dev_to_idx</span>.<span class='ident'>get</span>(<span class='kw-2'>&amp;</span><span class='ident'>k</span>).<span class='ident'>unwrap</span>());
+                                   <span class='macro'>vec</span><span class='macro'>!</span>[
+                                       <span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='ident'>name</span>),
+                                       <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>v</span> <span class='kw'>as</span> <span class='ident'>i64</span>)
+                                           ]
+                                       .<span class='ident'>into_iter</span>()
+                               })
                                .<span class='ident'>flat_map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>x</span>)
                                .<span class='ident'>collect</span>())));
         <span class='ident'>map</span>
+    }
+
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>from_textmap</span>(<span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>, <span class='ident'>pvs</span>: <span class='kw-2'>&amp;</span><span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>PV</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Segment</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;segment textmap parsing error&quot;</span>);
+
+        <span class='kw'>let</span> <span class='ident'>stripe_list</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>map</span>.<span class='ident'>list_from_textmap</span>(<span class='string'>&quot;stripes&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>stripes</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+        <span class='kw'>for</span> <span class='ident'>slc</span> <span class='kw'>in</span> <span class='ident'>stripe_list</span>.<span class='ident'>chunks</span>(<span class='number'>2</span>) {
+            <span class='kw'>let</span> <span class='ident'>name</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='kw-2'>&amp;</span><span class='ident'>slc</span>[<span class='number'>0</span>] {
+                <span class='kw-2'>&amp;</span><span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='kw-2'>ref</span> <span class='ident'>x</span>) <span class='op'>=&gt;</span> {
+                    <span class='kw'>let</span> <span class='ident'>pv</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>pvs</span>.<span class='ident'>get</span>(<span class='ident'>x</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+                    <span class='ident'>pv</span>.<span class='ident'>device</span>
+                },
+                _ <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>err</span>())
+            };
+            <span class='kw'>let</span> <span class='ident'>val</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>slc</span>[<span class='number'>1</span>] {
+                <span class='ident'>Entry</span>::<span class='ident'>Number</span>(<span class='ident'>x</span>) <span class='op'>=&gt;</span> <span class='ident'>x</span>,
+                _ <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>err</span>())
+            };
+            <span class='ident'>stripes</span>.<span class='ident'>push</span>((<span class='ident'>name</span>, <span class='ident'>val</span> <span class='kw'>as</span> <span class='ident'>u64</span>));
+        }
+
+        <span class='prelude-val'>Ok</span>(<span class='ident'>Segment</span> {
+            <span class='ident'>start_extent</span>: <span class='macro'>try</span><span class='macro'>!</span>(
+                <span class='ident'>map</span>.<span class='ident'>i64_from_textmap</span>(<span class='string'>&quot;start_extent&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>())) <span class='kw'>as</span> <span class='ident'>u64</span>,
+            <span class='ident'>extent_count</span>: <span class='macro'>try</span><span class='macro'>!</span>(
+                <span class='ident'>map</span>.<span class='ident'>i64_from_textmap</span>(<span class='string'>&quot;extent_count&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>())) <span class='kw'>as</span> <span class='ident'>u64</span>,
+            <span class='ident'>ty</span>: <span class='macro'>try</span><span class='macro'>!</span>(
+                <span class='ident'>map</span>.<span class='ident'>string_from_textmap</span>(<span class='string'>&quot;type&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>())).<span class='ident'>to_string</span>(),
+            <span class='ident'>stripes</span>: <span class='ident'>stripes</span>,
+        })
     }
 }
 </pre>

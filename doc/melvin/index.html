@@ -45,7 +45,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-0' class='srclink' href='../src/melvin/lib.rs.html#5-25' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/melvin/lib.rs.html#5-32' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>Melvin is pure Rust library for configuring <a href="https://www.sourceware.org/lvm2/">LVM</a>.</p>
 </div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
 <table>
@@ -53,25 +53,7 @@
                         <td><a class='mod' href='dm/index.html'
                                title='melvin::dm'>dm</a></td>
                         <td class='docblock short'>
-                             <p>Communicating with the running kernel using devicemapper.</p>
-
-                        </td>
-                    </tr>
-                
-                    <tr class=' module-item'>
-                        <td><a class='mod' href='lv/index.html'
-                               title='melvin::lv'>lv</a></td>
-                        <td class='docblock short'>
-                             <p>Logical Volumes</p>
-
-                        </td>
-                    </tr>
-                
-                    <tr class=' module-item'>
-                        <td><a class='mod' href='lvmetad/index.html'
-                               title='melvin::lvmetad'>lvmetad</a></td>
-                        <td class='docblock short'>
-                             <p>Communicating with <code>lvmetad</code>.</p>
+                             <p>Low-level devicemapper configuration of the running kernel.</p>
 
                         </td>
                     </tr>
@@ -84,30 +66,70 @@
 
                         </td>
                     </tr>
-                
+                </table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
                     <tr class=' module-item'>
-                        <td><a class='mod' href='pv/index.html'
-                               title='melvin::pv'>pv</a></td>
+                        <td><a class='struct' href='struct.Device.html'
+                               title='melvin::Device'>Device</a></td>
                         <td class='docblock short'>
-                             <p>Physical Volumes</p>
+                             <p>A struct containing the device&#39;s major and minor numbers</p>
 
                         </td>
                     </tr>
                 
                     <tr class=' module-item'>
-                        <td><a class='mod' href='pvlabel/index.html'
-                               title='melvin::pvlabel'>pvlabel</a></td>
+                        <td><a class='struct' href='struct.LV.html'
+                               title='melvin::LV'>LV</a></td>
                         <td class='docblock short'>
-                             <p>Reading and writing LVM on-disk labels and metadata.</p>
+                             <p>A Logical Volume that is created from a Volume Group.</p>
 
                         </td>
                     </tr>
                 
                     <tr class=' module-item'>
-                        <td><a class='mod' href='vg/index.html'
-                               title='melvin::vg'>vg</a></td>
+                        <td><a class='struct' href='struct.PV.html'
+                               title='melvin::PV'>PV</a></td>
                         <td class='docblock short'>
-                             <p>Volume Groups</p>
+                             <p>A Physical Volume that is part of a Volume Group.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.PvHeader.html'
+                               title='melvin::PvHeader'>PvHeader</a></td>
+                        <td class='docblock short'>
+                             <p>A block device that has been initialized to be a LVM Physical
+Volume, but that may not be part of a VG yet.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.VG.html'
+                               title='melvin::VG'>VG</a></td>
+                        <td class='docblock short'>
+                             <p>A Volume Group allows multiple Physical Volumes to be treated as a
+storage pool that can then be used to allocate Logical Volumes.</p>
+
+                        </td>
+                    </tr>
+                </table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.pvheader_scan.html'
+                               title='melvin::pvheader_scan'>pvheader_scan</a></td>
+                        <td class='docblock short'>
+                             <p>Scan a list of directories for block devices containing LVM PV labels.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.vg_list.html'
+                               title='melvin::vg_list'>vg_list</a></td>
+                        <td class='docblock short'>
+                             <p>Query <code>lvmetad</code> for a list of Volume Groups on the system.</p>
 
                         </td>
                     </tr>

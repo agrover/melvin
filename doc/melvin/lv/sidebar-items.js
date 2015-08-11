@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LV","A Logical Volume."],["Segment","A Logical Volume Segment."]]});
+initSidebarItems({"struct":[["LV","A Logical Volume that is created from a Volume Group."]]});

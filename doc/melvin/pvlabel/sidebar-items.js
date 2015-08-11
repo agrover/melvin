@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["scan_for_pvs","Scan a list of directories for block devices containing LVM PV labels."]],"struct":[["PvArea","Describes an area within a PV"],["PvHeader","A struct containing the values in the PV header. It contains pointers to the data area, and possibly metadata areas and bootloader area."]]});
+initSidebarItems({"fn":[["pvheader_scan","Scan a list of directories for block devices containing LVM PV labels."]],"struct":[["PvHeader","A block device that has been initialized to be a LVM Physical Volume, but that may not be part of a VG yet."]]});

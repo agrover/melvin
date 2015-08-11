@@ -59,7 +59,7 @@ pub struct VG {
     /// How many metadata copies (?)
     pub metadata_copies: u64,
     /// Physical Volumes within this volume group.
-    pub pvs: BTreeMap<String, PV>,
+    pub pvs: BTreeMap<Device, PV>,
     /// Logical Volumes within this volume group.
     pub lvs: BTreeMap<String, LV>,
 }
@@ -151,8 +151,6 @@ impl VG {
         let area_size_sectors = dev_size_sectors - pe_start_sectors - mda1_size_sectors;
         let pe_count = area_size_sectors / self.extent_size;
 
-        let name = format!("pv{}", self.pvs.len());
-
         // make a PV and add it to self
         let pv = PV {
             id: pvh.uuid.clone(),
@@ -164,7 +162,7 @@ impl VG {
             pe_count: pe_count,
         };
 
-        self.pvs.insert(name, pv);
+        self.pvs.insert(dev, pv);
 
         self.commit()
     }
@@ -176,17 +174,17 @@ impl VG {
         }
 
         let mut contig_area = None;
-        for (pvname, areas) in self.free_areas() {
+        for (dev, areas) in self.free_areas() {
             for (start, len) in areas {
                 if len >= extent_size {
-                    contig_area = Some((pvname, start));
+                    contig_area = Some((dev, start));
                     break;
                 }
             }
         }
 
         // we don't support multiple segments yet
-        let (pv_with_area, area_start) = match contig_area {
+        let (dev, area_start) = match contig_area {
             None => return Err(Error::new(Other, "no contiguous area for new LV")),
             Some(x) => x,
         };
@@ -195,7 +193,7 @@ impl VG {
             start_extent: 0,
             extent_count: extent_size,
             ty: "striped".to_string(),
-            stripes: vec![(pv_with_area, area_start)],
+            stripes: vec![(dev, area_start)],
         };
 
         let mut lv = LV {
@@ -261,7 +259,7 @@ impl VG {
     fn commit(&mut self) -> Result<()> {
         self.seqno += 1;
 
-        let map: LvmTextMap = self.clone().into();
+        let map: LvmTextMap = to_textmap(self);
 
         let mut disk_map = LvmTextMap::new();
         disk_map.insert("contents".to_string(),
@@ -295,13 +293,13 @@ impl VG {
     //
     // PVs with no used areas are not in the outer map at all.
     //
-    fn used_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    fn used_areas(&self) -> BTreeMap<Device, BTreeMap<u64, u64>> {
         let mut used_map = BTreeMap::new();
 
         for lv in self.lvs.values() {
             for seg in &lv.segments {
-                for &(ref pvname, start) in &seg.stripes {
-                    used_map.entry(pvname.to_string())
+                for &(device, start) in &seg.stripes {
+                    used_map.entry(device)
                         .or_insert(BTreeMap::new())
                         .insert(start as u64, seg.extent_count);
                 }
@@ -314,21 +312,21 @@ impl VG {
     // Returns e.g. {"pv0": {45: 47, 200: 1000} }
     // (assuming pv0 has 1000 extents)
     //
-    fn free_areas(&self) -> BTreeMap<String, BTreeMap<u64, u64>> {
+    fn free_areas(&self) -> BTreeMap<Device, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();
 
-        for (pvname, mut area_map) in self.used_areas() {
+        for (dev, mut area_map) in self.used_areas() {
 
             // Insert an entry to mark the end of the PV so the fold works
             // correctly
-            let pv = self.pvs.get(&pvname)
+            let pv = self.pvs.get(&dev)
                 .expect("area map name refers to nonexistent PV");
             area_map.insert(pv.pe_count, 0);
 
             area_map.iter()
                 .fold(0, |prev_end, (start, len)| {
                     if prev_end < *start {
-                        free_map.entry(pvname.clone())
+                        free_map.entry(dev)
                             .or_insert(BTreeMap::new())
                             .insert(prev_end, start-prev_end);
                     }
@@ -337,11 +335,11 @@ impl VG {
         }
 
         // Also return completely-unused PVs
-        for (pvname, pv) in &self.pvs {
-            if !free_map.contains_key(pvname) {
+        for (dev, pv) in &self.pvs {
+            if !free_map.contains_key(dev) {
                 let mut map = BTreeMap::new();
                 map.insert(0, pv.pe_count);
-                free_map.insert(pvname.clone(), map);
+                free_map.insert(*dev, map);
             }
         }
 
@@ -349,60 +347,74 @@ impl VG {
     }
 }
 
-impl From<VG> for LvmTextMap {
-    fn from(vg: VG) -> Self {
-        let mut map = LvmTextMap::new();
+fn to_textmap(vg: &VG) -> LvmTextMap {
+    let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(vg.id));
-        map.insert("seqno".to_string(),
-                   Entry::Number(vg.seqno as i64));
-        map.insert("format".to_string(), Entry::String(vg.format));
+    map.insert("id".to_string(), Entry::String(vg.id.clone()));
+    map.insert("seqno".to_string(),
+               Entry::Number(vg.seqno as i64));
+    map.insert("format".to_string(), Entry::String(vg.format.clone()));
 
-        map.insert("max_pv".to_string(), Entry::Number(0));
-        map.insert("max_lv".to_string(), Entry::Number(0));
+    map.insert("max_pv".to_string(), Entry::Number(0));
+    map.insert("max_lv".to_string(), Entry::Number(0));
 
-        map.insert("status".to_string(),
-                   Entry::List(
-                       Box::new(
-                           vg.status
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("status".to_string(),
+               Entry::List(
+                   Box::new(
+                       vg.status
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("flags".to_string(),
-                   Entry::List(
-                       Box::new(
-                           vg.flags
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("flags".to_string(),
+               Entry::List(
+                   Box::new(
+                       vg.flags
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("extent_size".to_string(),
-                   Entry::Number(vg.extent_size as i64));
-        map.insert("metadata_copies".to_string(),
-                   Entry::Number(vg.metadata_copies as i64));
-        map.insert("physical_volumes".to_string(),
-                   Entry::TextMap(
-                       Box::new(
-                           vg.pvs
-                               .into_iter()
-                               .map(|(k, v)|
-                                    (k, Entry::TextMap(Box::new(v.into()))))
-                               .collect())));
+    map.insert("extent_size".to_string(),
+               Entry::Number(vg.extent_size as i64));
+    map.insert("metadata_copies".to_string(),
+               Entry::Number(vg.metadata_copies as i64));
 
-        if !vg.lvs.is_empty() {
-            map.insert("logical_volumes".to_string(),
-                       Entry::TextMap(
-                           Box::new(
-                               vg.lvs
-                                   .into_iter()
-                                   .map(|(k, v)|
-                                        (k, Entry::TextMap(Box::new(v.into()))))
-                                   .collect())));
-        }
+    // See comment in from_textmap() - we need to assign ordinals to
+    // the PV map so the textmap can use "pv0"-style strings to link
+    // pvs with LV stripes.
+    let dev_to_idx: BTreeMap<Device, usize> = vg.pvs.values()
+        .enumerate()
+        .map(|(num, pv)| {
+            (pv.device, num)
+        })
+        .collect();
 
-        map
+    map.insert("physical_volumes".to_string(),
+               Entry::TextMap(
+                   Box::new(
+                       vg.pvs
+                           .iter()
+                           .map(|(k, v)|
+                                (format!("pv{}", dev_to_idx.get(k).unwrap()),
+                                 Entry::TextMap(Box::new(
+                                     pv::to_textmap(v)))))
+                           .collect())));
+
+    if !vg.lvs.is_empty() {
+        map.insert(
+            "logical_volumes".to_string(),
+            Entry::TextMap(
+                Box::new(
+                    vg.lvs
+                        .iter()
+                        .map(|(k, v)|
+                             (k.clone(),
+                              Entry::TextMap(Box::new(
+                                  lv::to_textmap(v, &dev_to_idx)))))
+                        .collect())));
     }
+
+    map
 }
 
 /// Construct a `VG` from its name and an `LvmTextMap`.
@@ -421,28 +433,44 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
     let status = try!(status_from_textmap(map));
 
     let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
-        .into_iter()
-        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
+        .iter()
+        .filter_map(|item| match item {
+            &Entry::String(ref x) => Some(x.clone()),
+            _ => {None},
+        })
         .collect();
 
-    let pvs = try!(map.textmap_from_textmap("physical_volumes").ok_or(err())
-                   .and_then(|tm| {
-                       let mut ret_map = BTreeMap::new();
 
-                       for (key, value) in tm {
-                           match value {
-                               &Entry::TextMap(ref pv_dict) => {
-                                   ret_map.insert(
-                                       key.to_string(),
-                                       try!(pv::from_textmap(pv_dict)));
-                               },
-                               _ => return Err(
-                                   Error::new(Other, "expected PV textmap")),
-                           };
-                       }
+    // While the textmap uses "pv0"-style names to link physical
+    // volume definitions with LV segment stripes, we do not want to
+    // use these internally, because what if "pv0" is unused and is
+    // removed from the VG? When writing out metadata, the remaining
+    // PV should then be labeled "pv0".
+    //
+    // Instead, we index PVs by Device, but only after letting
+    // segment::from_textmap() (via lv::from_textmap) use the
+    // str_to_pv map to translate its "pv0" references to Devices as
+    // well.
+    //
+    let str_to_pv = try!(
+        map.textmap_from_textmap("physical_volumes").ok_or(err())
+            .and_then(|tm| {
+                let mut ret_map = BTreeMap::new();
 
-                       Ok(ret_map)
-                   }));
+                for (key, value) in tm {
+                    match value {
+                        &Entry::TextMap(ref pv_dict) => {
+                            ret_map.insert(
+                                key.to_string(),
+                                try!(pv::from_textmap(pv_dict)));
+                        },
+                        _ => return Err(
+                            Error::new(Other, "expected PV textmap")),
+                    };
+                }
+
+                Ok(ret_map)
+            }));
 
     // "logical_volumes" may be absent
     let lvs = match map.textmap_from_textmap("logical_volumes") {
@@ -454,7 +482,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
                     &Entry::TextMap(ref lv_dict) => {
                         ret_map.insert(
                             key.to_string(),
-                            try!(lv::from_textmap(key, lv_dict)));
+                            try!(lv::from_textmap(key, lv_dict, &str_to_pv)));
                     },
                     _ => return Err(
                         Error::new(Other, "expected LV textmap")),
@@ -465,6 +493,10 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
         },
         None => BTreeMap::new(),
     };
+
+    let pvs = str_to_pv.into_iter()
+        .map(|(_, pv)| (pv.device, pv))
+        .collect();
 
     let mut vg = VG {
         name: name.to_string(),

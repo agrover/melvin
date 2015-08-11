@@ -7,6 +7,7 @@
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::collections::BTreeMap;
 
 use parser::{
     LvmTextMap,
@@ -15,6 +16,7 @@ use parser::{
     status_from_textmap,
 };
 use Device;
+use PV;
 
 /// A Logical Volume that is created from a Volume Group.
 #[derive(Debug, PartialEq, Clone)]
@@ -48,7 +50,7 @@ impl LV {
 }
 
 /// Construct an LV from an LvmTextMap.
-pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<LV> {
+pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<LV> {
     let err = || Error::new(Other, "lv textmap parsing error");
 
     let id = try!(map.string_from_textmap("id").ok_or(err()));
@@ -64,7 +66,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<LV> {
         .map(|num| {
             let name = format!("segment{}", num+1);
             let seg_dict = try!(map.textmap_from_textmap(&name).ok_or(err()));
-            segment::from_textmap(seg_dict)
+            segment::from_textmap(seg_dict, pvs)
         })
         .filter_map(|seg| seg.ok())
         .collect();
@@ -73,8 +75,11 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<LV> {
     let status = try!(status_from_textmap(map));
 
     let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
-        .into_iter()
-        .filter_map(|item| match item { &Entry::String(ref x) => Some(x.clone()), _ => {None}})
+        .iter()
+        .filter_map(|item| match item {
+            &Entry::String(ref x) => Some(x.clone()),
+            _ => {None},
+        })
         .collect();
 
     Ok(LV {
@@ -89,56 +94,57 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<LV> {
     })
 }
 
-impl From<LV> for LvmTextMap {
-    fn from(lv: LV) -> LvmTextMap {
-        let mut map = LvmTextMap::new();
+pub fn to_textmap(lv: &LV, dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
+    let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(lv.id));
+    map.insert("id".to_string(), Entry::String(lv.id.clone()));
 
-        map.insert("status".to_string(),
-                   Entry::List(
-                       Box::new(
-                           lv.status
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("status".to_string(),
+               Entry::List(
+                   Box::new(
+                       lv.status
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("flags".to_string(),
-                   Entry::List(
-                       Box::new(
-                           lv.flags
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("flags".to_string(),
+               Entry::List(
+                   Box::new(
+                       lv.flags
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("creation_host".to_string(),
-                   Entry::String(lv.creation_host));
-        map.insert("creation_time".to_string(),
-                   Entry::Number(lv.creation_time as i64));
+    map.insert("creation_host".to_string(),
+               Entry::String(lv.creation_host.clone()));
+    map.insert("creation_time".to_string(),
+               Entry::Number(lv.creation_time as i64));
 
-        map.insert("segment_count".to_string(),
-                   Entry::Number(lv.segments.len() as i64));
+    map.insert("segment_count".to_string(),
+               Entry::Number(lv.segments.len() as i64));
 
-        for (i, seg) in lv.segments.into_iter().enumerate() {
-            map.insert(format!("segment{}", i+1),
-                       Entry::TextMap(
-                           Box::new(seg.into())));
-        }
-
-        map
+    for (i, seg) in lv.segments.iter().enumerate() {
+        map.insert(format!("segment{}", i+1),
+                   Entry::TextMap(
+                       Box::new(segment::to_textmap(seg, dev_to_idx))));
     }
+
+    map
 }
 
 pub mod segment {
     use std::io::Result;
     use std::io::Error;
     use std::io::ErrorKind::Other;
+    use std::collections::BTreeMap;
 
     use parser::{
         LvmTextMap,
         TextMapOps,
         Entry,
     };
+    use PV;
+    use Device;
 
     /// A Logical Volume Segment.
     #[derive(Debug, PartialEq, Clone)]
@@ -149,41 +155,43 @@ pub mod segment {
         pub extent_count: u64,
         /// The segment type.
         pub ty: String,
-        /// If >1, Segment is striped across multiple PVs.
-        pub stripes: Vec<(String, u64)>,
+        /// If 1 stripe, Segment is type "linear", else "striped"
+        /// Stripes contain the Device and the starting PV extent.
+        pub stripes: Vec<(Device, u64)>,
     }
 
-    impl From<Segment> for LvmTextMap {
-        fn from(seg: Segment) -> LvmTextMap {
-            let mut map = LvmTextMap::new();
+    pub fn to_textmap(seg: &Segment, dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
+        let mut map = LvmTextMap::new();
 
-            map.insert("start_extent".to_string(),
-                       Entry::Number(seg.start_extent as i64));
-            map.insert("extent_count".to_string(),
-                       Entry::Number(seg.extent_count as i64));
-            map.insert("type".to_string(),
-                       Entry::String(seg.ty));
-            map.insert("stripe_count".to_string(),
-                       Entry::Number(seg.stripes.len() as i64));
+        map.insert("start_extent".to_string(),
+                   Entry::Number(seg.start_extent as i64));
+        map.insert("extent_count".to_string(),
+                   Entry::Number(seg.extent_count as i64));
+        map.insert("type".to_string(),
+                   Entry::String(seg.ty.clone()));
+        map.insert("stripe_count".to_string(),
+                   Entry::Number(seg.stripes.len() as i64));
 
-            map.insert("stripes".to_string(),
-                       Entry::List(
-                           Box::new(
-                               seg.stripes
-                                   .into_iter()
-                                   .map(|(k, v)|
-                                        vec![
-                                            Entry::String(k),
-                                            Entry::Number(v as i64)
-                                                ]
-                                        .into_iter())
-                                   .flat_map(|x| x)
-                                   .collect())));
-            map
-        }
+        map.insert("stripes".to_string(),
+                   Entry::List(
+                       Box::new(
+                           seg.stripes
+                               .iter()
+                               .map(|&(k, v)| {
+                                   let name = format!(
+                                       "pv{}", dev_to_idx.get(&k).unwrap());
+                                   vec![
+                                       Entry::String(name),
+                                       Entry::Number(v as i64)
+                                           ]
+                                       .into_iter()
+                               })
+                               .flat_map(|x| x)
+                               .collect())));
+        map
     }
 
-    pub fn from_textmap(map: &LvmTextMap) -> Result<Segment> {
+    pub fn from_textmap(map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<Segment> {
         let err = || Error::new(Other, "segment textmap parsing error");
 
         let stripe_list = try!(map.list_from_textmap("stripes").ok_or(err()));
@@ -191,7 +199,10 @@ pub mod segment {
         let mut stripes: Vec<_> = Vec::new();
         for slc in stripe_list.chunks(2) {
             let name = match &slc[0] {
-                &Entry::String(ref x) => x.clone(),
+                &Entry::String(ref x) => {
+                    let pv = try!(pvs.get(x).ok_or(err()));
+                    pv.device
+                },
                 _ => return Err(err())
             };
             let val = match slc[1] {

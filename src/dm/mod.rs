@@ -268,9 +268,9 @@ impl <'a> DM<'a> {
                 }
             };
 
-            for &(ref pvname, ref loc) in &seg.stripes {
+            for &(dev, pv_extent) in &seg.stripes {
                 let err = || Error::new(Other, "dm load_device error");
-                let pv = try!(self.vg.pvs.get(pvname).ok_or(err()));
+                let pv = try!(self.vg.pvs.get(&dev).ok_or(err()));
 
                 let mut targ: dmi::Struct_dm_target_spec = Default::default();
                 targ.sector_start = seg.start_extent * sectors_per_extent;
@@ -288,7 +288,7 @@ impl <'a> DM<'a> {
                     format!("{}:{} {}",
                             pv.device.major,
                             pv.device.minor,
-                            (loc * sectors_per_extent) + pv.pe_start).as_bytes());
+                            (pv_extent * sectors_per_extent) + pv.pe_start).as_bytes());
 
                 let pad_bytes = align_to(
                     params.len() + 1usize, 8usize) - params.len();

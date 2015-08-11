@@ -33,7 +33,7 @@ pub mod dev {
     /// A struct containing the device's major and minor numbers
     ///
     /// Also allows conversion to/from a single 64bit value.
-    #[derive(Debug, PartialEq, Clone, Copy)]
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
     pub struct Device {
         /// Device major number
         pub major: u32,
@@ -139,10 +139,10 @@ pub fn from_textmap(map: &LvmTextMap) -> io::Result<PV> {
     let status = try!(status_from_textmap(map));
 
     let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
-        .into_iter()
+        .iter()
         .filter_map(|item| match item {
             &Entry::String(ref x) => Some(x.clone()),
-            _ => {None}
+            _ => {None},
         })
         .collect();
 
@@ -162,34 +162,32 @@ pub fn from_textmap(map: &LvmTextMap) -> io::Result<PV> {
     })
 }
 
-impl From<PV> for LvmTextMap {
-    fn from(pv: PV) -> LvmTextMap {
-        let mut map = LvmTextMap::new();
+pub fn to_textmap(pv: &PV) -> LvmTextMap {
+    let mut map = LvmTextMap::new();
 
-        map.insert("id".to_string(), Entry::String(pv.id));
-        let tmp: u64 = pv.device.into();
-        map.insert("device".to_string(), Entry::Number(tmp as i64));
+    map.insert("id".to_string(), Entry::String(pv.id.clone()));
+    let tmp: u64 = pv.device.into();
+    map.insert("device".to_string(), Entry::Number(tmp as i64));
 
-        map.insert("status".to_string(),
-                   Entry::List(
-                       Box::new(
-                           pv.status
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("status".to_string(),
+               Entry::List(
+                   Box::new(
+                       pv.status
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("flags".to_string(),
-                   Entry::List(
-                       Box::new(
-                           pv.flags
-                               .into_iter()
-                               .map(|x| Entry::String(x))
-                               .collect())));
+    map.insert("flags".to_string(),
+               Entry::List(
+                   Box::new(
+                       pv.flags
+                           .iter()
+                           .map(|x| Entry::String(x.clone()))
+                           .collect())));
 
-        map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));
-        map.insert("pe_start".to_string(), Entry::Number(pv.pe_start as i64));
-        map.insert("pe_count".to_string(), Entry::Number(pv.pe_count as i64));
+    map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));
+    map.insert("pe_start".to_string(), Entry::Number(pv.pe_start as i64));
+    map.insert("pe_count".to_string(), Entry::Number(pv.pe_count as i64));
 
-        map
-    }
+    map
 }

@@ -105,14 +105,14 @@ impl VG {
         };
 
         for path in &pv_paths {
-            try!(vg.add_pv(path));
+            try!(vg.pv_add(path));
         }
 
         Ok(vg)
     }
 
     /// Add a non-affiliated PV to this VG.
-    pub fn add_pv(&mut self, path: &Path) -> Result<()> {
+    pub fn pv_add(&mut self, path: &Path) -> Result<()> {
         let pvh = try!(PvHeader::find_in_dev(path));
 
         // Check pv is not on an LV from the vg:
@@ -181,7 +181,7 @@ impl VG {
     }
 
     /// Remove a PV. It must be unused by any LVs.
-    pub fn remove_pv(&mut self, pvh: &PvHeader) -> Result<()> {
+    pub fn pv_remove(&mut self, pvh: &PvHeader) -> Result<()> {
         let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
 
         for (lvname, lv) in &self.lvs {
@@ -202,7 +202,7 @@ impl VG {
     }
 
     /// Create a new linear logical volume in the volume group.
-    pub fn new_linear_lv(&mut self, name: &str, extent_size: u64) -> Result<()> {
+    pub fn lv_create_linear(&mut self, name: &str, extent_size: u64) -> Result<()> {
         if self.lvs.contains_key(name) {
             return Err(Error::new(Other, "LV already exists"));
         }

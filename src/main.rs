@@ -10,7 +10,6 @@ use std::path;
 use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-use std::str::FromStr;
 use std::path::Path;
 
 use melvin::{VG, PvHeader, pvheader_scan};
@@ -30,7 +29,8 @@ fn print_pvheaders() -> Result<()> {
 fn get_first_vg_meta() -> Result<(String, parser::LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
 
-    for pvheader in try!(pvheader_scan(&dirs)) {
+    for pv_path in try!(pvheader_scan(&dirs)) {
+        let pvheader = try!(PvHeader::find_in_dev(&pv_path));
         let map = try!(pvheader.read_metadata());
 
         // Find the textmap for the vg, among all the other stuff.
@@ -66,12 +66,12 @@ fn main() {
     // let mut vgs = lvmetad::vg_list().expect("could not get vgs from lvmetad");
     // let mut vg = vgs.pop().expect("no vgs in vgs");
 
-    let pvh1 = PvHeader::initialize(Path::new("/dev/vdc1")).expect("pvheader not found");
-    let pvh2 = PvHeader::initialize(Path::new("/dev/vdc2")).expect("pvheader not found");
+    let path1 = Path::new("/dev/vdc1");
+    let path2 = Path::new("/dev/vdc2");
 
 //    let pvh1 = PvHeader::find_in_dev(Path::new("/dev/vdc1")).expect("pvheader not found");
 
-    let vg = VG::create("vg-dopey", vec![pvh1, pvh2]).expect("vgcreate failed yo");
+    let vg = VG::create("vg-dopey", vec![path1, path2]).expect("vgcreate failed yo");
     // vg.add_pv(&pvh1).unwrap();
     // vg.add_pv(&pvh2).unwrap();
 

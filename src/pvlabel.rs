@@ -572,7 +572,7 @@ fn to_textmap(pvh: &PvHeader) -> LvmTextMap {
 }
 
 /// Scan a list of directories for block devices containing LVM PV labels.
-pub fn pvheader_scan(dirs: &[&Path]) -> Result<Vec<PvHeader>> {
+pub fn pvheader_scan(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
 
     let mut ret_vec = Vec::new();
 
@@ -583,7 +583,7 @@ pub fn pvheader_scan(dirs: &[&Path]) -> Result<Vec<PvHeader>> {
                         { Some(dir_e.unwrap().path()) } else {None} )
             .filter(|path| {
                 (stat::stat(path).unwrap().st_mode & 0x6000) == 0x6000 }) // S_IFBLK
-            .filter_map(|path| { PvHeader::find_in_dev(&path).ok() })
+            .filter(|path| { PvHeader::find_in_dev(&path).is_ok() })
             .collect::<Vec<_>>());
     }
 

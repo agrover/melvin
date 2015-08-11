@@ -10,6 +10,7 @@ use std::io::ErrorKind::Other;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::borrow::Cow;
+use std::path::Path;
 
 use time::now;
 use nix::sys::utsname::uname;
@@ -66,10 +67,18 @@ pub struct VG {
 
 impl VG {
     /// Create a Volume Group from one or more initialized PvHeaders.
-    pub fn create(name: &str, pvhs: Vec<PvHeader>) -> Result<VG> {
-        if pvhs.len() == 0 {
-            return Err(Error::new(Other, "One or more PvHeaders required"));
+    pub fn create(name: &str, pv_paths: Vec<&Path>) -> Result<VG> {
+        if pv_paths.len() == 0 {
+            return Err(Error::new(Other, "One or more paths to PVs required"));
         }
+
+        let pvhs = {
+            let mut v = Vec::new();
+            for path in &pv_paths {
+                v.push(try!(PvHeader::find_in_dev(path)));
+            }
+            v
+        };
 
         let metadata_areas = pvhs.iter()
             .map(|x| x.metadata_areas.len())
@@ -95,20 +104,22 @@ impl VG {
             lvs: BTreeMap::new(),
         };
 
-        for pv in &pvhs {
-            try!(vg.add_pv(pv));
+        for path in &pv_paths {
+            try!(vg.add_pv(path));
         }
 
         Ok(vg)
     }
 
     /// Add a non-affiliated PV to this VG.
-    pub fn add_pv(&mut self, pvh: &PvHeader) -> Result<()> {
+    pub fn add_pv(&mut self, path: &Path) -> Result<()> {
+        let pvh = try!(PvHeader::find_in_dev(path));
+
         // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
         // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
         let dm_majors = dm::dev_majors();
-        let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
+        let dev = try!(Device::from_str(&path.to_string_lossy()));
         if dm_majors.contains(&dev.major) {
             let dm = try!(DM::new(&self));
             if dm.depends_on(dev, &dm_majors) {

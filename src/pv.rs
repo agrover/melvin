@@ -61,8 +61,6 @@ pub mod dev {
             }
             None
         }
-
-
     }
 
     impl FromStr for Device {

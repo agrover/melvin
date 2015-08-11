@@ -83,7 +83,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
         .collect();
 
     Ok(LV {
-        name: name.into(),
+        name: name.to_string(),
         id: id.to_string(),
         status: status,
         flags: flags,

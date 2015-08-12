@@ -45,52 +45,18 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-11779' class='srclink' href='../src/melvin/vg.rs.html#40-65' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-11706' class='srclink' href='../src/melvin/vg.rs.html#41-66' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct VG {
-    pub name: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
-    pub id: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
-    pub seqno: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
-    pub status: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;,
-    pub flags: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;,
-    pub extent_size: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
-    pub max_lv: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
-    pub max_pv: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
-    pub metadata_copies: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
-    pub pvs: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/btree/map/struct.BTreeMap.html' title='collections::btree::map::BTreeMap'>BTreeMap</a>&lt;<a class='struct' href='../melvin/struct.Device.html' title='melvin::Device'>Device</a>, <a class='struct' href='../melvin/struct.PV.html' title='melvin::PV'>PV</a>&gt;,
-    pub lvs: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/btree/map/struct.BTreeMap.html' title='collections::btree::map::BTreeMap'>BTreeMap</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='struct' href='../melvin/struct.LV.html' title='melvin::LV'>LV</a>&gt;,
     // some fields omitted
 }</pre><div class='docblock'><p>A Volume Group allows multiple Physical Volumes to be treated as a
 storage pool that can then be used to allocate Logical Volumes.</p>
-</div><h2 class='fields'>Fields</h2>
-<table><tr class='stab '>
-                                  <td id='structfield.name'><code>name</code></td><td><div class='docblock'><p>Name.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.id'><code>id</code></td><td><div class='docblock'><p>Uuid.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.seqno'><code>seqno</code></td><td><div class='docblock'><p>The generation of metadata this VG represents.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.status'><code>status</code></td><td><div class='docblock'><p>Status.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.flags'><code>flags</code></td><td><div class='docblock'><p>Flags.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.extent_size'><code>extent_size</code></td><td><div class='docblock'><p>Size of each extent, in 512-byte sectors.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.max_lv'><code>max_lv</code></td><td><div class='docblock'><p>Maximum number of LVs, 0 means no limit.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.max_pv'><code>max_pv</code></td><td><div class='docblock'><p>Maximum number of PVs, 0 means no limit.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.metadata_copies'><code>metadata_copies</code></td><td><div class='docblock'><p>How many metadata copies (?)</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.pvs'><code>pvs</code></td><td><div class='docblock'><p>Physical Volumes within this volume group.</p>
-</div></td></tr><tr class='stab '>
-                                  <td id='structfield.lvs'><code>lvs</code></td><td><div class='docblock'><p>Logical Volumes within this volume group.</p>
-</div></td></tr></table><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.create' class='method'><code>fn <a href='#method.create' class='fnname'>create</a>(name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, pvhs: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../melvin/struct.PvHeader.html' title='melvin::PvHeader'>PvHeader</a>&gt;) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>&gt;</code></h4>
-<div class='docblock'><p>Create a Volume Group from one or more initialized PvHeaders.</p>
-</div><h4 id='method.add_pv' class='method'><code>fn <a href='#method.add_pv' class='fnname'>add_pv</a>(&amp;mut self, pvh: &amp;<a class='struct' href='../melvin/struct.PvHeader.html' title='melvin::PvHeader'>PvHeader</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.create' class='method'><code>fn <a href='#method.create' class='fnname'>create</a>(name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, pv_paths: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;&amp;<a class='struct' href='http://doc.rust-lang.org/nightly/std/path/struct.Path.html' title='std::path::Path'>Path</a>&gt;) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>&gt;</code></h4>
+<div class='docblock'><p>Create a Volume Group from one or more PVs.</p>
+</div><h4 id='method.pv_add' class='method'><code>fn <a href='#method.pv_add' class='fnname'>pv_add</a>(&amp;mut self, path: &amp;<a class='struct' href='http://doc.rust-lang.org/nightly/std/path/struct.Path.html' title='std::path::Path'>Path</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Add a non-affiliated PV to this VG.</p>
-</div><h4 id='method.remove_pv' class='method'><code>fn <a href='#method.remove_pv' class='fnname'>remove_pv</a>(&amp;mut self, pvh: &amp;<a class='struct' href='../melvin/struct.PvHeader.html' title='melvin::PvHeader'>PvHeader</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+</div><h4 id='method.pv_remove' class='method'><code>fn <a href='#method.pv_remove' class='fnname'>pv_remove</a>(&amp;mut self, pvh: &amp;<a class='struct' href='../melvin/struct.PvHeader.html' title='melvin::PvHeader'>PvHeader</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Remove a PV. It must be unused by any LVs.</p>
-</div><h4 id='method.new_linear_lv' class='method'><code>fn <a href='#method.new_linear_lv' class='fnname'>new_linear_lv</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, extent_size: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+</div><h4 id='method.lv_create_linear' class='method'><code>fn <a href='#method.lv_create_linear' class='fnname'>lv_create_linear</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, extent_size: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Create a new linear logical volume in the volume group.</p>
 </div><h4 id='method.lv_remove' class='method'><code>fn <a href='#method.lv_remove' class='fnname'>lv_remove</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Destroy a logical volume.</p>
@@ -100,9 +66,21 @@ storage pool that can then be used to allocate Logical Volumes.</p>
 <div class='docblock'><p>The total number of free extents in the volume group.</p>
 </div><h4 id='method.extents' class='method'><code>fn <a href='#method.extents' class='fnname'>extents</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a></code></h4>
 <div class='docblock'><p>The total number of extents in the volume group.</p>
-</div></div><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h4>
-<h4 id='method.clone_from' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
-</div><h3 class='impl'><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a> for <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.eq' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+</div><h4 id='method.pv_list' class='method'><code>fn <a href='#method.pv_list' class='fnname'>pv_list</a>(&amp;self) -&gt; <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../melvin/struct.Device.html' title='melvin::Device'>Device</a>&gt;</code></h4>
+<div class='docblock'><p>Returns a list of PV Devices that make up the VG.</p>
+</div><h4 id='method.pv_get' class='method'><code>fn <a href='#method.pv_get' class='fnname'>pv_get</a>(&amp;self, dev: <a class='struct' href='../melvin/struct.Device.html' title='melvin::Device'>Device</a>) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;<a class='struct' href='../melvin/struct.PV.html' title='melvin::PV'>PV</a>&gt;</code></h4>
+<div class='docblock'><p>Returns a reference to the PV matching the Device.</p>
+</div><h4 id='method.lv_list' class='method'><code>fn <a href='#method.lv_list' class='fnname'>lv_list</a>(&amp;self) -&gt; <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;</code></h4>
+<div class='docblock'><p>Returns a list of the names of LVs in the VG.</p>
+</div><h4 id='method.lv_get' class='method'><code>fn <a href='#method.lv_get' class='fnname'>lv_get</a>(&amp;self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;<a class='struct' href='../melvin/struct.LV.html' title='melvin::LV'>LV</a>&gt;</code></h4>
+<div class='docblock'><p>Returns a reference to the LV matching the name.</p>
+</div><h4 id='method.name' class='method'><code>fn <a href='#method.name' class='fnname'>name</a>(&amp;self) -&gt; &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a></code></h4>
+<div class='docblock'><p>Returns the name of the VG.</p>
+</div><h4 id='method.id' class='method'><code>fn <a href='#method.id' class='fnname'>id</a>(&amp;self) -&gt; &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a></code></h4>
+<div class='docblock'><p>Returns the UUID of the VG.</p>
+</div><h4 id='method.extent_size' class='method'><code>fn <a href='#method.extent_size' class='fnname'>extent_size</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a></code></h4>
+<div class='docblock'><p>Returns how many 512-byte sectors make up each extent in the VG.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a> for <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.eq' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
 <h4 id='method.ne' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, __arg_0: &amp;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
 </div><h3 class='impl'><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class='struct' href='http://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
 </div></section>
@@ -140,8 +118,8 @@ storage pool that can then be used to allocate Logical Volumes.</p>
                 <p>
                     Accepted types are: <code>fn</code>, <code>mod</code>,
                     <code>struct</code>, <code>enum</code>,
-                    <code>trait</code>, <code>typedef</code> (or
-                    <code>tdef</code>).
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
                 </p>
 
                 <p>

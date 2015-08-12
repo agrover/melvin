@@ -591,6 +591,52 @@
 <span id="549">549</span>
 <span id="550">550</span>
 <span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -604,6 +650,7 @@
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>collections</span>::<span class='ident'>BTreeMap</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>str</span>::<span class='ident'>FromStr</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>borrow</span>::<span class='ident'>Cow</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>path</span>::<span class='ident'>Path</span>;
 
 <span class='kw'>use</span> <span class='ident'>time</span>::<span class='ident'>now</span>;
 <span class='kw'>use</span> <span class='ident'>nix</span>::<span class='ident'>sys</span>::<span class='ident'>utsname</span>::<span class='ident'>uname</span>;
@@ -630,40 +677,48 @@
 
 <span class='doccomment'>/// A Volume Group allows multiple Physical Volumes to be treated as a</span>
 <span class='doccomment'>/// storage pool that can then be used to allocate Logical Volumes.</span>
-<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>VG</span> {
     <span class='doccomment'>/// Name.</span>
-    <span class='kw'>pub</span> <span class='ident'>name</span>: <span class='ident'>String</span>,
+    <span class='ident'>name</span>: <span class='ident'>String</span>,
     <span class='doccomment'>/// Uuid.</span>
-    <span class='kw'>pub</span> <span class='ident'>id</span>: <span class='ident'>String</span>,
+    <span class='ident'>id</span>: <span class='ident'>String</span>,
     <span class='doccomment'>/// The generation of metadata this VG represents.</span>
-    <span class='kw'>pub</span> <span class='ident'>seqno</span>: <span class='ident'>u64</span>,
+    <span class='ident'>seqno</span>: <span class='ident'>u64</span>,
     <span class='doccomment'>/// Always &quot;lvm2&quot;.</span>
     <span class='ident'>format</span>: <span class='ident'>String</span>,
     <span class='doccomment'>/// Status.</span>
-    <span class='kw'>pub</span> <span class='ident'>status</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span>,
+    <span class='ident'>status</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span>,
     <span class='doccomment'>/// Flags.</span>
-    <span class='kw'>pub</span> <span class='ident'>flags</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span>,
+    <span class='ident'>flags</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span>,
     <span class='doccomment'>/// Size of each extent, in 512-byte sectors.</span>
-    <span class='kw'>pub</span> <span class='ident'>extent_size</span>: <span class='ident'>u64</span>,
+    <span class='ident'>extent_size</span>: <span class='ident'>u64</span>,
     <span class='doccomment'>/// Maximum number of LVs, 0 means no limit.</span>
-    <span class='kw'>pub</span> <span class='ident'>max_lv</span>: <span class='ident'>u64</span>,
+    <span class='ident'>max_lv</span>: <span class='ident'>u64</span>,
     <span class='doccomment'>/// Maximum number of PVs, 0 means no limit.</span>
-    <span class='kw'>pub</span> <span class='ident'>max_pv</span>: <span class='ident'>u64</span>,
+    <span class='ident'>max_pv</span>: <span class='ident'>u64</span>,
     <span class='doccomment'>/// How many metadata copies (?)</span>
-    <span class='kw'>pub</span> <span class='ident'>metadata_copies</span>: <span class='ident'>u64</span>,
+    <span class='ident'>metadata_copies</span>: <span class='ident'>u64</span>,
     <span class='doccomment'>/// Physical Volumes within this volume group.</span>
-    <span class='kw'>pub</span> <span class='ident'>pvs</span>: <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>Device</span>, <span class='ident'>PV</span><span class='op'>&gt;</span>,
+    <span class='ident'>pvs</span>: <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>Device</span>, <span class='ident'>PV</span><span class='op'>&gt;</span>,
     <span class='doccomment'>/// Logical Volumes within this volume group.</span>
-    <span class='kw'>pub</span> <span class='ident'>lvs</span>: <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>LV</span><span class='op'>&gt;</span>,
+    <span class='ident'>lvs</span>: <span class='ident'>BTreeMap</span><span class='op'>&lt;</span><span class='ident'>String</span>, <span class='ident'>LV</span><span class='op'>&gt;</span>,
 }
 
 <span class='kw'>impl</span> <span class='ident'>VG</span> {
-    <span class='doccomment'>/// Create a Volume Group from one or more initialized PvHeaders.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>create</span>(<span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>pvhs</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PvHeader</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>VG</span><span class='op'>&gt;</span> {
-        <span class='kw'>if</span> <span class='ident'>pvhs</span>.<span class='ident'>len</span>() <span class='op'>==</span> <span class='number'>0</span> {
-            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;One or more PvHeaders required&quot;</span>));
+    <span class='doccomment'>/// Create a Volume Group from one or more PVs.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>create</span>(<span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>pv_paths</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>Path</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>VG</span><span class='op'>&gt;</span> {
+        <span class='kw'>if</span> <span class='ident'>pv_paths</span>.<span class='ident'>len</span>() <span class='op'>==</span> <span class='number'>0</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;One or more paths to PVs required&quot;</span>));
         }
+
+        <span class='kw'>let</span> <span class='ident'>pvhs</span> <span class='op'>=</span> {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+            <span class='kw'>for</span> <span class='ident'>path</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>pv_paths</span> {
+                <span class='ident'>v</span>.<span class='ident'>push</span>(<span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>PvHeader</span>::<span class='ident'>find_in_dev</span>(<span class='ident'>path</span>)));
+            }
+            <span class='ident'>v</span>
+        };
 
         <span class='kw'>let</span> <span class='ident'>metadata_areas</span> <span class='op'>=</span> <span class='ident'>pvhs</span>.<span class='ident'>iter</span>()
             .<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>x</span><span class='op'>|</span> <span class='ident'>x</span>.<span class='ident'>metadata_areas</span>.<span class='ident'>len</span>())
@@ -689,20 +744,22 @@
             <span class='ident'>lvs</span>: <span class='ident'>BTreeMap</span>::<span class='ident'>new</span>(),
         };
 
-        <span class='kw'>for</span> <span class='ident'>pv</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>pvhs</span> {
-            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>vg</span>.<span class='ident'>add_pv</span>(<span class='ident'>pv</span>));
+        <span class='kw'>for</span> <span class='ident'>path</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>pv_paths</span> {
+            <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>vg</span>.<span class='ident'>pv_add</span>(<span class='ident'>path</span>));
         }
 
         <span class='prelude-val'>Ok</span>(<span class='ident'>vg</span>)
     }
 
     <span class='doccomment'>/// Add a non-affiliated PV to this VG.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>add_pv</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>pvh</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvHeader</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pv_add</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>Path</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>pvh</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>PvHeader</span>::<span class='ident'>find_in_dev</span>(<span class='ident'>path</span>));
+
         <span class='comment'>// Check pv is not on an LV from the vg:</span>
         <span class='comment'>// 1) is pv&#39;s major a devicemapper major?</span>
         <span class='comment'>// 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)</span>
         <span class='kw'>let</span> <span class='ident'>dm_majors</span> <span class='op'>=</span> <span class='ident'>dm</span>::<span class='ident'>dev_majors</span>();
-        <span class='kw'>let</span> <span class='ident'>dev</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Device</span>::<span class='ident'>from_str</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>.<span class='ident'>dev_path</span>.<span class='ident'>to_string_lossy</span>()));
+        <span class='kw'>let</span> <span class='ident'>dev</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Device</span>::<span class='ident'>from_str</span>(<span class='kw-2'>&amp;</span><span class='ident'>path</span>.<span class='ident'>to_string_lossy</span>()));
         <span class='kw'>if</span> <span class='ident'>dm_majors</span>.<span class='ident'>contains</span>(<span class='kw-2'>&amp;</span><span class='ident'>dev</span>.<span class='ident'>major</span>) {
             <span class='kw'>let</span> <span class='ident'>dm</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>DM</span>::<span class='ident'>new</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>));
             <span class='kw'>if</span> <span class='ident'>dm</span>.<span class='ident'>depends_on</span>(<span class='ident'>dev</span>, <span class='kw-2'>&amp;</span><span class='ident'>dm_majors</span>) {
@@ -764,7 +821,7 @@
     }
 
     <span class='doccomment'>/// Remove a PV. It must be unused by any LVs.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>remove_pv</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>pvh</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvHeader</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pv_remove</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>pvh</span>: <span class='kw-2'>&amp;</span><span class='ident'>PvHeader</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
         <span class='kw'>let</span> <span class='ident'>dev</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Device</span>::<span class='ident'>from_str</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>.<span class='ident'>dev_path</span>.<span class='ident'>to_string_lossy</span>()));
 
         <span class='kw'>for</span> (<span class='ident'>lvname</span>, <span class='ident'>lv</span>) <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>lvs</span> {
@@ -785,7 +842,7 @@
     }
 
     <span class='doccomment'>/// Create a new linear logical volume in the volume group.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>new_linear_lv</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>extent_size</span>: <span class='ident'>u64</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>lv_create_linear</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>extent_size</span>: <span class='ident'>u64</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
         <span class='kw'>if</span> <span class='self'>self</span>.<span class='ident'>lvs</span>.<span class='ident'>contains_key</span>(<span class='ident'>name</span>) {
             <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;LV already exists&quot;</span>));
         }
@@ -961,6 +1018,41 @@
         }
 
         <span class='ident'>free_map</span>
+    }
+
+    <span class='doccomment'>/// Returns a list of PV Devices that make up the VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pv_list</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Device</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>pvs</span>.<span class='ident'>keys</span>().<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>key</span><span class='op'>|</span> <span class='op'>*</span><span class='ident'>key</span>).<span class='ident'>collect</span>()
+    }
+
+    <span class='doccomment'>/// Returns a reference to the PV matching the Device.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pv_get</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>dev</span>: <span class='ident'>Device</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>PV</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>pvs</span>.<span class='ident'>get</span>(<span class='kw-2'>&amp;</span><span class='ident'>dev</span>)
+    }
+
+    <span class='doccomment'>/// Returns a list of the names of LVs in the VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>lv_list</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>lvs</span>.<span class='ident'>keys</span>().<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>key</span><span class='op'>|</span> <span class='ident'>key</span>.<span class='ident'>clone</span>()).<span class='ident'>collect</span>()
+    }
+
+    <span class='doccomment'>/// Returns a reference to the LV matching the name.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>lv_get</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>LV</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>lvs</span>.<span class='ident'>get</span>(<span class='ident'>name</span>)
+    }
+
+    <span class='doccomment'>/// Returns the name of the VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>name</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='kw-2'>&amp;</span><span class='ident'>str</span> {
+        <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>name</span>
+    }
+
+    <span class='doccomment'>/// Returns the UUID of the VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>id</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='kw-2'>&amp;</span><span class='ident'>str</span> {
+        <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>id</span>
+    }
+
+    <span class='doccomment'>/// Returns how many 512-byte sectors make up each extent in the VG.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>extent_size</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>u64</span> {
+        <span class='self'>self</span>.<span class='ident'>extent_size</span>
     }
 }
 
@@ -1179,8 +1271,8 @@
                 <p>
                     Accepted types are: <code>fn</code>, <code>mod</code>,
                     <code>struct</code>, <code>enum</code>,
-                    <code>trait</code>, <code>typedef</code> (or
-                    <code>tdef</code>).
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
                 </p>
 
                 <p>

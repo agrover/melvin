@@ -585,7 +585,7 @@
                 <span class='kw'>let</span> <span class='ident'>slc</span> <span class='op'>=</span> <span class='ident'>slice_to_null</span>(<span class='kw-2'>&amp;</span><span class='ident'>result</span>[<span class='number'>12</span>..]).<span class='ident'>expect</span>(<span class='string'>&quot;Bad data from ioctl&quot;</span>);
                 <span class='kw'>let</span> <span class='ident'>devno</span> <span class='op'>=</span> <span class='ident'>NativeEndian</span>::<span class='ident'>read_u64</span>(<span class='kw-2'>&amp;</span><span class='ident'>result</span>[..<span class='number'>8</span>]);
                 <span class='kw'>let</span> <span class='ident'>dm_name</span> <span class='op'>=</span> <span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='ident'>slc</span>);
-                <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>vg_name</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>.<span class='ident'>replace</span>(<span class='string'>&quot;-&quot;</span>, <span class='string'>&quot;--&quot;</span>);
+                <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>vg_name</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>().<span class='ident'>replace</span>(<span class='string'>&quot;-&quot;</span>, <span class='string'>&quot;--&quot;</span>);
                 <span class='ident'>vg_name</span>.<span class='ident'>push</span>(<span class='string'>&#39;-&#39;</span>);
 
                 <span class='comment'>// Return only devices within this VG</span>
@@ -662,8 +662,8 @@
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span>: <span class='ident'>dmi</span>::<span class='ident'>Struct_dm_ioctl</span> <span class='op'>=</span> <span class='ident'>Default</span>::<span class='ident'>default</span>();
 
         <span class='ident'>Self</span>::<span class='ident'>initialize_hdr</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>);
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_uuid</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>id</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>id</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_uuid</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>id</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>id</span>);
         <span class='ident'>hdr</span>.<span class='ident'>data_size</span> <span class='op'>=</span> <span class='ident'>hdr</span>.<span class='ident'>data_start</span>;
 
         <span class='kw'>let</span> <span class='ident'>op</span> <span class='op'>=</span> <span class='ident'>ioctl</span>::<span class='ident'>op_read_write</span>(<span class='ident'>DM_IOCTL</span>, <span class='ident'>dmi</span>::<span class='ident'>DM_DEV_CREATE_CMD</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
@@ -684,7 +684,7 @@
 
         <span class='ident'>Self</span>::<span class='ident'>initialize_hdr</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>);
         <span class='ident'>hdr</span>.<span class='ident'>data_size</span> <span class='op'>=</span> <span class='ident'>hdr</span>.<span class='ident'>data_start</span>;
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
 
         <span class='kw'>let</span> <span class='ident'>op</span> <span class='op'>=</span> <span class='ident'>ioctl</span>::<span class='ident'>op_read_write</span>(<span class='ident'>DM_IOCTL</span>, <span class='ident'>dmi</span>::<span class='ident'>DM_DEV_REMOVE_CMD</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
                                       <span class='ident'>mem</span>::<span class='ident'>size_of</span>::<span class='op'>&lt;</span><span class='ident'>dmi</span>::<span class='ident'>Struct_dm_ioctl</span><span class='op'>&gt;</span>());
@@ -696,7 +696,7 @@
     }
 
     <span class='kw'>fn</span> <span class='ident'>load_device</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>lv</span>: <span class='kw-2'>&amp;</span><span class='ident'>LV</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>sectors_per_extent</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>extent_size</span>;
+        <span class='kw'>let</span> <span class='ident'>sectors_per_extent</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>extent_size</span>();
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>targs</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
 
         <span class='comment'>// Construct targets first, since we need to know how many &amp; size</span>
@@ -713,7 +713,7 @@
 
             <span class='kw'>for</span> <span class='kw-2'>&amp;</span>(<span class='ident'>dev</span>, <span class='ident'>pv_extent</span>) <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>seg</span>.<span class='ident'>stripes</span> {
                 <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;dm load_device error&quot;</span>);
-                <span class='kw'>let</span> <span class='ident'>pv</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>pvs</span>.<span class='ident'>get</span>(<span class='kw-2'>&amp;</span><span class='ident'>dev</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+                <span class='kw'>let</span> <span class='ident'>pv</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>pv_get</span>(<span class='ident'>dev</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
 
                 <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>targ</span>: <span class='ident'>dmi</span>::<span class='ident'>Struct_dm_target_spec</span> <span class='op'>=</span> <span class='ident'>Default</span>::<span class='ident'>default</span>();
                 <span class='ident'>targ</span>.<span class='ident'>sector_start</span> <span class='op'>=</span> <span class='ident'>seg</span>.<span class='ident'>start_extent</span> <span class='op'>*</span> <span class='ident'>sectors_per_extent</span>;
@@ -747,7 +747,7 @@
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>hdr</span>: <span class='ident'>dmi</span>::<span class='ident'>Struct_dm_ioctl</span> <span class='op'>=</span> <span class='ident'>Default</span>::<span class='ident'>default</span>();
 
         <span class='ident'>Self</span>::<span class='ident'>initialize_hdr</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>);
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
 
         <span class='ident'>hdr</span>.<span class='ident'>data_start</span> <span class='op'>=</span> <span class='ident'>mem</span>::<span class='ident'>size_of</span>::<span class='op'>&lt;</span><span class='ident'>dmi</span>::<span class='ident'>Struct_dm_ioctl</span><span class='op'>&gt;</span>() <span class='kw'>as</span> <span class='ident'>u32</span>;
         <span class='ident'>hdr</span>.<span class='ident'>data_size</span> <span class='op'>=</span> <span class='ident'>hdr</span>.<span class='ident'>data_start</span> <span class='op'>+</span> <span class='ident'>targs</span>.<span class='ident'>iter</span>()
@@ -787,7 +787,7 @@
 
         <span class='ident'>Self</span>::<span class='ident'>initialize_hdr</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>);
         <span class='ident'>hdr</span>.<span class='ident'>data_size</span> <span class='op'>=</span> <span class='ident'>hdr</span>.<span class='ident'>data_start</span>;
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
         <span class='ident'>hdr</span>.<span class='ident'>flags</span> <span class='op'>=</span> <span class='ident'>DM_SUSPEND_FLAG</span>;
 
         <span class='kw'>let</span> <span class='ident'>op</span> <span class='op'>=</span> <span class='ident'>ioctl</span>::<span class='ident'>op_read_write</span>(<span class='ident'>DM_IOCTL</span>, <span class='ident'>dmi</span>::<span class='ident'>DM_DEV_SUSPEND_CMD</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
@@ -804,7 +804,7 @@
 
         <span class='ident'>Self</span>::<span class='ident'>initialize_hdr</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>);
         <span class='ident'>hdr</span>.<span class='ident'>data_size</span> <span class='op'>=</span> <span class='ident'>hdr</span>.<span class='ident'>data_start</span>;
-        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>, <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
+        <span class='ident'>Self</span>::<span class='ident'>hdr_set_name</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>hdr</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>vg</span>.<span class='ident'>name</span>(), <span class='kw-2'>&amp;</span><span class='ident'>lv</span>.<span class='ident'>name</span>);
         <span class='comment'>// DM_SUSPEND_FLAG not set = resume</span>
 
         <span class='kw'>let</span> <span class='ident'>op</span> <span class='op'>=</span> <span class='ident'>ioctl</span>::<span class='ident'>op_read_write</span>(<span class='ident'>DM_IOCTL</span>, <span class='ident'>dmi</span>::<span class='ident'>DM_DEV_SUSPEND_CMD</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
@@ -877,8 +877,8 @@
                 <p>
                     Accepted types are: <code>fn</code>, <code>mod</code>,
                     <code>struct</code>, <code>enum</code>,
-                    <code>trait</code>, <code>typedef</code> (or
-                    <code>tdef</code>).
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
                 </p>
 
                 <p>

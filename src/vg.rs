@@ -319,9 +319,11 @@ impl VG {
         lvmetad::vg_update(&self.name, &map)
     }
 
-    // Returns e.g. {"pv0": {0: 45, 47: 100, 100: 200} }
-    // This means extents 0-44 are used, 45 and 46 are not,
-    // 47-99 are used, then 100-199 are used.
+    // Returns used areas in the format: {Device: {start: len} }
+    //
+    // e.g. with {<Device 3:1>: {0: 45, 47: 100, 147: 200} }
+    // extents 0-44 (inclusive) are used, 45 and 46 are not, 47-146
+    // are used, then 147-346 are used.
     //
     // Adjacent used areas are not merged.
     //
@@ -341,8 +343,11 @@ impl VG {
         used_map
     }
 
-    // Returns e.g. {"pv0": {45: 47, 200: 1000} }
-    // (assuming pv0 has 1000 extents)
+    // Returns unused areas in the format: {Device: {start: len} }
+    //
+    // e.g. assuming the same <Device 3:1> as above and it has 1000
+    // extents, calling free_areas would result in:
+    // {<Device 3:1>: {45: 2, 347: 653} }
     //
     fn free_areas(&self) -> BTreeMap<Device, BTreeMap<u64, u64>> {
         let mut free_map = BTreeMap::new();

@@ -71,7 +71,7 @@ fn main() {
 
 //    let pvh1 = PvHeader::find_in_dev(Path::new("/dev/vdc1")).expect("pvheader not found");
 
-    let vg = VG::create("vg-dopey", vec![path1, path2]).expect("vgcreate failed yo");
+    let mut vg = VG::create("vg-dopey", vec![path1, path2]).expect("vgcreate failed yo");
     // vg.add_pv(&pvh1).unwrap();
     // vg.add_pv(&pvh2).unwrap();
 

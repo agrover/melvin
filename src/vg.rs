@@ -37,36 +37,36 @@ const DEFAULT_EXTENT_SIZE: u64 = 8192;  // 4MiB
 
 /// A Volume Group allows multiple Physical Volumes to be treated as a
 /// storage pool that can then be used to allocate Logical Volumes.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct VG {
     /// Name.
-    pub name: String,
+    name: String,
     /// Uuid.
-    pub id: String,
+    id: String,
     /// The generation of metadata this VG represents.
-    pub seqno: u64,
+    seqno: u64,
     /// Always "lvm2".
     format: String,
     /// Status.
-    pub status: Vec<String>,
+    status: Vec<String>,
     /// Flags.
-    pub flags: Vec<String>,
+    flags: Vec<String>,
     /// Size of each extent, in 512-byte sectors.
-    pub extent_size: u64,
+    extent_size: u64,
     /// Maximum number of LVs, 0 means no limit.
-    pub max_lv: u64,
+    max_lv: u64,
     /// Maximum number of PVs, 0 means no limit.
-    pub max_pv: u64,
+    max_pv: u64,
     /// How many metadata copies (?)
-    pub metadata_copies: u64,
+    metadata_copies: u64,
     /// Physical Volumes within this volume group.
-    pub pvs: BTreeMap<Device, PV>,
+    pvs: BTreeMap<Device, PV>,
     /// Logical Volumes within this volume group.
-    pub lvs: BTreeMap<String, LV>,
+    lvs: BTreeMap<String, LV>,
 }
 
 impl VG {
-    /// Create a Volume Group from one or more initialized PvHeaders.
+    /// Create a Volume Group from one or more PVs.
     pub fn create(name: &str, pv_paths: Vec<&Path>) -> Result<VG> {
         if pv_paths.len() == 0 {
             return Err(Error::new(Other, "One or more paths to PVs required"));
@@ -378,6 +378,41 @@ impl VG {
         }
 
         free_map
+    }
+
+    /// Returns a list of PV Devices that make up the VG.
+    pub fn pv_list(&self) -> Vec<Device> {
+        self.pvs.keys().map(|key| *key).collect()
+    }
+
+    /// Returns a reference to the PV matching the Device.
+    pub fn pv_get(&self, dev: Device) -> Option<&PV> {
+        self.pvs.get(&dev)
+    }
+
+    /// Returns a list of the names of LVs in the VG.
+    pub fn lv_list(&self) -> Vec<String> {
+        self.lvs.keys().map(|key| key.clone()).collect()
+    }
+
+    /// Returns a reference to the LV matching the name.
+    pub fn lv_get(&self, name: &str) -> Option<&LV> {
+        self.lvs.get(name)
+    }
+
+    /// Returns the name of the VG.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the UUID of the VG.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Returns how many 512-byte sectors make up each extent in the VG.
+    pub fn extent_size(&self) -> u64 {
+        self.extent_size
     }
 }
 

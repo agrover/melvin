@@ -19,7 +19,7 @@ use Device;
 use PV;
 
 /// A Logical Volume that is created from a Volume Group.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct LV {
     /// The name.
     pub name: String,

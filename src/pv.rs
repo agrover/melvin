@@ -106,7 +106,7 @@ pub mod dev {
 }
 
 /// A Physical Volume that is part of a Volume Group.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct PV {
     /// Its UUID
     pub id: String,

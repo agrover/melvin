@@ -142,7 +142,7 @@ impl <'a> DM<'a> {
                 let slc = slice_to_null(&result[12..]).expect("Bad data from ioctl");
                 let devno = NativeEndian::read_u64(&result[..8]);
                 let dm_name = String::from_utf8_lossy(slc);
-                let mut vg_name = self.vg.name.replace("-", "--");
+                let mut vg_name = self.vg.name().replace("-", "--");
                 vg_name.push('-');
 
                 // Return only devices within this VG
@@ -219,8 +219,8 @@ impl <'a> DM<'a> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
-        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
-        Self::hdr_set_uuid(&mut hdr, &self.vg.id, &lv.id);
+        Self::hdr_set_name(&mut hdr, &self.vg.name(), &lv.name);
+        Self::hdr_set_uuid(&mut hdr, &self.vg.id(), &lv.id);
         hdr.data_size = hdr.data_start;
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_CREATE_CMD as u8,
@@ -241,7 +241,7 @@ impl <'a> DM<'a> {
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = hdr.data_start;
-        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        Self::hdr_set_name(&mut hdr, &self.vg.name(), &lv.name);
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_REMOVE_CMD as u8,
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
@@ -253,7 +253,7 @@ impl <'a> DM<'a> {
     }
 
     fn load_device(&self, lv: &LV) -> io::Result<()> {
-        let sectors_per_extent = self.vg.extent_size;
+        let sectors_per_extent = self.vg.extent_size();
         let mut targs = Vec::new();
 
         // Construct targets first, since we need to know how many & size
@@ -270,7 +270,7 @@ impl <'a> DM<'a> {
 
             for &(dev, pv_extent) in &seg.stripes {
                 let err = || Error::new(Other, "dm load_device error");
-                let pv = try!(self.vg.pvs.get(&dev).ok_or(err()));
+                let pv = try!(self.vg.pv_get(dev).ok_or(err()));
 
                 let mut targ: dmi::Struct_dm_target_spec = Default::default();
                 targ.sector_start = seg.start_extent * sectors_per_extent;
@@ -304,7 +304,7 @@ impl <'a> DM<'a> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
-        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        Self::hdr_set_name(&mut hdr, &self.vg.name(), &lv.name);
 
         hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
         hdr.data_size = hdr.data_start + targs.iter()
@@ -344,7 +344,7 @@ impl <'a> DM<'a> {
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = hdr.data_start;
-        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        Self::hdr_set_name(&mut hdr, &self.vg.name(), &lv.name);
         hdr.flags = DM_SUSPEND_FLAG;
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
@@ -361,7 +361,7 @@ impl <'a> DM<'a> {
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = hdr.data_start;
-        Self::hdr_set_name(&mut hdr, &self.vg.name, &lv.name);
+        Self::hdr_set_name(&mut hdr, &self.vg.name(), &lv.name);
         // DM_SUSPEND_FLAG not set = resume
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,

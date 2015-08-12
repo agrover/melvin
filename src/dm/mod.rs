@@ -14,8 +14,6 @@ use std::os::unix::io::AsRawFd;
 use std::mem;
 use std::slice;
 use std::slice::bytes::copy_memory;
-use std::io::Error;
-use std::io::ErrorKind::Other;
 use std::collections::BTreeSet;
 
 use byteorder::{NativeEndian, ByteOrder};
@@ -259,46 +257,26 @@ impl <'a> DM<'a> {
         // Construct targets first, since we need to know how many & size
         // before initializing the header.
         for seg in &lv.segments {
+            let mut targ: dmi::Struct_dm_target_spec = Default::default();
+            targ.sector_start = seg.start_extent() * sectors_per_extent;
+            targ.length = seg.extent_count() * sectors_per_extent;
+            targ.status = 0;
 
-            let seg_ty = {
-                if seg.ty == "striped" && seg.stripes.len() == 1 {
-                    &b"linear"[..]
-                } else {
-                    seg.ty.as_bytes()
-                }
+            let mut dst: &mut [u8] = unsafe {
+                mem::transmute(&mut targ.target_type[..])
             };
+            copy_memory(seg.dm_type().as_bytes(), &mut dst);
 
-            for &(dev, pv_extent) in &seg.stripes {
-                let err = || Error::new(Other, "dm load_device error");
-                let pv = try!(self.vg.pv_get(dev).ok_or(err()));
+            let mut params = seg.dm_params(self.vg);
 
-                let mut targ: dmi::Struct_dm_target_spec = Default::default();
-                targ.sector_start = seg.start_extent * sectors_per_extent;
-                targ.length = seg.extent_count * sectors_per_extent;
-                targ.status = 0;
+            let pad_bytes = align_to(
+                params.len() + 1usize, 8usize) - params.len();
+            params.extend(vec!["\0"; pad_bytes]);
 
-                let mut dst: &mut [u8] = unsafe {
-                    mem::transmute(&mut targ.target_type[..])
-                };
-                copy_memory(seg_ty, &mut dst);
+            targ.next = (mem::size_of::<dmi::Struct_dm_target_spec>()
+                         + params.len()) as u32;
 
-                let mut params = Vec::new();
-                // TODO: only works for linear
-                params.extend(
-                    format!("{}:{} {}",
-                            pv.device.major,
-                            pv.device.minor,
-                            (pv_extent * sectors_per_extent) + pv.pe_start).as_bytes());
-
-                let pad_bytes = align_to(
-                    params.len() + 1usize, 8usize) - params.len();
-                params.extend(vec![0; pad_bytes]);
-
-                targ.next = (mem::size_of::<dmi::Struct_dm_target_spec>()
-                           + params.len()) as u32;
-
-                targs.push((targ, params));
-            }
+            targs.push((targ, params));
         }
 
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
@@ -328,7 +306,7 @@ impl <'a> DM<'a> {
                 buf.extend(slc);
             }
 
-            buf.extend(&param);
+            buf.extend(param.as_bytes());
         }
 
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_LOAD_CMD as u8, buf.len());

@@ -17,7 +17,7 @@ use nix::sys::utsname::uname;
 
 use lv;
 use lv::LV;
-use lv::segment::Segment;
+use lv::segment::StripedSegment;
 use pv;
 use pv::PV;
 use Device;
@@ -186,7 +186,7 @@ impl VG {
 
         for (lvname, lv) in &self.lvs {
             for seg in &lv.segments {
-                for &(seg_dev, _) in &seg.stripes {
+                for seg_dev in seg.pv_dependencies() {
                     if seg_dev == dev {
                         return Err(Error::new(
                             Other, format!("PV in use by LV {}", lvname)));
@@ -223,12 +223,12 @@ impl VG {
             Some(x) => x,
         };
 
-        let segment = Segment {
+        let segment = Box::new(StripedSegment {
             start_extent: 0,
             extent_count: extent_size,
-            ty: "striped".to_string(),
             stripes: vec![(dev, area_start)],
-        };
+            stripe_size: None,
+        });
 
         let mut lv = LV {
             name: name.to_string(),
@@ -331,12 +331,10 @@ impl VG {
         let mut used_map = BTreeMap::new();
 
         for lv in self.lvs.values() {
-            for seg in &lv.segments {
-                for &(device, start) in &seg.stripes {
-                    used_map.entry(device)
-                        .or_insert(BTreeMap::new())
-                        .insert(start as u64, seg.extent_count);
-                }
+            for (device, start, len) in lv::used_areas(lv) {
+                used_map.entry(device)
+                    .or_insert(BTreeMap::new())
+                    .insert(start, len);
             }
         }
 

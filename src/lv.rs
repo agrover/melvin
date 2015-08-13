@@ -183,7 +183,7 @@ pub mod segment {
                         -> Result<Box<Segment>> {
         match map.string_from_textmap("type") {
             Some("striped") => StripedSegment::from_textmap(map, pvs),
-            Some("thin-pool") => ThinpoolSegment::from_textmap(map, pvs),
+            Some("thin-pool") => ThinpoolSegment::from_textmap(map),
             _ => unimplemented!(),
         }
     }
@@ -354,7 +354,7 @@ pub mod segment {
     }
 
     impl ThinpoolSegment {
-        pub fn from_textmap(map: &LvmTextMap, _pvs: &BTreeMap<String, PV>)
+        pub fn from_textmap(map: &LvmTextMap)
                             -> Result<Box<Segment>> {
             let err = || Error::new(Other, "thinpool segment textmap parsing error");
 

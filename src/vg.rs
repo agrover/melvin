@@ -17,7 +17,7 @@ use nix::sys::utsname::uname;
 
 use lv;
 use lv::LV;
-use lv::segment::StripedSegment;
+use lv::segment;
 use pv;
 use pv::PV;
 use Device;
@@ -34,6 +34,7 @@ use dm::DM;
 use util::{align_to, make_uuid};
 
 const DEFAULT_EXTENT_SIZE: u64 = 8192;  // 4MiB
+const DEFAULT_THINPOOL_CHUNK_SIZE: u64 = 128; // 64KiB
 
 /// A Volume Group allows multiple Physical Volumes to be treated as a
 /// storage pool that can then be used to allocate Logical Volumes.
@@ -223,11 +224,73 @@ impl VG {
             Some(x) => x,
         };
 
-        let segment = Box::new(StripedSegment {
+        let segment = Box::new(segment::StripedSegment {
             start_extent: 0,
             extent_count: extent_size,
             stripes: vec![(dev, area_start)],
             stripe_size: None,
+        });
+
+        let mut lv = LV {
+            name: name.to_string(),
+            id: make_uuid(),
+            status: vec!["READ".to_string(),
+                         "WRITE".to_string(),
+                         "VISIBLE".to_string()],
+            flags: Vec::new(),
+            creation_host: uname().nodename().to_string(),
+            creation_time: now().to_timespec().sec,
+            segments: vec![segment],
+            device: None,
+        };
+
+        // poke dm and tell it about a new device
+        let dm = try!(DM::new());
+        try!(dm.activate_device(self, &mut lv));
+
+        self.lvs.insert(name.to_string(), lv);
+
+        self.commit()
+    }
+
+    /// Create a thin pool from existing metadata and data volumes.
+    /// These will be renamed to "<name>_tmeta" and "<name>_tdata".
+    /// In addition, a spare metadata volume will be created if one
+    /// does not already exist.
+    ///
+    /// See the kernel's thin-provisioning.txt for the exact calculation, but a
+    /// reasonable size for the metadata volume (assuming default thinpool chunk
+    /// size of 64KiB) is 1/1000 the data volume, minimum 2MiB.
+    pub fn lv_create_thinpool(&mut self, name: &str, thin_meta: &str, thin_data: &str)
+                              -> Result<()> {
+        let dm = try!(DM::new());
+
+        let extent_count = {
+            let meta_lv = try!(self.lvs.get_mut(thin_meta)
+                               .ok_or(Error::new(Other, "Meta LV not found")));
+            let new_name = format!("{}_tmeta", name);
+
+            try!(dm.rename_device(&self.name, &meta_lv, &new_name));
+            meta_lv.name = new_name;
+            meta_lv.used_extents()
+        };
+        {
+            let data_lv = try!(self.lvs.get(thin_data)
+                               .ok_or(Error::new(Other, "Data LV not found")));
+            let new_name = format!("{}_tdata", name);
+            try!(dm.rename_device(&self.name, &data_lv, &new_name));
+        }
+        // TODO: create spare metadata volume
+
+        let segment = Box::new(segment::ThinpoolSegment {
+            start_extent: 0,
+            extent_count: extent_count,
+            metadata_lv: thin_meta.to_string(),
+            data_lv: thin_data.to_string(),
+            transaction_id: 1,
+            chunk_size: DEFAULT_THINPOOL_CHUNK_SIZE,
+            discards: segment::DiscardPolicy::Passdown,
+            zero_new_blocks: true,
         });
 
         let mut lv = LV {

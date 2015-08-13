@@ -32,6 +32,9 @@ const DM_VERSION_MAJOR: u32 = 4;
 const DM_VERSION_MINOR: u32 = 30;
 const DM_VERSION_PATCHLEVEL: u32 = 0;
 
+const DM_NAME_LEN: usize = 128;
+const DM_UUID_LEN: usize = 129;
+
 // Status bits
 //const DM_READONLY_FLAG: u32 = 1;
 const DM_SUSPEND_FLAG: u32 = 2;
@@ -86,13 +89,13 @@ impl <'a> DM<'a> {
     fn hdr_set_name(hdr: &mut dmi::Struct_dm_ioctl, vg_name: &str, lv_name: &str) -> () {
         let name = format!("{}-{}", vg_name.replace("-", "--"),
                            lv_name.replace("-", "--"));
-        let name_dest: &mut [u8; 128] = unsafe { mem::transmute(&mut hdr.name) };
+        let name_dest: &mut [u8; DM_NAME_LEN] = unsafe { mem::transmute(&mut hdr.name) };
         copy_memory(name.as_bytes(), &mut name_dest[..]);
     }
 
     fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, vg_uuid: &str, lv_uuid: &str) -> () {
         let uuid = format!("LVM-{}{}", vg_uuid.replace("-", ""), lv_uuid.replace("-", ""));
-        let uuid_dest: &mut [u8; 129] = unsafe { mem::transmute(&mut hdr.uuid) };
+        let uuid_dest: &mut [u8; DM_UUID_LEN] = unsafe { mem::transmute(&mut hdr.uuid) };
         copy_memory(uuid.as_bytes(), &mut uuid_dest[..]);
     }
 

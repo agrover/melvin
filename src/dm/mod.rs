@@ -9,6 +9,7 @@ mod dm_ioctl;
 
 use std::fs::File;
 use std::io::{Result, Error, BufReader, BufRead};
+use std::io::ErrorKind::Other;
 use std::os::unix::io::AsRawFd;
 use std::mem;
 use std::slice;
@@ -32,6 +33,7 @@ const DM_VERSION_MAJOR: u32 = 4;
 const DM_VERSION_MINOR: u32 = 30;
 const DM_VERSION_PATCHLEVEL: u32 = 0;
 
+const DM_IOCTL_STRUCT_LEN: usize = 312;
 const DM_NAME_LEN: usize = 128;
 const DM_UUID_LEN: usize = 129;
 
@@ -364,6 +366,31 @@ impl DM {
     pub fn deactivate_device(&self, vg: &VG, lv: &LV) -> Result<()> {
         try!(self.suspend_device(vg, lv));
         self.remove_device(vg, lv)
+    }
+
+    /// Rename a Logical Volume.
+    pub fn rename_device(&self, vg_name: &str, lv: &LV, new_name: &str) -> Result<()> {
+        let mut buf = [0u8; DM_IOCTL_STRUCT_LEN + DM_NAME_LEN];
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+
+        if new_name.as_bytes().len() > (DM_NAME_LEN - 1) {
+            return Err(
+                Error::new(Other, format!("New name {} too long", new_name)));
+        }
+
+        Self::initialize_hdr(&mut hdr);
+        hdr.data_size = hdr.data_start;
+        Self::hdr_set_name(&mut hdr, vg_name, &lv.name);
+
+        copy_memory(new_name.as_bytes(), &mut buf[DM_IOCTL_STRUCT_LEN..]);
+
+        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_RENAME_CMD as u8,
+                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+
+        match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
+            Err(_) => return Err((Error::last_os_error())),
+            _ => Ok(())
+        }
     }
 }
 

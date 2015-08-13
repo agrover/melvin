@@ -204,7 +204,7 @@ pub mod segment {
     impl StripedSegment {
         pub fn from_textmap(map: &LvmTextMap, pvs: &BTreeMap<String, PV>)
                             -> Result<Box<Segment>> {
-            let err = || Error::new(Other, "segment textmap parsing error");
+            let err = || Error::new(Other, "striped segment textmap parsing error");
 
             let stripe_list = try!(map.list_from_textmap("stripes").ok_or(err()));
 
@@ -230,6 +230,7 @@ pub mod segment {
                 extent_count: try!(
                     map.i64_from_textmap("extent_count").ok_or(err())) as u64,
                 stripes: stripes,
+                // optional
                 stripe_size: map.i64_from_textmap("start_extent").map(|x| x as u64),
             }))
         }

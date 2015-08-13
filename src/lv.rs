@@ -179,8 +179,16 @@ pub mod segment {
         fn dm_params(&self, vg: &VG) -> String;
     }
 
-    /// A Logical Volume Segment.
-    #[derive(Debug, PartialEq, Clone)]
+    pub fn from_textmap(map: &LvmTextMap, pvs: &BTreeMap<String, PV>)
+                        -> Result<Box<Segment>> {
+        match map.string_from_textmap("type") {
+            Some("striped") => StripedSegment::from_textmap(map, pvs),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// A striped Logical Volume Segment.
+    #[derive(Debug, PartialEq)]
     pub struct StripedSegment {
         /// The first extent within the LV this segment comprises.
         pub start_extent: u64,
@@ -190,14 +198,6 @@ pub mod segment {
         pub stripe_size: Option<u64>,
         /// Stripes contain the Device and the starting PV extent.
         pub stripes: Vec<(Device, u64)>,
-    }
-
-    pub fn from_textmap(map: &LvmTextMap, pvs: &BTreeMap<String, PV>)
-                        -> Result<Box<Segment>> {
-        match map.string_from_textmap("type") {
-            Some("striped") => StripedSegment::from_textmap(map, pvs),
-            _ => unimplemented!(),
-        }
     }
 
     impl StripedSegment {

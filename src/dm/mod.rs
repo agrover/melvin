@@ -8,8 +8,7 @@
 mod dm_ioctl;
 
 use std::fs::File;
-use std::io;
-use std::io::{BufReader, BufRead};
+use std::io::{Result, Error, BufReader, BufRead};
 use std::os::unix::io::AsRawFd;
 use std::mem;
 use std::slice;
@@ -69,7 +68,7 @@ pub struct DM<'a> {
 
 impl <'a> DM<'a> {
     /// Create a new context for communicating about a given VG with DM.
-    pub fn new(vg: &'a VG) -> io::Result<Self> {
+    pub fn new(vg: &'a VG) -> Result<Self> {
         Ok(DM {
             file: try!(File::open(DM_CTL_PATH)),
             vg: vg,
@@ -98,7 +97,7 @@ impl <'a> DM<'a> {
     }
 
     /// Devicemapper version information: Major, Minor, and patchlevel versions.
-    pub fn get_version(&self) -> io::Result<(u32, u32, u32)> {
+    pub fn get_version(&self) -> Result<(u32, u32, u32)> {
 
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
         hdr.version[0] = DM_VERSION_MAJOR;
@@ -109,7 +108,7 @@ impl <'a> DM<'a> {
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => {},
         };
 
@@ -118,7 +117,7 @@ impl <'a> DM<'a> {
 
     /// Returns a list of tuples containing DM device names within this VG,
     /// and their major/minor device numbers.
-    pub fn list_devices(&self) -> io::Result<Vec<(String, Device)>> {
+    pub fn list_devices(&self) -> Result<Vec<(String, Device)>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 
@@ -128,7 +127,7 @@ impl <'a> DM<'a> {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_LIST_DEVICES_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => {},
         };
 
@@ -160,7 +159,7 @@ impl <'a> DM<'a> {
     }
 
     /// Query DM for which devices depend on this device.
-    pub fn list_deps(&self, dev: Device) -> io::Result<Vec<Device>> {
+    pub fn list_deps(&self, dev: Device) -> Result<Vec<Device>> {
         let mut buf = [0u8; 16 * 1024];
         let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
 
@@ -171,7 +170,7 @@ impl <'a> DM<'a> {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_DEPS_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => {},
         };
 
@@ -213,7 +212,7 @@ impl <'a> DM<'a> {
         false
     }
 
-    fn create_device(&self, lv: &mut LV) -> io::Result<()> {
+    fn create_device(&self, lv: &mut LV) -> Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
@@ -225,7 +224,7 @@ impl <'a> DM<'a> {
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => { }
         };
 
@@ -234,7 +233,7 @@ impl <'a> DM<'a> {
         Ok(())
     }
 
-    fn remove_device(&self, lv: &LV) -> io::Result<()> {
+    fn remove_device(&self, lv: &LV) -> Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
@@ -245,12 +244,12 @@ impl <'a> DM<'a> {
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => Ok(())
         }
     }
 
-    fn load_device(&self, lv: &LV) -> io::Result<()> {
+    fn load_device(&self, lv: &LV) -> Result<()> {
         let sectors_per_extent = self.vg.extent_size();
         let mut targs = Vec::new();
 
@@ -312,12 +311,12 @@ impl <'a> DM<'a> {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_LOAD_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into_ptr(self.file.as_raw_fd(), op, buf.as_mut_ptr()) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => Ok(())
         }
     }
 
-    fn suspend_device(&self, lv: &LV) -> io::Result<()> {
+    fn suspend_device(&self, lv: &LV) -> Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
@@ -329,12 +328,12 @@ impl <'a> DM<'a> {
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => Ok(())
         }
     }
 
-    fn resume_device(&self, lv: &LV) -> io::Result<()> {
+    fn resume_device(&self, lv: &LV) -> Result<()> {
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
 
         Self::initialize_hdr(&mut hdr);
@@ -346,7 +345,7 @@ impl <'a> DM<'a> {
                                       mem::size_of::<dmi::Struct_dm_ioctl>());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             _ => Ok(())
         }
     }
@@ -354,14 +353,14 @@ impl <'a> DM<'a> {
     /// Activate a Logical Volume.
     ///
     /// Also populates the LV's device field.
-    pub fn activate_device(&self, lv: &mut LV) -> io::Result<()> {
+    pub fn activate_device(&self, lv: &mut LV) -> Result<()> {
         try!(self.create_device(lv));
         try!(self.load_device(lv));
         self.resume_device(lv)
     }
 
     /// Deactivate a Logical Volume.
-    pub fn deactivate_device(&self, lv: &LV) -> io::Result<()> {
+    pub fn deactivate_device(&self, lv: &LV) -> Result<()> {
         try!(self.suspend_device(lv));
         self.remove_device(lv)
     }

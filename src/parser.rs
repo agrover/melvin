@@ -28,7 +28,7 @@
 
 //! Parsing LVM's text-based configuration format.
 
-use std::io;
+use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
@@ -313,7 +313,7 @@ impl TextMapOps for LvmTextMap {
     }
 }
 
-fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> io::Result<&'b[Token<'a>]> {
+fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> Result<&'b[Token<'a>]> {
     let mut brace_count = 0;
 
     for (i, x) in tokens.iter().enumerate() {
@@ -334,7 +334,7 @@ fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &
 }
 
 // lists can only contain strings and numbers, yay
-fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
+fn get_list<'a>(tokens: &[Token<'a>]) -> Result<Vec<Entry>> {
     let mut v = Vec::new();
 
     assert_eq!(*tokens.first().unwrap(), Token::BracketOpen);
@@ -354,8 +354,8 @@ fn get_list<'a>(tokens: &[Token<'a>]) -> io::Result<Vec<Entry>> {
     Ok(v)
 }
 
-// TODO: More appropriate error type than io::Result
-fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
+// TODO: More appropriate error type than Result
+fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
     let mut ret: LvmTextMap = BTreeMap::new();
 
     assert_eq!(*tokens.first().unwrap(), Token::CurlyOpen);
@@ -419,7 +419,7 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> io::Result<LvmTextMap> {
 ///
 /// LVM uses the same configuration file format for it's on-disk metadata,
 /// as well as for lvmetad, and the lvm.conf configuration file.
-pub fn buf_to_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
+pub fn buf_to_textmap(buf: &[u8]) -> Result<LvmTextMap> {
 
     let mut tokens: Vec<Token> = Vec::new();
 
@@ -434,7 +434,7 @@ pub fn buf_to_textmap(buf: &[u8]) -> io::Result<LvmTextMap> {
 
 /// Status may be either a string or a list of strings. Convert either
 /// into a list of strings.
-pub fn status_from_textmap(map: &LvmTextMap) -> io::Result<Vec<String>> {
+pub fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
     match map.get("status") {
         Some(&Entry::String(ref x)) => Ok(vec!(x.clone())),
         Some(&Entry::List(ref x)) =>

@@ -4,7 +4,7 @@
 
 //! Physical Volumes
 
-use std::io;
+use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
 
@@ -17,7 +17,7 @@ use parser::{
 
 pub mod dev {
     use std::str::FromStr;
-    use std::io;
+    use std::io::Result;
     use std::io::Error;
     use std::io::ErrorKind::Other;
     use std::io::{BufReader, BufRead};
@@ -64,8 +64,8 @@ pub mod dev {
     }
 
     impl FromStr for Device {
-        type Err = io::Error;
-        fn from_str(s: &str) -> io::Result<Device> {
+        type Err = Error;
+        fn from_str(s: &str) -> Result<Device> {
             match s.parse::<i64>() {
                 Ok(x) => Ok(Device::from(x as u64)),
                 Err(_) => {
@@ -91,7 +91,7 @@ pub mod dev {
     }
 
     /// Device may be a number or a path. Convert either into a Device.
-    pub fn from_textmap(map: &LvmTextMap) -> io::Result<Device> {
+    pub fn from_textmap(map: &LvmTextMap) -> Result<Device> {
         match map.get("device") {
             Some(&Entry::String(ref x)) => {
                 match Device::from_str(x) {
@@ -125,7 +125,7 @@ pub struct PV {
 }
 
 /// Construct a PV from an LvmTextMap.
-pub fn from_textmap(map: &LvmTextMap) -> io::Result<PV> {
+pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
     let err = || Error::new(Other, "pv textmap parsing error");
 
     let id = try!(map.string_from_textmap("id").ok_or(err()));

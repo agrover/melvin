@@ -19,7 +19,6 @@
 //   increments seqno.
 //
 
-use std::io;
 use std::io::{Read, Write, Result, Error, Seek, SeekFrom};
 use std::io::ErrorKind::Other;
 use std::path::{Path, PathBuf};
@@ -272,7 +271,7 @@ impl PvHeader {
         let mut val: u64 = 0;
 
         match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
-            Err(_) => return Err((io::Error::last_os_error())),
+            Err(_) => return Err((Error::last_os_error())),
             Ok(_) => Ok(val),
         }
     }
@@ -378,7 +377,7 @@ impl PvHeader {
     // For the moment, the only important thing in the MDA header is rlocn0,
     // so we don't need separate functions that return anything in it except
     // rlocn0.
-    fn read_mda_header(area: &PvArea, file: &mut File) -> io::Result<Option<RawLocn>> {
+    fn read_mda_header(area: &PvArea, file: &mut File) -> Result<Option<RawLocn>> {
         assert!(area.size as usize > MDA_HEADER_SIZE);
         try!(file.seek(SeekFrom::Start(area.offset)));
         let mut hdr = [0u8; MDA_HEADER_SIZE];
@@ -414,7 +413,7 @@ impl PvHeader {
         Ok(iter_raw_locn(&hdr[40..]).next())
     }
 
-    fn write_mda_header(area: &PvArea, file: &mut File, rl: &RawLocn) -> io::Result<()> {
+    fn write_mda_header(area: &PvArea, file: &mut File, rl: &RawLocn) -> Result<()> {
         let mut hdr = [0u8; MDA_HEADER_SIZE];
 
         copy_memory(MDA_MAGIC, &mut hdr[4..20]);
@@ -443,7 +442,7 @@ impl PvHeader {
     /// Read the metadata contained in the metadata area.
     /// In the case of multiple metadata areas, return the information
     /// from the first valid one.
-    pub fn read_metadata(&self) -> io::Result<LvmTextMap> {
+    pub fn read_metadata(&self) -> Result<LvmTextMap> {
         let mut f = try!(OpenOptions::new().read(true).open(&self.dev_path));
 
         for pvarea in &self.metadata_areas {
@@ -479,7 +478,7 @@ impl PvHeader {
     }
 
     /// Write the given metadata to all active metadata areas in the PV.
-    pub fn write_metadata(&mut self, map: &LvmTextMap) -> io::Result<()> {
+    pub fn write_metadata(&mut self, map: &LvmTextMap) -> Result<()> {
 
         let mut f = try!(OpenOptions::new().read(true).write(true)
                          .open(&self.dev_path));

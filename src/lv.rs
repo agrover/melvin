@@ -183,6 +183,7 @@ pub mod segment {
                         -> Result<Box<Segment>> {
         match map.string_from_textmap("type") {
             Some("striped") => StripedSegment::from_textmap(map, pvs),
+            Some("thin-pool") => ThinpoolSegment::from_textmap(map, pvs),
             _ => unimplemented!(),
         }
     }
@@ -320,6 +321,144 @@ pub mod segment {
                         self.stripe_size.unwrap(),
                         stripes.join(" "))
             }
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub enum DiscardPolicy {
+        Passdown,
+        NoPassdown,
+        Ignore,
+    }
+
+    /// A Thinpool Logical Volume Segment, tying together data and metadata LVs
+    #[derive(Debug, PartialEq)]
+    pub struct ThinpoolSegment {
+        /// The first extent within the LV this segment comprises.
+        pub start_extent: u64,
+        /// How many extents this segment comprises
+        pub extent_count: u64,
+        /// The name of the metadata LV
+        pub metadata_lv: String,
+        /// The name of the data LV
+        pub data_lv: String,
+        /// The transaction ID
+        pub transaction_id: u64,
+        /// The chunk size.
+        pub chunk_size: u64,
+        /// The discard policy.
+        pub discards: DiscardPolicy,
+        /// Whether to zero new blocks.
+        pub zero_new_blocks: bool,
+    }
+
+    impl ThinpoolSegment {
+        pub fn from_textmap(map: &LvmTextMap, _pvs: &BTreeMap<String, PV>)
+                            -> Result<Box<Segment>> {
+            let err = || Error::new(Other, "thinpool segment textmap parsing error");
+
+            let discards = match map.string_from_textmap("discards") {
+                Some("passdown") => DiscardPolicy::Passdown,
+                Some("nopassdown") => DiscardPolicy::NoPassdown,
+                Some("ignore") => DiscardPolicy::Ignore,
+                _ => return Err(Error::new(
+                    Other, "Invalid text for \"discards\" in thinpool segment")),
+            };
+
+            Ok(Box::new(ThinpoolSegment {
+                start_extent: try!(
+                    map.i64_from_textmap("start_extent").ok_or(err())) as u64,
+                extent_count: try!(
+                    map.i64_from_textmap("extent_count").ok_or(err())) as u64,
+                metadata_lv: try!(
+                    map.string_from_textmap("metadata").ok_or(err())).to_string(),
+                data_lv: try!(
+                    map.string_from_textmap("pool").ok_or(err())).to_string(),
+                transaction_id: try!(
+                    map.i64_from_textmap("transaction_id").ok_or(err())) as u64,
+                chunk_size: try!(
+                    map.i64_from_textmap("chunk_size").ok_or(err())) as u64,
+                discards: discards,
+                zero_new_blocks: try!(
+                    map.i64_from_textmap("start_extent").ok_or(err())) != 0,
+            }))
+        }
+    }
+
+    impl Segment for ThinpoolSegment {
+        fn to_textmap(&self, _dev_to_idx: &BTreeMap<Device, usize>)
+                      -> LvmTextMap {
+            let mut map = LvmTextMap::new();
+
+            let discards = match self.discards {
+                DiscardPolicy::Passdown => "passdown".to_string(),
+                DiscardPolicy::NoPassdown => "nopassdown".to_string(),
+                DiscardPolicy::Ignore => "ignore".to_string(),
+            };
+
+            map.insert("start_extent".to_string(),
+                       Entry::Number(self.start_extent as i64));
+            map.insert("extent_count".to_string(),
+                       Entry::Number(self.extent_count as i64));
+            map.insert("type".to_string(),
+                       Entry::String("thin-pool".to_string()));
+            map.insert("metadata".to_string(),
+                       Entry::String(self.metadata_lv.clone()));
+            map.insert("pool".to_string(),
+                       Entry::String(self.data_lv.clone()));
+            map.insert("transaction_id".to_string(),
+                       Entry::Number(self.transaction_id as i64));
+            map.insert("chunk_size".to_string(),
+                       Entry::Number(self.chunk_size as i64));
+            map.insert("discards".to_string(), Entry::String(discards));
+            map.insert("zero_new_blocks".to_string(),
+                       Entry::Number(self.zero_new_blocks as i64));
+
+            map
+        }
+
+        fn start_extent(&self) -> u64 {
+            self.start_extent
+        }
+
+        fn extent_count(&self) -> u64 {
+            self.extent_count
+        }
+
+        // None, they're all on subordinate devs
+        fn pv_dependencies(&self) -> Vec<Device> {
+            Vec::new()
+        }
+
+        // None, they're all on subordinate devs
+        fn used_areas(&self) -> Vec<(Device, u64, u64)> {
+            Vec::new()
+        }
+
+        fn dm_type(&self) -> &'static str {
+            "thin-pool"
+        }
+
+        fn dm_params(&self, vg: &VG) -> String {
+            let chunks = (self.extent_count * vg.extent_size()) / self.chunk_size;
+            let mut ctor = format!(
+                "{} {} {} {}",
+                self.metadata_lv,
+                self.data_lv,
+                self.chunk_size,
+                chunks / 5); // 80% low water mark
+
+            if !self.zero_new_blocks {
+                ctor.push_str(" skip_block_zeroing");
+            }
+
+            match self.discards {
+                DiscardPolicy::Passdown => {},
+                DiscardPolicy::NoPassdown => ctor.push_str(" no_discard_passdown"),
+                DiscardPolicy::Ignore => ctor.push_str( " ignore_discard"),
+            };
+
+            ctor
         }
     }
 }

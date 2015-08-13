@@ -184,6 +184,7 @@ pub mod segment {
         match map.string_from_textmap("type") {
             Some("striped") => StripedSegment::from_textmap(map, pvs),
             Some("thin-pool") => ThinpoolSegment::from_textmap(map),
+            Some("thin") => ThinSegment::from_textmap(map),
             _ => unimplemented!(),
         }
     }
@@ -460,6 +461,95 @@ pub mod segment {
             };
 
             ctor
+        }
+    }
+
+    /// A Thin Logical Volume Segment, a copy-on-write segment
+    /// allocated from a thinpool.
+    #[derive(Debug, PartialEq)]
+    pub struct ThinSegment {
+        /// The first extent within the LV this segment comprises.
+        pub start_extent: u64,
+        /// How many extents this segment comprises
+        pub extent_count: u64,
+        /// The name of the thinpool allocated from
+        pub thin_pool: String,
+        /// The transaction ID
+        pub transaction_id: u64,
+        /// Device ID within the thinpool
+        pub device_id: u64,
+    }
+
+    impl ThinSegment {
+        pub fn from_textmap(map: &LvmTextMap)
+                            -> Result<Box<Segment>> {
+            let err = || Error::new(Other, "thin segment textmap parsing error");
+
+            Ok(Box::new(ThinSegment {
+                start_extent: try!(
+                    map.i64_from_textmap("start_extent").ok_or(err())) as u64,
+                extent_count: try!(
+                    map.i64_from_textmap("extent_count").ok_or(err())) as u64,
+                thin_pool: try!(
+                    map.string_from_textmap("thin_pool").ok_or(err())).to_string(),
+                transaction_id: try!(
+                    map.i64_from_textmap("transaction_id").ok_or(err())) as u64,
+                device_id: try!(
+                    map.i64_from_textmap("device_id").ok_or(err())) as u64,
+            }))
+        }
+    }
+
+    impl Segment for ThinSegment {
+        fn to_textmap(&self, _dev_to_idx: &BTreeMap<Device, usize>)
+                      -> LvmTextMap {
+            let mut map = LvmTextMap::new();
+
+            map.insert("start_extent".to_string(),
+                       Entry::Number(self.start_extent as i64));
+            map.insert("extent_count".to_string(),
+                       Entry::Number(self.extent_count as i64));
+            map.insert("type".to_string(),
+                       Entry::String("thin".to_string()));
+            map.insert("thin_pool".to_string(),
+                       Entry::String(self.thin_pool.clone()));
+            map.insert("transaction_id".to_string(),
+                       Entry::Number(self.transaction_id as i64));
+            map.insert("device_id".to_string(),
+                       Entry::Number(self.device_id as i64));
+
+            map
+        }
+
+        fn start_extent(&self) -> u64 {
+            self.start_extent
+        }
+
+        fn extent_count(&self) -> u64 {
+            self.extent_count
+        }
+
+        fn pv_dependencies(&self) -> Vec<Device> {
+            Vec::new()
+        }
+
+        fn used_areas(&self) -> Vec<(Device, u64, u64)> {
+            Vec::new()
+        }
+
+        fn dm_type(&self) -> &'static str {
+            "thin"
+        }
+
+        // External origin dev param not supported
+        fn dm_params(&self, vg: &VG) -> String {
+            let pool_lv = vg.lv_get(&self.thin_pool).unwrap();
+            let pool_dev = pool_lv.device.unwrap();
+            format!(
+                "{}:{} {}",
+                pool_dev.major,
+                pool_dev.minor,
+                self.device_id)
         }
     }
 }

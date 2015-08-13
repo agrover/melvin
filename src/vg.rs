@@ -121,7 +121,7 @@ impl VG {
         let dm_majors = dm::dev_majors();
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         if dm_majors.contains(&dev.major) {
-            let dm = try!(DM::new(&self));
+            let dm = try!(DM::new());
             if dm.depends_on(dev, &dm_majors) {
                 return Err(Error::new(Other, "Dependency loops prohibited"));
             }
@@ -244,10 +244,8 @@ impl VG {
         };
 
         // poke dm and tell it about a new device
-        {
-            let dm = try!(DM::new(self));
-            try!(dm.activate_device(&mut lv));
-        }
+        let dm = try!(DM::new());
+        try!(dm.activate_device(self, &mut lv));
 
         self.lvs.insert(name.to_string(), lv);
 
@@ -259,10 +257,8 @@ impl VG {
         match self.lvs.remove(name) {
             None => Err(Error::new(Other, "LV not found in VG")),
             Some(mut lv) => {
-                {
-                    let dm = try!(DM::new(self));
-                    try!(dm.deactivate_device(&mut lv));
-                }
+                let dm = try!(DM::new());
+                try!(dm.deactivate_device(self, &mut lv));
 
                 self.commit()
             },
@@ -586,8 +582,8 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
     };
 
     let dm_devices = {
-        let dm = try!(DM::new(&vg));
-        try!(dm.list_devices())
+        let dm = try!(DM::new());
+        try!(dm.list_devices(&vg))
     };
 
     for (lvname, dev) in dm_devices {

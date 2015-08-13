@@ -2,6 +2,13 @@
 name = "melvin"
 version = "0.1.0"
 authors = ["Andy Grover <agrover@redhat.com>"]
+description = "A library for configuring LVM"
+documentation = "http://agrover.github.io/melvin/doc/melvin/index.html"
+# homepage = "..."
+repository = "https://github.com/agrover/melvin"
+readme = "README.md"
+keywords = ["Linux", "volume", "management", "LVM", "storage"]
+license = "MPL-2.0"
 
 [[bin]]
 name = "mlv"

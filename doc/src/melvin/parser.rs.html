@@ -566,7 +566,7 @@
 
 <span class='doccomment'>//! Parsing LVM&#39;s text-based configuration format.</span>
 
-<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>Error</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>ErrorKind</span>::<span class='ident'>Other</span>;
 
@@ -851,7 +851,7 @@
     }
 }
 
-<span class='kw'>fn</span> <span class='ident'>find_matching_token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span>, <span class='lifetime'>&#39;b</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;b</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>], <span class='ident'>begin</span>: <span class='kw-2'>&amp;</span><span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>, <span class='ident'>end</span>: <span class='kw-2'>&amp;</span><span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='lifetime'>&#39;b</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]<span class='op'>&gt;</span> {
+<span class='kw'>fn</span> <span class='ident'>find_matching_token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span>, <span class='lifetime'>&#39;b</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;b</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>], <span class='ident'>begin</span>: <span class='kw-2'>&amp;</span><span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>, <span class='ident'>end</span>: <span class='kw-2'>&amp;</span><span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='lifetime'>&#39;b</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]<span class='op'>&gt;</span> {
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>brace_count</span> <span class='op'>=</span> <span class='number'>0</span>;
 
     <span class='kw'>for</span> (<span class='ident'>i</span>, <span class='ident'>x</span>) <span class='kw'>in</span> <span class='ident'>tokens</span>.<span class='ident'>iter</span>().<span class='ident'>enumerate</span>() {
@@ -872,7 +872,7 @@
 }
 
 <span class='comment'>// lists can only contain strings and numbers, yay</span>
-<span class='kw'>fn</span> <span class='ident'>get_list</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Entry</span><span class='op'>&gt;&gt;</span> {
+<span class='kw'>fn</span> <span class='ident'>get_list</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Entry</span><span class='op'>&gt;&gt;</span> {
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
 
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>tokens</span>.<span class='ident'>first</span>().<span class='ident'>unwrap</span>(), <span class='ident'>Token</span>::<span class='ident'>BracketOpen</span>);
@@ -892,8 +892,8 @@
     <span class='prelude-val'>Ok</span>(<span class='ident'>v</span>)
 }
 
-<span class='comment'>// TODO: More appropriate error type than io::Result</span>
-<span class='kw'>fn</span> <span class='ident'>get_textmap</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
+<span class='comment'>// TODO: More appropriate error type than Result</span>
+<span class='kw'>fn</span> <span class='ident'>get_textmap</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>(<span class='ident'>tokens</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>Token</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ret</span>: <span class='ident'>LvmTextMap</span> <span class='op'>=</span> <span class='ident'>BTreeMap</span>::<span class='ident'>new</span>();
 
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>tokens</span>.<span class='ident'>first</span>().<span class='ident'>unwrap</span>(), <span class='ident'>Token</span>::<span class='ident'>CurlyOpen</span>);
@@ -957,7 +957,7 @@
 <span class='doccomment'>///</span>
 <span class='doccomment'>/// LVM uses the same configuration file format for it&#39;s on-disk metadata,</span>
 <span class='doccomment'>/// as well as for lvmetad, and the lvm.conf configuration file.</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>buf_to_textmap</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>buf_to_textmap</span>(<span class='ident'>buf</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>LvmTextMap</span><span class='op'>&gt;</span> {
 
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>tokens</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Token</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
 
@@ -972,7 +972,7 @@
 
 <span class='doccomment'>/// Status may be either a string or a list of strings. Convert either</span>
 <span class='doccomment'>/// into a list of strings.</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>status_from_textmap</span>(<span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>) <span class='op'>-&gt;</span> <span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;&gt;</span> {
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>status_from_textmap</span>(<span class='ident'>map</span>: <span class='kw-2'>&amp;</span><span class='ident'>LvmTextMap</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;&gt;</span> {
     <span class='kw'>match</span> <span class='ident'>map</span>.<span class='ident'>get</span>(<span class='string'>&quot;status&quot;</span>) {
         <span class='prelude-val'>Some</span>(<span class='kw-2'>&amp;</span><span class='ident'>Entry</span>::<span class='ident'>String</span>(<span class='kw-2'>ref</span> <span class='ident'>x</span>)) <span class='op'>=&gt;</span> <span class='prelude-val'>Ok</span>(<span class='macro'>vec</span><span class='macro'>!</span>(<span class='ident'>x</span>.<span class='ident'>clone</span>())),
         <span class='prelude-val'>Some</span>(<span class='kw-2'>&amp;</span><span class='ident'>Entry</span>::<span class='ident'>List</span>(<span class='kw-2'>ref</span> <span class='ident'>x</span>)) <span class='op'>=&gt;</span>

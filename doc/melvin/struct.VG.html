@@ -45,7 +45,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-11706' class='srclink' href='../src/melvin/vg.rs.html#41-66' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-13600' class='srclink' href='../src/melvin/vg.rs.html#42-67' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct VG {
     // some fields omitted
 }</pre><div class='docblock'><p>A Volume Group allows multiple Physical Volumes to be treated as a
@@ -58,6 +58,15 @@ storage pool that can then be used to allocate Logical Volumes.</p>
 <div class='docblock'><p>Remove a PV. It must be unused by any LVs.</p>
 </div><h4 id='method.lv_create_linear' class='method'><code>fn <a href='#method.lv_create_linear' class='fnname'>lv_create_linear</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, extent_size: <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Create a new linear logical volume in the volume group.</p>
+</div><h4 id='method.lv_create_thinpool' class='method'><code>fn <a href='#method.lv_create_thinpool' class='fnname'>lv_create_thinpool</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, thin_meta: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, thin_data: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Create a thin pool from existing metadata and data volumes.
+These will be renamed to &quot;<name>_tmeta&quot; and &quot;<name>_tdata&quot;.
+In addition, a spare metadata volume will be created if one
+does not already exist.</p>
+
+<p>See the kernel&#39;s thin-provisioning.txt for the exact calculation, but a
+reasonable size for the metadata volume (assuming default thinpool chunk
+size of 64KiB) is 1/1000 the data volume, minimum 2MiB.</p>
 </div><h4 id='method.lv_remove' class='method'><code>fn <a href='#method.lv_remove' class='fnname'>lv_remove</a>(&amp;mut self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
 <div class='docblock'><p>Destroy a logical volume.</p>
 </div><h4 id='method.extents_in_use' class='method'><code>fn <a href='#method.extents_in_use' class='fnname'>extents_in_use</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a></code></h4>

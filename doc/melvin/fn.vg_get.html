@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `vg_list` fn in crate `melvin`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, vg_list">
+    <meta name="description" content="API documentation for the Rust `vg_get` fn in crate `melvin`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, vg_get">
 
-    <title>melvin::vg_list - Rust</title>
+    <title>melvin::vg_get - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../main.css">
 
@@ -26,7 +26,7 @@
 
     <section class="sidebar">
         
-        <p class='location'><a href='index.html'>melvin</a></p><script>window.sidebarCurrent = {name: 'vg_list', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='index.html'>melvin</a></p><script>window.sidebarCurrent = {name: 'vg_get', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </section>
 
     <nav class="sub">
@@ -41,18 +41,18 @@
     </nav>
 
     <section id='main' class="content fn">
-<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>melvin</a>::<wbr><a class='fn' href=''>vg_list</a></span><span class='out-of-band'><span id='render-detail'>
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>melvin</a>::<wbr><a class='fn' href=''>vg_get</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-6093' class='srclink' href='../src/melvin/metad.rs.html#114-141' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn vg_list() -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>&gt;&gt;</pre><div class='docblock'><p>Query <code>lvmetad</code> for a list of Volume Groups on the system.</p>
+        </span><a id='src-6223' class='srclink' href='../src/melvin/lvmetad.rs.html#140-153' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn vg_get(name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='../melvin/struct.VG.html' title='melvin::VG'>VG</a>&gt;</pre><div class='docblock'><p>Get a VG from <code>lvmetad</code>.</p>
 
 <h1 id="examples" class='section-header'><a
                            href="#examples">Examples</a></h1><pre class='rust rust-example-rendered'>
-   <span class='kw'>use</span> <span class='ident'>melvin</span>::<span class='ident'>vg_list</span>;
+   <span class='kw'>use</span> <span class='ident'>melvin</span>::<span class='ident'>vg_get</span>;
 
-   <span class='kw'>let</span> <span class='ident'>vgs</span> <span class='op'>=</span> <span class='ident'>vg_list</span>();</pre>
+   <span class='kw'>let</span> <span class='ident'>vg</span> <span class='op'>=</span> <span class='ident'>vg_get</span>(<span class='string'>&quot;vg0&quot;</span>);</pre>
 </div></section>
     <section id='search' class="content hidden"></section>
 

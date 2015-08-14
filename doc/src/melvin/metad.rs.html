@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="Source to the Rust file `src/lvmetad.rs`.">
+    <meta name="description" content="Source to the Rust file `src/metad.rs`.">
     <meta name="keywords" content="rust, rustlang, rust-lang">
 
-    <title>lvmetad.rs.html -- source</title>
+    <title>metad.rs.html -- source</title>
 
     <link rel="stylesheet" type="text/css" href="../../main.css">
 
@@ -215,18 +215,6 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
 </pre><pre class='rust '>
 <span class='comment'>// This Source Code Form is subject to the terms of the Mozilla Public</span>
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
@@ -250,7 +238,7 @@
 <span class='kw'>use</span> <span class='ident'>vg</span>::<span class='ident'>VG</span>;
 
 
-<span class='kw'>const</span> <span class='ident'>LVMETAD_PATH</span>: <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;static</span> <span class='ident'>str</span> <span class='op'>=</span> <span class='string'>&quot;/run/lvm/lvmetad.socket&quot;</span>;
+<span class='kw'>const</span> <span class='ident'>MLVMETAD_PATH</span>: <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;static</span> <span class='ident'>str</span> <span class='op'>=</span> <span class='string'>&quot;/run/lvm/mlvmetad.socket&quot;</span>;
 
 <span class='kw'>fn</span> <span class='ident'>collect_response</span>(<span class='ident'>stream</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>UnixStream</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>u8</span><span class='op'>&gt;&gt;</span> {
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>response</span> <span class='op'>=</span> [<span class='number'>0</span>; <span class='number'>32</span>];
@@ -304,7 +292,7 @@
     <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;response parsing error&quot;</span>);
     <span class='kw'>let</span> <span class='ident'>token</span> <span class='op'>=</span> <span class='string'>b&quot;0&quot;</span>;
 
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>stream</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>UnixStream</span>::<span class='ident'>connect</span>(<span class='ident'>LVMETAD_PATH</span>));
+    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>stream</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>UnixStream</span>::<span class='ident'>connect</span>(<span class='ident'>MLVMETAD_PATH</span>));
 
     <span class='kw'>let</span> <span class='ident'>txt</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>_request</span>(<span class='ident'>req</span>, <span class='prelude-val'>Some</span>(<span class='ident'>token</span>), <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>stream</span>, <span class='kw-2'>&amp;</span><span class='ident'>args</span>));
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>response</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>buf_to_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>txt</span>));
@@ -339,9 +327,9 @@
 <span class='doccomment'>/// ```</span>
 <span class='doccomment'>///    use melvin::vg_list;</span>
 <span class='doccomment'>///</span>
-<span class='doccomment'>///    let vg_names = vg_list();</span>
+<span class='doccomment'>///    let vgs = vg_list();</span>
 <span class='doccomment'>/// ```</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>vg_list</span>() <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;&gt;</span> {
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>vg_list</span>() <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>VG</span><span class='op'>&gt;&gt;</span> {
     <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;response parsing error&quot;</span>);
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
 
@@ -352,34 +340,22 @@
         <span class='kw'>let</span> <span class='ident'>name</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>vgs</span>.<span class='ident'>textmap_from_textmap</span>(<span class='ident'>id</span>)
                         .<span class='ident'>and_then</span>(<span class='op'>|</span><span class='ident'>val</span><span class='op'>|</span> <span class='ident'>val</span>.<span class='ident'>string_from_textmap</span>(<span class='string'>&quot;name&quot;</span>))
                         .<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
-        <span class='ident'>v</span>.<span class='ident'>push</span>(<span class='ident'>name</span>.<span class='ident'>to_string</span>());
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>option</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>u8</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+        <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='string'>b&quot;uuid = \&quot;&quot;</span>);
+        <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='ident'>id</span>.<span class='ident'>as_bytes</span>());
+        <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='string'>b&quot;\&quot;&quot;</span>);
+        <span class='kw'>let</span> <span class='ident'>options</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>(<span class='kw-2'>&amp;</span><span class='ident'>option</span>[..]);
+
+        <span class='kw'>let</span> <span class='ident'>vg_info</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>request</span>(<span class='string'>b&quot;vg_lookup&quot;</span>, <span class='prelude-val'>Some</span>(<span class='ident'>options</span>)));
+        <span class='kw'>let</span> <span class='ident'>md</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>vg_info</span>.<span class='ident'>textmap_from_textmap</span>(<span class='string'>&quot;metadata&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
+
+        <span class='kw'>let</span> <span class='ident'>vg</span> <span class='op'>=</span> <span class='ident'>vg</span>::<span class='ident'>from_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>name</span>, <span class='ident'>md</span>).<span class='ident'>expect</span>(<span class='string'>&quot;didn&#39;t get vg!&quot;</span>);
+
+        <span class='ident'>v</span>.<span class='ident'>push</span>(<span class='ident'>vg</span>);
     }
 
     <span class='prelude-val'>Ok</span>(<span class='ident'>v</span>)
-}
-
-<span class='doccomment'>/// Get a VG from `lvmetad`.</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// # Examples</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>///    use melvin::vg_get;</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>///    let vg = vg_get(&quot;vg0&quot;);</span>
-<span class='doccomment'>/// ```</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>vg_get</span>(<span class='ident'>name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>VG</span><span class='op'>&gt;</span> {
-    <span class='kw'>let</span> <span class='ident'>err</span> <span class='op'>=</span> <span class='op'>||</span> <span class='ident'>Error</span>::<span class='ident'>new</span>(<span class='ident'>Other</span>, <span class='string'>&quot;response parsing error&quot;</span>);
-
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>option</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>u8</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
-    <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='string'>b&quot;name = \&quot;&quot;</span>);
-    <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='ident'>name</span>.<span class='ident'>as_bytes</span>());
-    <span class='ident'>option</span>.<span class='ident'>extend</span>(<span class='string'>b&quot;\&quot;&quot;</span>);
-    <span class='kw'>let</span> <span class='ident'>options</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>(<span class='kw-2'>&amp;</span><span class='ident'>option</span>[..]);
-
-    <span class='kw'>let</span> <span class='ident'>vg_info</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>request</span>(<span class='string'>b&quot;vg_lookup&quot;</span>, <span class='prelude-val'>Some</span>(<span class='ident'>options</span>)));
-    <span class='kw'>let</span> <span class='ident'>md</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>vg_info</span>.<span class='ident'>textmap_from_textmap</span>(<span class='string'>&quot;metadata&quot;</span>).<span class='ident'>ok_or</span>(<span class='ident'>err</span>()));
-
-    <span class='ident'>vg</span>::<span class='ident'>from_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>name</span>, <span class='ident'>md</span>)
 }
 
 <span class='doccomment'>/// Tell `lvmetad` about the current state of a Volume Group. The</span>

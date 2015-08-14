@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["vg_list","Query `lvmetad` for a list of Volume Groups on the system."]]});

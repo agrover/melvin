@@ -45,8 +45,9 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-0' class='srclink' href='../src/melvin/lib.rs.html#5-32' title='goto source code'>[src]</a></span></h1>
-<div class='docblock'><p>Melvin is pure Rust library for configuring <a href="https://www.sourceware.org/lvm2/">LVM</a>.</p>
+        </span><a id='src-0' class='srclink' href='../src/melvin/lib.rs.html#5-33' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Melvin is a library for configuring logical volumes in the style of <a href="https://www.sourceware.org/lvm2/">LVM</a>
+Melvin is not compatible with LVM.</p>
 </div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
 <table>
                     <tr class=' module-item'>
@@ -62,7 +63,7 @@
                         <td><a class='mod' href='parser/index.html'
                                title='melvin::parser'>parser</a></td>
                         <td class='docblock short'>
-                             <p>Parsing LVM&#39;s text-based configuration format.</p>
+                             <p>Parsing MLV&#39;s text-based configuration format.</p>
 
                         </td>
                     </tr>
@@ -99,7 +100,7 @@
                         <td><a class='struct' href='struct.PvHeader.html'
                                title='melvin::PvHeader'>PvHeader</a></td>
                         <td class='docblock short'>
-                             <p>A block device that has been initialized to be a LVM Physical
+                             <p>A block device that has been initialized to be a MLV Physical
 Volume, but that may not be part of a VG yet.</p>
 
                         </td>
@@ -120,7 +121,7 @@ storage pool that can then be used to allocate Logical Volumes.</p>
                         <td><a class='fn' href='fn.pvheader_scan.html'
                                title='melvin::pvheader_scan'>pvheader_scan</a></td>
                         <td class='docblock short'>
-                             <p>Scan a list of directories for block devices containing LVM PV labels.</p>
+                             <p>Scan a list of directories for block devices containing MLV PV labels.</p>
 
                         </td>
                     </tr>

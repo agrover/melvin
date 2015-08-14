@@ -635,7 +635,7 @@
 <span class='comment'>// License, v. 2.0. If a copy of the MPL was not distributed with this</span>
 <span class='comment'>// file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
 
-<span class='doccomment'>//! Reading and writing LVM on-disk labels and metadata.</span>
+<span class='doccomment'>//! Reading and writing MLV on-disk labels and metadata.</span>
 
 <span class='comment'>//</span>
 <span class='comment'>// label is at start of sectors 0-3, usually 1</span>
@@ -667,7 +667,7 @@
 <span class='kw'>use</span> <span class='ident'>parser</span>::{<span class='ident'>LvmTextMap</span>, <span class='ident'>textmap_to_buf</span>, <span class='ident'>buf_to_textmap</span>, <span class='ident'>Entry</span>};
 <span class='kw'>use</span> <span class='ident'>util</span>::{<span class='ident'>align_to</span>, <span class='ident'>crc32_calc</span>, <span class='ident'>make_uuid</span>, <span class='ident'>hyphenate_uuid</span>};
 <span class='kw'>use</span> <span class='ident'>Device</span>;
-<span class='kw'>use</span> <span class='ident'>lvmetad</span>;
+<span class='kw'>use</span> <span class='ident'>metad</span>;
 
 <span class='kw'>const</span> <span class='ident'>LABEL_SCAN_SECTORS</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>4</span>;
 <span class='kw'>const</span> <span class='ident'>ID_LEN</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>32</span>;
@@ -722,7 +722,7 @@
         <span class='ident'>copy_memory</span>(<span class='string'>b&quot;LABELONE&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[..<span class='number'>8</span>]);
         <span class='ident'>LittleEndian</span>::<span class='ident'>write_u64</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>8</span>..<span class='number'>16</span>], <span class='ident'>LABEL_SECTOR</span> <span class='kw'>as</span> <span class='ident'>u64</span>);
         <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>20</span>..<span class='number'>24</span>], <span class='ident'>LABEL_SIZE</span> <span class='kw'>as</span> <span class='ident'>u32</span>);
-        <span class='ident'>copy_memory</span>(<span class='string'>b&quot;LVM2 001&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>24</span>..<span class='number'>32</span>]);
+        <span class='ident'>copy_memory</span>(<span class='string'>b&quot;MLV2 001&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>24</span>..<span class='number'>32</span>]);
         <span class='kw'>let</span> <span class='ident'>crc_val</span> <span class='op'>=</span> <span class='ident'>crc32_calc</span>(<span class='kw-2'>&amp;</span><span class='ident'>sec_buf</span>[<span class='number'>20</span>..]);
         <span class='ident'>LittleEndian</span>::<span class='ident'>write_u32</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>sec_buf</span>[<span class='number'>16</span>..<span class='number'>20</span>], <span class='ident'>crc_val</span>);
     }
@@ -807,7 +807,7 @@
     }
 }
 
-<span class='doccomment'>/// A block device that has been initialized to be a LVM Physical</span>
+<span class='doccomment'>/// A block device that has been initialized to be a MLV Physical</span>
 <span class='doccomment'>/// Volume, but that may not be part of a VG yet.</span>
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>PartialEq</span>, <span class='ident'>Clone</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>PvHeader</span> {
@@ -1002,7 +1002,7 @@
             <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>Self</span>::<span class='ident'>write_mda_header</span>(<span class='ident'>area</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>f</span>, <span class='kw-2'>&amp;</span><span class='ident'>new_rl</span>));
         }
 
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>lvmetad</span>::<span class='ident'>pv_found</span>(<span class='kw-2'>&amp;</span><span class='ident'>to_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>)));
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>metad</span>::<span class='ident'>pv_found</span>(<span class='kw-2'>&amp;</span><span class='ident'>to_textmap</span>(<span class='kw-2'>&amp;</span><span class='ident'>pvh</span>)));
 
         <span class='prelude-val'>Ok</span>(<span class='ident'>pvh</span>)
     }
@@ -1203,7 +1203,7 @@
     <span class='ident'>pvmeta</span>
 }
 
-<span class='doccomment'>/// Scan a list of directories for block devices containing LVM PV labels.</span>
+<span class='doccomment'>/// Scan a list of directories for block devices containing MLV PV labels.</span>
 <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pvheader_scan</span>(<span class='ident'>dirs</span>: <span class='kw-2'>&amp;</span>[<span class='kw-2'>&amp;</span><span class='ident'>Path</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>PathBuf</span><span class='op'>&gt;&gt;</span> {
 
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>ret_vec</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();

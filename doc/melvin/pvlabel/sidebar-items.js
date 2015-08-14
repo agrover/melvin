@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["pvheader_scan","Scan a list of directories for block devices containing LVM PV labels."]],"struct":[["PvHeader","A block device that has been initialized to be a LVM Physical Volume, but that may not be part of a VG yet."]]});
+initSidebarItems({"fn":[["pvheader_scan","Scan a list of directories for block devices containing MLV PV labels."]],"struct":[["PvHeader","A block device that has been initialized to be a MLV Physical Volume, but that may not be part of a VG yet."]]});

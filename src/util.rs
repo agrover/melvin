@@ -18,12 +18,12 @@ pub fn crc32_calc(buf: &[u8]) -> u32 {
     let table = crc32::make_table(CRC_SEED);
 
     // For some reason, we need to negate the initial CRC value
-    // and the result, to match what LVM2 is generating.
+    // and the result, to match what MLV2 is generating.
     !crc32::update(!INITIAL_CRC, &table, buf)
 }
 
-// Make a uuid with the same hyphenation as LVM2
-// Only uses 0-9a-f but LVM2 shouldn't care.
+// Make a uuid with the same hyphenation as MLV2
+// Only uses 0-9a-f but MLV2 shouldn't care.
 pub fn make_uuid() -> String {
     let uuid = Uuid::new_v4().to_simple_string();
 

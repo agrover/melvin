@@ -1,13 +1,13 @@
 [package]
 name = "melvin"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Andy Grover <agrover@redhat.com>"]
-description = "A library for configuring LVM"
+description = "A library for configuring an LVM-style volume manager"
 documentation = "http://agrover.github.io/melvin/doc/melvin/index.html"
 # homepage = "..."
 repository = "https://github.com/agrover/melvin"
 readme = "README.md"
-keywords = ["Linux", "volume", "management", "LVM", "storage"]
+keywords = ["Linux", "volume", "management", "storage"]
 license = "MPL-2.0"
 
 [[bin]]

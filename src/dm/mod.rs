@@ -94,7 +94,7 @@ impl DM {
     }
 
     fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, vg_uuid: &str, lv_uuid: &str) -> () {
-        let uuid = format!("LVM-{}{}", vg_uuid.replace("-", ""), lv_uuid.replace("-", ""));
+        let uuid = format!("MLV-{}{}", vg_uuid.replace("-", ""), lv_uuid.replace("-", ""));
         let uuid_dest: &mut [u8; DM_UUID_LEN] = unsafe { mem::transmute(&mut hdr.uuid) };
         copy_memory(uuid.as_bytes(), &mut uuid_dest[..]);
     }

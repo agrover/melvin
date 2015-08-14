@@ -20,7 +20,7 @@ use vg;
 use vg::VG;
 
 
-const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
+const MLVMETAD_PATH: &'static str = "/run/lvm/mlvmetad.socket";
 
 fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     let mut response = [0; 32];
@@ -74,7 +74,7 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     let err = || Error::new(Other, "response parsing error");
     let token = b"0";
 
-    let mut stream = try!(UnixStream::connect(LVMETAD_PATH));
+    let mut stream = try!(UnixStream::connect(MLVMETAD_PATH));
 
     let txt = try!(_request(req, Some(token), &mut stream, &args));
     let mut response = try!(buf_to_textmap(&txt));

@@ -18,7 +18,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Base a lexer for LVM2's text format on the more complex (hah) json format.
+// Base a lexer for MLV2's text format on the more complex (hah) json format.
 //
 // Given a &[u8], the lexer produces a stream of tokens.
 // get_textmap takes tokens and produces a TextMap nested
@@ -26,7 +26,7 @@
 // VG struct, with associated LVs and PVs.
 //
 
-//! Parsing LVM's text-based configuration format.
+//! Parsing MLV's text-based configuration format.
 
 use std::io::Result;
 use std::io::Error;
@@ -249,9 +249,9 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
-/// A Map that represents LVM metadata.
+/// A Map that represents MLV metadata.
 ///
-/// This is an intermediate representation between LVM's textual metadata format
+/// This is an intermediate representation between MLV's textual metadata format
 /// and actual Rust structs. It is an associative map in which each entry can
 /// refer to either a `Number`, a `String`, a `List`, or another `LvmTextMap`.
 pub type LvmTextMap = BTreeMap<String, Entry>;
@@ -415,15 +415,15 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
     Ok(ret)
 }
 
-/// Generate an `LvmTextMap` from a textual LVM configuration string.
+/// Generate an `LvmTextMap` from a textual MLV configuration string.
 ///
-/// LVM uses the same configuration file format for it's on-disk metadata,
+/// MLV uses the same configuration file format for it's on-disk metadata,
 /// as well as for lvmetad, and the lvm.conf configuration file.
 pub fn buf_to_textmap(buf: &[u8]) -> Result<LvmTextMap> {
 
     let mut tokens: Vec<Token> = Vec::new();
 
-    // LVM vsn1 is implicitly a map at the top level, so add
+    // MLV vsn1 is implicitly a map at the top level, so add
     // the appropriate tokens
     tokens.push(Token::CurlyOpen);
     tokens.extend(&mut Lexer::new(&buf));
@@ -449,7 +449,7 @@ pub fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
     }
 }
 
-/// Generate a textual LVM configuration string from an LvmTextMap.
+/// Generate a textual MLV configuration string from an LvmTextMap.
 pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
     let mut vec = Vec::new();
 

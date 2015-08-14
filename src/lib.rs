@@ -5,7 +5,8 @@
 #![feature(iter_arith, result_expect, path_ext, slice_bytes)]
 #![warn(missing_docs)]
 
-//! Melvin is pure Rust library for configuring [LVM](https://www.sourceware.org/lvm2/).
+//! Melvin is a library for configuring logical volumes in the style of [LVM](https://www.sourceware.org/lvm2/)
+//! Melvin is not compatible with LVM.
 
 extern crate byteorder;
 extern crate crc;
@@ -17,7 +18,7 @@ extern crate time;
 
 pub mod dm;
 pub mod parser;
-mod lvmetad;
+mod metad;
 mod pvlabel;
 mod lv;
 mod vg;
@@ -28,5 +29,5 @@ pub use vg::VG;
 pub use pv::PV;
 pub use pv::dev::Device;
 pub use lv::LV;
-pub use lvmetad::vg_list;
+pub use metad::vg_list;
 pub use pvlabel::{PvHeader, pvheader_scan};

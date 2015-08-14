@@ -28,7 +28,7 @@ use parser::{
     Entry,
     status_from_textmap,
 };
-use lvmetad;
+use metad;
 use dm;
 use dm::DM;
 use util::{align_to, make_uuid};
@@ -118,7 +118,7 @@ impl VG {
 
         // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
-        // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
+        // 2) Walk dm deps (equiv. of MLV2 dev_manager_device_uses_vg)
         let dm_majors = dm::dev_majors();
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         if dm_majors.contains(&dev.major) {
@@ -356,7 +356,7 @@ impl VG {
 
         let mut disk_map = LvmTextMap::new();
         disk_map.insert("contents".to_string(),
-                        Entry::String("Text Format Volume Group".to_string()));
+                        Entry::String("Melvin Text Format Volume Group".to_string()));
         disk_map.insert("version".to_string(), Entry::Number(1));
         disk_map.insert("description".to_string(), Entry::String("".to_string()));
         disk_map.insert("creation_host".to_string(),
@@ -375,7 +375,7 @@ impl VG {
             }
         }
 
-        lvmetad::vg_update(&self.name, &map)
+        metad::vg_update(&self.name, &map)
     }
 
     // Returns used areas in the format: {Device: {start: len} }

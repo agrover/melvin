@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Reading and writing LVM on-disk labels and metadata.
+//! Reading and writing MLV on-disk labels and metadata.
 
 //
 // label is at start of sectors 0-3, usually 1
@@ -34,7 +34,7 @@ use nix::sys::{stat, ioctl};
 use parser::{LvmTextMap, textmap_to_buf, buf_to_textmap, Entry};
 use util::{align_to, crc32_calc, make_uuid, hyphenate_uuid};
 use Device;
-use lvmetad;
+use metad;
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -89,7 +89,7 @@ impl LabelHeader {
         copy_memory(b"LABELONE", &mut sec_buf[..8]);
         LittleEndian::write_u64(&mut sec_buf[8..16], LABEL_SECTOR as u64);
         LittleEndian::write_u32(&mut sec_buf[20..24], LABEL_SIZE as u32);
-        copy_memory(b"LVM2 001", &mut sec_buf[24..32]);
+        copy_memory(b"MLV2 001", &mut sec_buf[24..32]);
         let crc_val = crc32_calc(&sec_buf[20..]);
         LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
     }
@@ -174,7 +174,7 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-/// A block device that has been initialized to be a LVM Physical
+/// A block device that has been initialized to be a MLV Physical
 /// Volume, but that may not be part of a VG yet.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PvHeader {
@@ -369,7 +369,7 @@ impl PvHeader {
             try!(Self::write_mda_header(area, &mut f, &new_rl));
         }
 
-        try!(lvmetad::pv_found(&to_textmap(&pvh)));
+        try!(metad::pv_found(&to_textmap(&pvh)));
 
         Ok(pvh)
     }
@@ -570,7 +570,7 @@ fn to_textmap(pvh: &PvHeader) -> LvmTextMap {
     pvmeta
 }
 
-/// Scan a list of directories for block devices containing LVM PV labels.
+/// Scan a list of directories for block devices containing MLV PV labels.
 pub fn pvheader_scan(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
 
     let mut ret_vec = Vec::new();

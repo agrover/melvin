@@ -2,12 +2,9 @@
 
 ## MeLVin
 
-#### An implementation of [LVM](https://www.sourceware.org/lvm2/)-style volume manager library.
+#### An implementation of an [LVM](https://www.sourceware.org/lvm2/)-style volume manager library.
 
 #### Melvin is not compatible with LVM2.
-
-Currently a big pile of pieces, someday this could be a nice library
-that provides a nice API to LVM that clients could use.
 
 * parsing of metadata and lvm.conf
 * locking

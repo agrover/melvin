@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#![feature(iter_arith, result_expect, path_ext, slice_bytes)]
+#![feature(iter_arith, path_ext, slice_bytes)]
 #![warn(missing_docs)]
 
 //! Melvin is a library for configuring logical volumes in the style of [LVM](https://www.sourceware.org/lvm2/)

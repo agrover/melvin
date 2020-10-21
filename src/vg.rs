@@ -4,36 +4,31 @@
 
 //! Volume Groups
 
-use std::io::Result;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::io::Error;
 use std::io::ErrorKind::Other;
-use std::collections::BTreeMap;
-use std::str::FromStr;
-use std::borrow::Cow;
+use std::io::Result;
 use std::path::Path;
+use std::str::FromStr;
 
-use time::now;
 use nix::sys::utsname::uname;
+use time::now;
 
-use lv;
-use lv::LV;
-use lv::segment;
-use pv;
-use pv::PV;
-use Device;
-use pvlabel::{PvHeader, SECTOR_SIZE};
-use parser::{
-    LvmTextMap,
-    TextMapOps,
-    Entry,
-    status_from_textmap,
-};
-use metad;
 use dm;
 use dm::DM;
+use lv;
+use lv::segment;
+use lv::LV;
+use metad;
+use parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
+use pv;
+use pv::PV;
+use pvlabel::{PvHeader, SECTOR_SIZE};
 use util::{align_to, make_uuid};
+use Device;
 
-const DEFAULT_EXTENT_SIZE: u64 = 8192;  // 4MiB
+const DEFAULT_EXTENT_SIZE: u64 = 8192; // 4MiB
 const DEFAULT_THINPOOL_CHUNK_SIZE: u64 = 128; // 64KiB
 
 /// A Volume Group allows multiple Physical Volumes to be treated as a
@@ -76,16 +71,17 @@ impl VG {
         let pvhs = {
             let mut v = Vec::new();
             for path in &pv_paths {
-                v.push(try!(PvHeader::find_in_dev(path)));
+                v.push(PvHeader::find_in_dev(path)?);
             }
             v
         };
 
-        let metadata_areas = pvhs.iter()
-            .map(|x| x.metadata_areas.len())
-            .sum::<usize>();
+        let metadata_areas = pvhs.iter().map(|x| x.metadata_areas.len()).sum::<usize>();
         if metadata_areas == 0 {
-            return Err(Error::new(Other, "PVs must have at least one metadata area"));
+            return Err(Error::new(
+                Other,
+                "PVs must have at least one metadata area",
+            ));
         }
 
         let mut vg = VG {
@@ -93,9 +89,11 @@ impl VG {
             id: make_uuid(),
             seqno: 0,
             format: "lvm2".to_string(),
-            status: vec!["READ".to_string(),
-                         "WRITE".to_string(),
-                         "RESIZEABLE".to_string()],
+            status: vec![
+                "READ".to_string(),
+                "WRITE".to_string(),
+                "RESIZEABLE".to_string(),
+            ],
             flags: Vec::new(),
             extent_size: DEFAULT_EXTENT_SIZE,
             max_lv: 0,
@@ -106,7 +104,7 @@ impl VG {
         };
 
         for path in &pv_paths {
-            try!(vg.pv_add(path));
+            vg.pv_add(path)?;
         }
 
         Ok(vg)
@@ -114,15 +112,15 @@ impl VG {
 
     /// Add a non-affiliated PV to this VG.
     pub fn pv_add(&mut self, path: &Path) -> Result<()> {
-        let pvh = try!(PvHeader::find_in_dev(path));
+        let pvh = PvHeader::find_in_dev(path)?;
 
         // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
         // 2) Walk dm deps (equiv. of MLV2 dev_manager_device_uses_vg)
         let dm_majors = dm::dev_majors();
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
+        let dev = Device::from_str(&path.to_string_lossy())?;
         if dm_majors.contains(&dev.major) {
-            let dm = try!(DM::new());
+            let dm = DM::new()?;
             if dm.depends_on(dev, &dm_majors) {
                 return Err(Error::new(Other, "Dependency loops prohibited"));
             }
@@ -138,8 +136,8 @@ impl VG {
                 match value {
                     Entry::TextMap(_) => {
                         vg_name = Cow::Owned(key);
-                        break
-                    },
+                        break;
+                    }
                     _ => {}
                 }
             }
@@ -147,15 +145,18 @@ impl VG {
             return Err(Error::new(Other, format!("PV already in VG {}", vg_name)));
         }
 
-        let da = try!(pvh.data_areas.get(0)
-                      .ok_or(Error::new(Other, "Could not find data area in PV")));
+        let da = pvh
+            .data_areas
+            .get(0)
+            .ok_or(Error::new(Other, "Could not find data area in PV"))?;
 
         // figure out how many extents fit in the PV's data area
         // pe_start aligned to extent size
         let dev_size_sectors = pvh.size / SECTOR_SIZE as u64;
         let pe_start_sectors = align_to(
             (da.offset / SECTOR_SIZE as u64) as usize,
-            self.extent_size as usize) as u64;
+            self.extent_size as usize,
+        ) as u64;
         let mda1_size_sectors = match pvh.metadata_areas.get(1) {
             Some(pvarea) => pvarea.size / SECTOR_SIZE as u64,
             None => 0,
@@ -167,15 +168,18 @@ impl VG {
         if self.pvs.contains_key(&dev) {
             Err(Error::new(Other, "PV already in VG"))
         } else {
-            self.pvs.insert(dev, PV {
-                id: pvh.uuid.clone(),
-                device: dev,
-                status: vec!["ALLOCATABLE".to_string()],
-                flags: Vec::new(),
-                dev_size: dev_size_sectors,
-                pe_start: pe_start_sectors,
-                pe_count: pe_count,
-            });
+            self.pvs.insert(
+                dev,
+                PV {
+                    id: pvh.uuid.clone(),
+                    device: dev,
+                    status: vec!["ALLOCATABLE".to_string()],
+                    flags: Vec::new(),
+                    dev_size: dev_size_sectors,
+                    pe_start: pe_start_sectors,
+                    pe_count: pe_count,
+                },
+            );
 
             self.commit()
         }
@@ -183,21 +187,21 @@ impl VG {
 
     /// Remove a PV. It must be unused by any LVs.
     pub fn pv_remove(&mut self, pvh: &PvHeader) -> Result<()> {
-        let dev = try!(Device::from_str(&pvh.dev_path.to_string_lossy()));
+        let dev = Device::from_str(&pvh.dev_path.to_string_lossy())?;
 
         for (lvname, lv) in &self.lvs {
             for seg in &lv.segments {
                 for seg_dev in seg.pv_dependencies() {
                     if seg_dev == dev {
-                        return Err(Error::new(
-                            Other, format!("PV in use by LV {}", lvname)));
+                        return Err(Error::new(Other, format!("PV in use by LV {}", lvname)));
                     }
                 }
             }
         }
 
-        try!(self.pvs.remove(&dev)
-             .ok_or(Error::new(Other, "Could not remove PV")));
+        self.pvs
+            .remove(&dev)
+            .ok_or(Error::new(Other, "Could not remove PV"))?;
 
         self.commit()
     }
@@ -234,9 +238,11 @@ impl VG {
         let mut lv = LV {
             name: name.to_string(),
             id: make_uuid(),
-            status: vec!["READ".to_string(),
-                         "WRITE".to_string(),
-                         "VISIBLE".to_string()],
+            status: vec![
+                "READ".to_string(),
+                "WRITE".to_string(),
+                "VISIBLE".to_string(),
+            ],
             flags: Vec::new(),
             creation_host: uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
@@ -245,8 +251,8 @@ impl VG {
         };
 
         // poke dm and tell it about a new device
-        let dm = try!(DM::new());
-        try!(dm.activate_device(self, &mut lv));
+        let dm = DM::new()?;
+        dm.activate_device(self, &mut lv)?;
 
         self.lvs.insert(name.to_string(), lv);
 
@@ -261,24 +267,32 @@ impl VG {
     /// See the kernel's thin-provisioning.txt for the exact calculation, but a
     /// reasonable size for the metadata volume (assuming default thinpool chunk
     /// size of 64KiB) is 1/1000 the data volume, minimum 2MiB.
-    pub fn lv_create_thinpool(&mut self, name: &str, thin_meta: &str, thin_data: &str)
-                              -> Result<()> {
-        let dm = try!(DM::new());
+    pub fn lv_create_thinpool(
+        &mut self,
+        name: &str,
+        thin_meta: &str,
+        thin_data: &str,
+    ) -> Result<()> {
+        let dm = DM::new()?;
 
         let extent_count = {
-            let meta_lv = try!(self.lvs.get_mut(thin_meta)
-                               .ok_or(Error::new(Other, "Meta LV not found")));
+            let meta_lv = self
+                .lvs
+                .get_mut(thin_meta)
+                .ok_or(Error::new(Other, "Meta LV not found"))?;
             let new_name = format!("{}_tmeta", name);
 
-            try!(dm.rename_device(&self.name, &meta_lv, &new_name));
+            dm.rename_device(&self.name, &meta_lv, &new_name)?;
             meta_lv.name = new_name;
             meta_lv.used_extents()
         };
         {
-            let data_lv = try!(self.lvs.get(thin_data)
-                               .ok_or(Error::new(Other, "Data LV not found")));
+            let data_lv = self
+                .lvs
+                .get(thin_data)
+                .ok_or(Error::new(Other, "Data LV not found"))?;
             let new_name = format!("{}_tdata", name);
-            try!(dm.rename_device(&self.name, &data_lv, &new_name));
+            dm.rename_device(&self.name, &data_lv, &new_name)?;
         }
         // TODO: create spare metadata volume
 
@@ -296,9 +310,11 @@ impl VG {
         let mut lv = LV {
             name: name.to_string(),
             id: make_uuid(),
-            status: vec!["READ".to_string(),
-                         "WRITE".to_string(),
-                         "VISIBLE".to_string()],
+            status: vec![
+                "READ".to_string(),
+                "WRITE".to_string(),
+                "VISIBLE".to_string(),
+            ],
             flags: Vec::new(),
             creation_host: uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
@@ -307,8 +323,8 @@ impl VG {
         };
 
         // poke dm and tell it about a new device
-        let dm = try!(DM::new());
-        try!(dm.activate_device(self, &mut lv));
+        let dm = DM::new()?;
+        dm.activate_device(self, &mut lv)?;
 
         self.lvs.insert(name.to_string(), lv);
 
@@ -320,20 +336,17 @@ impl VG {
         match self.lvs.remove(name) {
             None => Err(Error::new(Other, "LV not found in VG")),
             Some(mut lv) => {
-                let dm = try!(DM::new());
-                try!(dm.deactivate_device(self, &mut lv));
+                let dm = DM::new()?;
+                dm.deactivate_device(self, &mut lv)?;
 
                 self.commit()
-            },
+            }
         }
     }
 
     /// The total number of extents in use in the volume group.
     pub fn extents_in_use(&self) -> u64 {
-        self.lvs
-            .values()
-            .map(|x| x.used_extents())
-            .sum()
+        self.lvs.values().map(|x| x.used_extents()).sum()
     }
 
     /// The total number of free extents in the volume group.
@@ -343,10 +356,7 @@ impl VG {
 
     /// The total number of extents in the volume group.
     pub fn extents(&self) -> u64 {
-        self.pvs
-            .values()
-            .map(|x| x.pe_count)
-            .sum()
+        self.pvs.values().map(|x| x.pe_count).sum()
     }
 
     fn commit(&mut self) -> Result<()> {
@@ -355,23 +365,28 @@ impl VG {
         let map: LvmTextMap = to_textmap(self);
 
         let mut disk_map = LvmTextMap::new();
-        disk_map.insert("contents".to_string(),
-                        Entry::String("Melvin Text Format Volume Group".to_string()));
+        disk_map.insert(
+            "contents".to_string(),
+            Entry::String("Melvin Text Format Volume Group".to_string()),
+        );
         disk_map.insert("version".to_string(), Entry::Number(1));
         disk_map.insert("description".to_string(), Entry::String("".to_string()));
-        disk_map.insert("creation_host".to_string(),
-                        Entry::String(uname().nodename().to_string()));
-        disk_map.insert("creation_time".to_string(),
-                        Entry::Number(now().to_timespec().sec));
+        disk_map.insert(
+            "creation_host".to_string(),
+            Entry::String(uname().nodename().to_string()),
+        );
+        disk_map.insert(
+            "creation_time".to_string(),
+            Entry::Number(now().to_timespec().sec),
+        );
         disk_map.insert(self.name.clone(), Entry::TextMap(Box::new(map.clone())));
 
         // TODO: atomicity of updating pvs, metad, dm
         for pv in self.pvs.values() {
             if let Some(path) = pv.device.path() {
-                let mut pvheader = PvHeader::find_in_dev(&path)
-                    .expect("could not find pvheader");
+                let mut pvheader = PvHeader::find_in_dev(&path).expect("could not find pvheader");
 
-                try!(pvheader.write_metadata(&disk_map));
+                pvheader.write_metadata(&disk_map)?;
             }
         }
 
@@ -393,7 +408,8 @@ impl VG {
 
         for lv in self.lvs.values() {
             for (device, start, len) in lv::used_areas(lv) {
-                used_map.entry(device)
+                used_map
+                    .entry(device)
                     .or_insert(BTreeMap::new())
                     .insert(start, len);
             }
@@ -412,22 +428,23 @@ impl VG {
         let mut free_map = BTreeMap::new();
 
         for (dev, mut area_map) in self.used_areas() {
-
             // Insert an entry to mark the end of the PV so the fold works
             // correctly
-            let pv = self.pvs.get(&dev)
+            let pv = self
+                .pvs
+                .get(&dev)
                 .expect("area map name refers to nonexistent PV");
             area_map.insert(pv.pe_count, 0);
 
-            area_map.iter()
-                .fold(0, |prev_end, (start, len)| {
-                    if prev_end < *start {
-                        free_map.entry(dev)
-                            .or_insert(BTreeMap::new())
-                            .insert(prev_end, start-prev_end);
-                    }
-                    start + len
-                });
+            area_map.iter().fold(0, |prev_end, (start, len)| {
+                if prev_end < *start {
+                    free_map
+                        .entry(dev)
+                        .or_insert(BTreeMap::new())
+                        .insert(prev_end, start - prev_end);
+                }
+                start + len
+            });
         }
 
         // Also return completely-unused PVs
@@ -482,67 +499,75 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
     let mut map = LvmTextMap::new();
 
     map.insert("id".to_string(), Entry::String(vg.id.clone()));
-    map.insert("seqno".to_string(),
-               Entry::Number(vg.seqno as i64));
+    map.insert("seqno".to_string(), Entry::Number(vg.seqno as i64));
     map.insert("format".to_string(), Entry::String(vg.format.clone()));
 
     map.insert("max_pv".to_string(), Entry::Number(0));
     map.insert("max_lv".to_string(), Entry::Number(0));
 
-    map.insert("status".to_string(),
-               Entry::List(
-                   Box::new(
-                       vg.status
-                           .iter()
-                           .map(|x| Entry::String(x.clone()))
-                           .collect())));
+    map.insert(
+        "status".to_string(),
+        Entry::List(Box::new(
+            vg.status.iter().map(|x| Entry::String(x.clone())).collect(),
+        )),
+    );
 
-    map.insert("flags".to_string(),
-               Entry::List(
-                   Box::new(
-                       vg.flags
-                           .iter()
-                           .map(|x| Entry::String(x.clone()))
-                           .collect())));
+    map.insert(
+        "flags".to_string(),
+        Entry::List(Box::new(
+            vg.flags.iter().map(|x| Entry::String(x.clone())).collect(),
+        )),
+    );
 
-    map.insert("extent_size".to_string(),
-               Entry::Number(vg.extent_size as i64));
-    map.insert("metadata_copies".to_string(),
-               Entry::Number(vg.metadata_copies as i64));
+    map.insert(
+        "extent_size".to_string(),
+        Entry::Number(vg.extent_size as i64),
+    );
+    map.insert(
+        "metadata_copies".to_string(),
+        Entry::Number(vg.metadata_copies as i64),
+    );
 
     // See comment in from_textmap() - we need to assign ordinals to
     // the PV map so the textmap can use "pv0"-style strings to link
     // pvs with LV stripes.
-    let dev_to_idx: BTreeMap<Device, usize> = vg.pvs.values()
+    let dev_to_idx: BTreeMap<Device, usize> = vg
+        .pvs
+        .values()
         .enumerate()
-        .map(|(num, pv)| {
-            (pv.device, num)
-        })
+        .map(|(num, pv)| (pv.device, num))
         .collect();
 
-    map.insert("physical_volumes".to_string(),
-               Entry::TextMap(
-                   Box::new(
-                       vg.pvs
-                           .iter()
-                           .map(|(k, v)|
-                                (format!("pv{}", dev_to_idx.get(k).unwrap()),
-                                 Entry::TextMap(Box::new(
-                                     pv::to_textmap(v)))))
-                           .collect())));
+    map.insert(
+        "physical_volumes".to_string(),
+        Entry::TextMap(Box::new(
+            vg.pvs
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        format!("pv{}", dev_to_idx.get(k).unwrap()),
+                        Entry::TextMap(Box::new(pv::to_textmap(v))),
+                    )
+                })
+                .collect(),
+        )),
+    );
 
     if !vg.lvs.is_empty() {
         map.insert(
             "logical_volumes".to_string(),
-            Entry::TextMap(
-                Box::new(
-                    vg.lvs
-                        .iter()
-                        .map(|(k, v)|
-                             (k.clone(),
-                              Entry::TextMap(Box::new(
-                                  lv::to_textmap(v, &dev_to_idx)))))
-                        .collect())));
+            Entry::TextMap(Box::new(
+                vg.lvs
+                    .iter()
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            Entry::TextMap(Box::new(lv::to_textmap(v, &dev_to_idx))),
+                        )
+                    })
+                    .collect(),
+            )),
+        );
     }
 
     map
@@ -550,27 +575,27 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
 
 /// Construct a `VG` from its name and an `LvmTextMap`.
 pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
-
     let err = || Error::new(Other, "vg textmap parsing error");
 
-    let id = try!(map.string_from_textmap("id").ok_or(err()));
-    let seqno = try!(map.i64_from_textmap("seqno").ok_or(err()));
-    let format = try!(map.string_from_textmap("format").ok_or(err()));
-    let extent_size = try!(map.i64_from_textmap("extent_size").ok_or(err()));
-    let max_lv = try!(map.i64_from_textmap("max_lv").ok_or(err()));
-    let max_pv = try!(map.i64_from_textmap("max_pv").ok_or(err()));
-    let metadata_copies = try!(map.i64_from_textmap("metadata_copies").ok_or(err()));
+    let id = map.string_from_textmap("id").ok_or(err())?;
+    let seqno = map.i64_from_textmap("seqno").ok_or(err())?;
+    let format = map.string_from_textmap("format").ok_or(err())?;
+    let extent_size = map.i64_from_textmap("extent_size").ok_or(err())?;
+    let max_lv = map.i64_from_textmap("max_lv").ok_or(err())?;
+    let max_pv = map.i64_from_textmap("max_pv").ok_or(err())?;
+    let metadata_copies = map.i64_from_textmap("metadata_copies").ok_or(err())?;
 
-    let status = try!(status_from_textmap(map));
+    let status = status_from_textmap(map)?;
 
-    let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
+    let flags: Vec<_> = map
+        .list_from_textmap("flags")
+        .ok_or(err())?
         .iter()
         .filter_map(|item| match item {
             &Entry::String(ref x) => Some(x.clone()),
-            _ => {None},
+            _ => None,
         })
         .collect();
-
 
     // While the textmap uses "pv0"-style names to link physical
     // volume definitions with LV segment stripes, we do not want to
@@ -583,25 +608,23 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
     // str_to_pv map to translate its "pv0" references to Devices as
     // well.
     //
-    let str_to_pv = try!(
-        map.textmap_from_textmap("physical_volumes").ok_or(err())
-            .and_then(|tm| {
-                let mut ret_map = BTreeMap::new();
+    let str_to_pv = map
+        .textmap_from_textmap("physical_volumes")
+        .ok_or(err())
+        .and_then(|tm| {
+            let mut ret_map = BTreeMap::new();
 
-                for (key, value) in tm {
-                    match value {
-                        &Entry::TextMap(ref pv_dict) => {
-                            ret_map.insert(
-                                key.to_string(),
-                                try!(pv::from_textmap(pv_dict)));
-                        },
-                        _ => return Err(
-                            Error::new(Other, "expected PV textmap")),
-                    };
-                }
+            for (key, value) in tm {
+                match value {
+                    &Entry::TextMap(ref pv_dict) => {
+                        ret_map.insert(key.to_string(), pv::from_textmap(pv_dict)?);
+                    }
+                    _ => return Err(Error::new(Other, "expected PV textmap")),
+                };
+            }
 
-                Ok(ret_map)
-            }));
+            Ok(ret_map)
+        })?;
 
     // "logical_volumes" may be absent
     let lvs = match map.textmap_from_textmap("logical_volumes") {
@@ -611,21 +634,20 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
             for (key, value) in tm {
                 match value {
                     &Entry::TextMap(ref lv_dict) => {
-                        ret_map.insert(
-                            key.to_string(),
-                            try!(lv::from_textmap(key, lv_dict, &str_to_pv)));
-                    },
-                    _ => return Err(
-                        Error::new(Other, "expected LV textmap")),
+                        ret_map
+                            .insert(key.to_string(), lv::from_textmap(key, lv_dict, &str_to_pv)?);
+                    }
+                    _ => return Err(Error::new(Other, "expected LV textmap")),
                 }
             }
 
             ret_map
-        },
+        }
         None => BTreeMap::new(),
     };
 
-    let pvs = str_to_pv.into_iter()
+    let pvs = str_to_pv
+        .into_iter()
         .map(|(_, pv)| (pv.device, pv))
         .collect();
 
@@ -645,8 +667,8 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
     };
 
     let dm_devices = {
-        let dm = try!(DM::new());
-        try!(dm.list_devices(&vg))
+        let dm = DM::new()?;
+        dm.list_devices(&vg)?
     };
 
     for (lvname, dev) in dm_devices {

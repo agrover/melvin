@@ -7,27 +7,26 @@
 #[allow(dead_code, non_camel_case_types)]
 mod dm_ioctl;
 
-use std::fs::File;
-use std::io::{Result, Error, BufReader, BufRead};
-use std::io::ErrorKind::Other;
-use std::os::unix::io::AsRawFd;
-use std::mem;
-use std::slice;
-use std::slice::bytes::copy_memory;
 use std::collections::BTreeSet;
+use std::fs::File;
+use std::io::ErrorKind::Other;
+use std::io::{BufRead, BufReader, Error, Result};
+use std::mem;
+use std::os::unix::io::AsRawFd;
+use std::slice;
 
-use byteorder::{NativeEndian, ByteOrder};
+use byteorder::{ByteOrder, NativeEndian};
 
 use nix::sys::ioctl;
 
+use ::Device;
 use dm::dm_ioctl as dmi;
 use lv::LV;
-use vg::VG;
 use util::align_to;
-use ::Device;
+use vg::VG;
 
 const DM_IOCTL: u8 = 0xfd;
-const DM_CTL_PATH: &'static str= "/dev/mapper/control";
+const DM_CTL_PATH: &'static str = "/dev/mapper/control";
 
 const DM_VERSION_MAJOR: u32 = 4;
 const DM_VERSION_MINOR: u32 = 30;
@@ -47,20 +46,23 @@ pub fn dev_majors() -> BTreeSet<u32> {
     let mut set = BTreeSet::new();
 
     let f = File::open("/proc/devices")
-        .ok().expect("Could not open /proc/devices");
+        .ok()
+        .expect("Could not open /proc/devices");
 
     let reader = BufReader::new(f);
 
-    for line in reader.lines()
+    for line in reader
+        .lines()
         .filter_map(|x| x.ok())
         .skip_while(|x| x != "Block devices:")
-        .skip(1) {
-            let spl: Vec<_> = line.split_whitespace().collect();
+        .skip(1)
+    {
+        let spl: Vec<_> = line.split_whitespace().collect();
 
-            if spl[1] == "device-mapper" {
-                set.insert(spl[0].parse::<u32>().unwrap());
-            }
+        if spl[1] == "device-mapper" {
+            set.insert(spl[0].parse::<u32>().unwrap());
         }
+    }
 
     set
 }
@@ -74,7 +76,7 @@ impl DM {
     /// Create a new context for communicating about a given VG with DM.
     pub fn new() -> Result<Self> {
         Ok(DM {
-            file: try!(File::open(DM_CTL_PATH)),
+            file: File::open(DM_CTL_PATH)?,
         })
     }
 
@@ -87,32 +89,41 @@ impl DM {
     }
 
     fn hdr_set_name(hdr: &mut dmi::Struct_dm_ioctl, vg_name: &str, lv_name: &str) -> () {
-        let name = format!("{}-{}", vg_name.replace("-", "--"),
-                           lv_name.replace("-", "--"));
+        let name = format!(
+            "{}-{}",
+            vg_name.replace("-", "--"),
+            lv_name.replace("-", "--")
+        );
         let name_dest: &mut [u8; DM_NAME_LEN] = unsafe { mem::transmute(&mut hdr.name) };
-        copy_memory(name.as_bytes(), &mut name_dest[..]);
+        name_dest.copy_from_slice(name.as_bytes());
     }
 
     fn hdr_set_uuid(hdr: &mut dmi::Struct_dm_ioctl, vg_uuid: &str, lv_uuid: &str) -> () {
-        let uuid = format!("MLV-{}{}", vg_uuid.replace("-", ""), lv_uuid.replace("-", ""));
+        let uuid = format!(
+            "MLV-{}{}",
+            vg_uuid.replace("-", ""),
+            lv_uuid.replace("-", "")
+        );
         let uuid_dest: &mut [u8; DM_UUID_LEN] = unsafe { mem::transmute(&mut hdr.uuid) };
-        copy_memory(uuid.as_bytes(), &mut uuid_dest[..]);
+        uuid_dest.copy_from_slice(uuid.as_bytes());
     }
 
     /// Devicemapper version information: Major, Minor, and patchlevel versions.
     pub fn get_version(&self) -> Result<(u32, u32, u32)> {
-
         let mut hdr: dmi::Struct_dm_ioctl = Default::default();
         hdr.version[0] = DM_VERSION_MAJOR;
         hdr.version[1] = DM_VERSION_MINOR;
         hdr.version[2] = DM_VERSION_PATCHLEVEL;
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_VERSION_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_VERSION_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => {},
+            Err(_) => return Err(Error::last_os_error()),
+            _ => {}
         };
 
         Ok((hdr.version[0], hdr.version[1], hdr.version[2]))
@@ -122,7 +133,7 @@ impl DM {
     /// and their major/minor device numbers.
     pub fn list_devices(&self, vg: &VG) -> Result<Vec<(String, Device)>> {
         let mut buf = [0u8; 16 * 1024];
-        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe { mem::transmute(&mut buf) };
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = buf.len() as u32;
@@ -130,8 +141,8 @@ impl DM {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_LIST_DEVICES_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => {},
+            Err(_) => return Err(Error::last_os_error()),
+            _ => {}
         };
 
         let mut devs = Vec::new();
@@ -147,12 +158,14 @@ impl DM {
 
                 // Return only devices within this VG
                 if dm_name.starts_with(&vg_name) {
-                    let lv_name = dm_name.trim_left_matches(&vg_name).replace("--", "-");
+                    let lv_name = dm_name.trim_start_matches(&vg_name).replace("--", "-");
                     devs.push((lv_name, devno.into()));
                 }
 
                 let next = NativeEndian::read_u32(&result[8..12]);
-                if next == 0 { break }
+                if next == 0 {
+                    break;
+                }
 
                 result = &result[next as usize..];
             }
@@ -164,7 +177,7 @@ impl DM {
     /// Query DM for which devices depend on this device.
     pub fn list_deps(&self, dev: Device) -> Result<Vec<Device>> {
         let mut buf = [0u8; 16 * 1024];
-        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe { mem::transmute(&mut buf) };
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = buf.len() as u32;
@@ -173,8 +186,8 @@ impl DM {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_DEPS_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut buf) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => {},
+            Err(_) => return Err(Error::last_os_error()),
+            _ => {}
         };
 
         // TODO: Check DM_BUFFER_FULL_FLAG for:
@@ -188,7 +201,7 @@ impl DM {
             let entries = NativeEndian::read_u32(&result[..4]) as usize;
 
             for entry in 0..entries {
-                let dev = &result[(8*entry)+8..(8*entry)+16];
+                let dev = &result[(8 * entry) + 8..(8 * entry) + 16];
                 devs.push(Device::from(NativeEndian::read_u64(&dev)));
             }
         }
@@ -223,12 +236,15 @@ impl DM {
         Self::hdr_set_uuid(&mut hdr, &vg.id(), &lv.id);
         hdr.data_size = hdr.data_start;
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_CREATE_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_DEV_CREATE_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => { }
+            Err(_) => return Err(Error::last_os_error()),
+            _ => {}
         };
 
         lv.device = Some(Device::from(hdr.dev));
@@ -243,12 +259,15 @@ impl DM {
         hdr.data_size = hdr.data_start;
         Self::hdr_set_name(&mut hdr, &vg.name(), &lv.name);
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_REMOVE_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_DEV_REMOVE_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => Ok(())
+            Err(_) => return Err(Error::last_os_error()),
+            _ => Ok(()),
         }
     }
 
@@ -264,19 +283,15 @@ impl DM {
             targ.length = seg.extent_count() * sectors_per_extent;
             targ.status = 0;
 
-            let mut dst: &mut [u8] = unsafe {
-                mem::transmute(&mut targ.target_type[..])
-            };
-            copy_memory(seg.dm_type().as_bytes(), &mut dst);
+            let dst: &mut [u8] = unsafe { mem::transmute(&mut targ.target_type[..]) };
+            dst.copy_from_slice(seg.dm_type().as_bytes());
 
             let mut params = seg.dm_params(vg);
 
-            let pad_bytes = align_to(
-                params.len() + 1usize, 8usize) - params.len();
+            let pad_bytes = align_to(params.len() + 1usize, 8usize) - params.len();
             params.extend(vec!["\0"; pad_bytes]);
 
-            targ.next = (mem::size_of::<dmi::Struct_dm_target_spec>()
-                         + params.len()) as u32;
+            targ.next = (mem::size_of::<dmi::Struct_dm_target_spec>() + params.len()) as u32;
 
             targs.push((targ, params));
         }
@@ -287,9 +302,7 @@ impl DM {
         Self::hdr_set_name(&mut hdr, &vg.name(), &lv.name);
 
         hdr.data_start = mem::size_of::<dmi::Struct_dm_ioctl>() as u32;
-        hdr.data_size = hdr.data_start + targs.iter()
-            .map(|&(t, _)| t.next)
-            .sum::<u32>();
+        hdr.data_size = hdr.data_start + targs.iter().map(|&(t, _)| t.next).sum::<u32>();
         hdr.target_count = targs.len() as u32;
 
         // Flatten into buf
@@ -303,8 +316,7 @@ impl DM {
         for (targ, param) in targs {
             unsafe {
                 let ptr: *mut u8 = mem::transmute(&targ);
-                let slc = slice::from_raw_parts(
-                    ptr, mem::size_of::<dmi::Struct_dm_target_spec>());
+                let slc = slice::from_raw_parts(ptr, mem::size_of::<dmi::Struct_dm_target_spec>());
                 buf.extend(slc);
             }
 
@@ -314,8 +326,8 @@ impl DM {
         let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_TABLE_LOAD_CMD as u8, buf.len());
 
         match unsafe { ioctl::read_into_ptr(self.file.as_raw_fd(), op, buf.as_mut_ptr()) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => Ok(())
+            Err(_) => return Err(Error::last_os_error()),
+            _ => Ok(()),
         }
     }
 
@@ -327,12 +339,15 @@ impl DM {
         Self::hdr_set_name(&mut hdr, &vg.name(), &lv.name);
         hdr.flags = DM_SUSPEND_FLAG;
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_DEV_SUSPEND_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => Ok(())
+            Err(_) => return Err(Error::last_os_error()),
+            _ => Ok(()),
         }
     }
 
@@ -344,12 +359,15 @@ impl DM {
         Self::hdr_set_name(&mut hdr, &vg.name(), &lv.name);
         // DM_SUSPEND_FLAG not set = resume
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_SUSPEND_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_DEV_SUSPEND_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => Ok(())
+            Err(_) => return Err(Error::last_os_error()),
+            _ => Ok(()),
         }
     }
 
@@ -357,39 +375,41 @@ impl DM {
     ///
     /// Also populates the LV's device field.
     pub fn activate_device(&self, vg: &VG, lv: &mut LV) -> Result<()> {
-        try!(self.create_device(vg, lv));
-        try!(self.load_device(vg, lv));
+        self.create_device(vg, lv)?;
+        self.load_device(vg, lv)?;
         self.resume_device(vg, lv)
     }
 
     /// Deactivate a Logical Volume.
     pub fn deactivate_device(&self, vg: &VG, lv: &LV) -> Result<()> {
-        try!(self.suspend_device(vg, lv));
+        self.suspend_device(vg, lv)?;
         self.remove_device(vg, lv)
     }
 
     /// Rename a Logical Volume.
     pub fn rename_device(&self, vg_name: &str, lv: &LV, new_name: &str) -> Result<()> {
         let mut buf = [0u8; DM_IOCTL_STRUCT_LEN + DM_NAME_LEN];
-        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe {mem::transmute(&mut buf)};
+        let mut hdr: &mut dmi::Struct_dm_ioctl = unsafe { mem::transmute(&mut buf) };
 
         if new_name.as_bytes().len() > (DM_NAME_LEN - 1) {
-            return Err(
-                Error::new(Other, format!("New name {} too long", new_name)));
+            return Err(Error::new(Other, format!("New name {} too long", new_name)));
         }
 
         Self::initialize_hdr(&mut hdr);
         hdr.data_size = hdr.data_start;
         Self::hdr_set_name(&mut hdr, vg_name, &lv.name);
 
-        copy_memory(new_name.as_bytes(), &mut buf[DM_IOCTL_STRUCT_LEN..]);
+        buf[DM_IOCTL_STRUCT_LEN..].copy_from_slice(new_name.as_bytes());
 
-        let op = ioctl::op_read_write(DM_IOCTL, dmi::DM_DEV_RENAME_CMD as u8,
-                                      mem::size_of::<dmi::Struct_dm_ioctl>());
+        let op = ioctl::op_read_write(
+            DM_IOCTL,
+            dmi::DM_DEV_RENAME_CMD as u8,
+            mem::size_of::<dmi::Struct_dm_ioctl>(),
+        );
 
         match unsafe { ioctl::read_into(self.file.as_raw_fd(), op, &mut hdr) } {
-            Err(_) => return Err((Error::last_os_error())),
-            _ => Ok(())
+            Err(_) => return Err(Error::last_os_error()),
+            _ => Ok(()),
         }
     }
 }
@@ -399,7 +419,9 @@ impl DM {
 //
 fn slice_to_null(slc: &[u8]) -> Option<&[u8]> {
     for (i, c) in slc.iter().enumerate() {
-        if *c == b'\0' { return Some(&slc[..i]) };
+        if *c == b'\0' {
+            return Some(&slc[..i]);
+        };
     }
     None
 }

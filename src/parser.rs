@@ -28,9 +28,9 @@
 
 //! Parsing MLV's text-based configuration format.
 
-use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::io::Result;
 
 use std::collections::BTreeMap;
 
@@ -52,14 +52,14 @@ enum Token<'a> {
     Comma,
 
     /// A string , like `"foo"`
-    String(&'a[u8]),
+    String(&'a [u8]),
 
-    Ident(&'a[u8]),
+    Ident(&'a [u8]),
 
     /// An unsigned integer number
     Number(i64),
 
-    Comment(&'a[u8]),
+    Comment(&'a [u8]),
 
     /// The type of the token could not be identified.
     /// Should be removed if this lexer is ever to be feature complete
@@ -83,7 +83,7 @@ impl<'a> AsRef<str> for Token<'a> {
 }
 
 struct Lexer<'a> {
-    chars: &'a[u8],
+    chars: &'a [u8],
     next_byte: Option<u8>,
     cursor: usize,
     next_is_ident: bool,
@@ -91,7 +91,7 @@ struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// Returns a new Lexer from a given byte iterator.
-    fn new(chars: &'a[u8]) -> Lexer<'a> {
+    fn new(chars: &'a [u8]) -> Lexer<'a> {
         Lexer {
             chars: chars,
             next_byte: None,
@@ -111,12 +111,11 @@ impl<'a> Lexer<'a> {
             Some(c) => {
                 self.cursor += 1;
                 Some(c)
-            },
+            }
             None => {
                 if self.cursor >= self.chars.len() {
                     None
-                }
-                else {
+                } else {
                     let res = self.chars[self.cursor];
                     self.cursor += 1;
                     Some(res)
@@ -142,7 +141,6 @@ impl<'a> Iterator for Lexer<'a> {
 
     /// Lex the underlying byte stream to generate tokens
     fn next(&mut self) -> Option<Token<'a>> {
-
         let mut state = Mode::Main;
 
         while let Some(c) = self.next_byte() {
@@ -152,94 +150,82 @@ impl<'a> Iterator for Lexer<'a> {
                         b'{' => {
                             self.next_is_ident = true;
                             return Some(Token::CurlyOpen);
-                        },
+                        }
                         b'}' => {
                             return Some(Token::CurlyClose);
-                        },
+                        }
                         b'"' => {
                             state = Mode::String(self.cursor - 1);
-                        },
-                        b'a' ... b'z' | b'A' ... b'Z' | b'_' | b'.' => {
+                        }
+                        b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'.' => {
                             state = Mode::Ident(self.cursor - 1);
-                        },
-                        b'0' ... b'9' | b'-' => {
+                        }
+                        b'0'..=b'9' | b'-' => {
                             if self.next_is_ident {
                                 state = Mode::Ident(self.cursor - 1);
                             } else {
                                 state = Mode::Number(self.cursor - 1);
                             }
-                        },
+                        }
                         b'#' => {
                             state = Mode::Comment(self.cursor - 1);
-                        },
+                        }
                         b'[' => {
                             return Some(Token::BracketOpen);
-                        },
+                        }
                         b']' => {
                             return Some(Token::BracketClose);
-                        },
+                        }
                         b'=' => {
                             return Some(Token::Equals);
-                        },
+                        }
                         b',' => {
                             return Some(Token::Comma);
-                        },
+                        }
                         b' ' | b'\n' | b'\t' | b'\0' => {
                             // ignore whitespace
                         }
                         _ => {
                             return Some(Token::Invalid(c));
-                        },
-                    }
-                }
-                Mode::String(first) => {
-                    match c {
-                        b'"' => {
-                            return Some(Token::String(
-                                &self.chars[first+1..self.cursor-1]));
-                        },
-                        _ => {
-                            continue;
-                        }
-                    }
-                },
-                Mode::Ident(first) => {
-                    match c {
-                        b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9'
-                            | b'_' | b'.' | b'-' => {
-                                continue;
-                            }
-                        _ => {
-                            self.put_back(c);
-                            self.next_is_ident = false;
-                            return Some(Token::Ident(
-                                &self.chars[first..self.cursor]));
-                        }
-                    }
-                },
-                Mode::Number(first) => {
-                    match c {
-                        b'0' ... b'9' => {
-                            continue;
-                        },
-                        _ => {
-                            self.put_back(c);
-                            let s = String::from_utf8_lossy(
-                                &self.chars[first..self.cursor]).into_owned();
-                            return Some(Token::Number(s.parse().unwrap()));
                         }
                     }
                 }
-                Mode::Comment(first) => {
-                    match c {
-                        b'\n' => {
-                            self.put_back(c);
-                            return Some(Token::Comment(
-                                &self.chars[first..self.cursor]));
-                        }
-                        _ => {
-                            continue;
-                        }
+                Mode::String(first) => match c {
+                    b'"' => {
+                        return Some(Token::String(&self.chars[first + 1..self.cursor - 1]));
+                    }
+                    _ => {
+                        continue;
+                    }
+                },
+                Mode::Ident(first) => match c {
+                    b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'.' | b'-' => {
+                        continue;
+                    }
+                    _ => {
+                        self.put_back(c);
+                        self.next_is_ident = false;
+                        return Some(Token::Ident(&self.chars[first..self.cursor]));
+                    }
+                },
+                Mode::Number(first) => match c {
+                    b'0'..=b'9' => {
+                        continue;
+                    }
+                    _ => {
+                        self.put_back(c);
+                        let s =
+                            String::from_utf8_lossy(&self.chars[first..self.cursor]).into_owned();
+                        return Some(Token::Number(s.parse().unwrap()));
+                    }
+                },
+                Mode::Comment(first) => match c {
+                    b'\n' => {
+                        self.put_back(c);
+                        return Some(Token::Comment(&self.chars[first..self.cursor]));
+                    }
+                    _ => {
+                        continue;
                     }
                 },
             }
@@ -290,44 +276,48 @@ impl TextMapOps for LvmTextMap {
     fn i64_from_textmap(&self, name: &str) -> Option<i64> {
         match self.get(name) {
             Some(&Entry::Number(ref x)) => Some(*x),
-            _ => None
+            _ => None,
         }
     }
     fn string_from_textmap(&self, name: &str) -> Option<&str> {
         match self.get(name) {
             Some(&Entry::String(ref x)) => Some(x),
-            _ => None
+            _ => None,
         }
     }
     fn textmap_from_textmap(&self, name: &str) -> Option<&LvmTextMap> {
         match self.get(name) {
             Some(&Entry::TextMap(ref x)) => Some(x),
-            _ => None
+            _ => None,
         }
     }
     fn list_from_textmap(&self, name: &str) -> Option<&Vec<Entry>> {
         match self.get(name) {
             Some(&Entry::List(ref x)) => Some(x),
-            _ => None
+            _ => None,
         }
     }
 }
 
-fn find_matching_token<'a, 'b>(tokens: &'b[Token<'a>], begin: &Token<'a>, end: &Token<'a>) -> Result<&'b[Token<'a>]> {
+fn find_matching_token<'a, 'b>(
+    tokens: &'b [Token<'a>],
+    begin: &Token<'a>,
+    end: &Token<'a>,
+) -> Result<&'b [Token<'a>]> {
     let mut brace_count = 0;
 
     for (i, x) in tokens.iter().enumerate() {
         match x {
             x if x == begin => {
                 brace_count += 1;
-            },
+            }
             x if x == end => {
                 brace_count -= 1;
                 if brace_count == 0 {
-                    return Ok(&tokens[..i+1]);
+                    return Ok(&tokens[..i + 1]);
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
     Err(Error::new(Other, "token mismatch"))
@@ -341,13 +331,12 @@ fn get_list<'a>(tokens: &[Token<'a>]) -> Result<Vec<Entry>> {
     assert_eq!(*tokens.last().unwrap(), Token::BracketClose);
 
     // Omit enclosing brackets
-    for tok in &tokens[1..tokens.len()-1] {
+    for tok in &tokens[1..tokens.len() - 1] {
         match *tok {
             Token::Number(x) => v.push(Entry::Number(x)),
             Token::String(x) => v.push(Entry::String(String::from_utf8_lossy(x).into_owned())),
-            Token::Comma => { },
-            _ => return Err(Error::new(
-                Other, format!("Unexpected {:?}", *tok)))
+            Token::Comma => {}
+            _ => return Err(Error::new(Other, format!("Unexpected {:?}", *tok))),
         }
     }
 
@@ -364,15 +353,18 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
     let mut cur = 1;
 
     while tokens[cur] != Token::CurlyClose {
-
         let ident = match tokens[cur] {
             Token::Ident(x) => String::from_utf8_lossy(x).into_owned(),
             Token::Comment(_) => {
                 cur += 1;
-                continue
-            },
-            _ => return Err(Error::new(
-                Other, format!("Unexpected {:?} when seeking ident", tokens[cur])))
+                continue;
+            }
+            _ => {
+                return Err(Error::new(
+                    Other,
+                    format!("Unexpected {:?} when seeking ident", tokens[cur]),
+                ))
+            }
         };
 
         cur += 1;
@@ -383,32 +375,43 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
                     Token::Number(x) => {
                         cur += 1;
                         ret.insert(ident, Entry::Number(x));
-                    },
+                    }
                     Token::String(x) => {
                         cur += 1;
-                        ret.insert(ident, Entry::String(
-                            String::from_utf8_lossy(x).into_owned()));
-                    },
+                        ret.insert(
+                            ident,
+                            Entry::String(String::from_utf8_lossy(x).into_owned()),
+                        );
+                    }
                     Token::BracketOpen => {
-                        let slc = try!(find_matching_token(
-                            &tokens[cur..], &Token::BracketOpen, &Token::BracketClose));
-                        ret.insert(ident, Entry::List(
-                            Box::new(try!(get_list(&slc)))));
+                        let slc = find_matching_token(
+                            &tokens[cur..],
+                            &Token::BracketOpen,
+                            &Token::BracketClose,
+                        )?;
+                        ret.insert(ident, Entry::List(Box::new(get_list(&slc)?)));
                         cur += slc.len();
                     }
-                    _ => return Err(Error::new(
-                        Other, format!("Unexpected {:?} as rvalue", tokens[cur])))
+                    _ => {
+                        return Err(Error::new(
+                            Other,
+                            format!("Unexpected {:?} as rvalue", tokens[cur]),
+                        ))
+                    }
                 }
-            },
+            }
             Token::CurlyOpen => {
-                let slc = try!(find_matching_token(
-                    &tokens[cur..], &Token::CurlyOpen, &Token::CurlyClose));
-                ret.insert(ident, Entry::TextMap(
-                    Box::new(try!(get_textmap(&slc)))));
+                let slc =
+                    find_matching_token(&tokens[cur..], &Token::CurlyOpen, &Token::CurlyClose)?;
+                ret.insert(ident, Entry::TextMap(Box::new(get_textmap(&slc)?)));
                 cur += slc.len();
             }
-            _ => return Err(Error::new(
-                Other, format!("Unexpected {:?} after an ident", tokens[cur])))
+            _ => {
+                return Err(Error::new(
+                    Other,
+                    format!("Unexpected {:?} after an ident", tokens[cur]),
+                ))
+            }
         };
     }
 
@@ -420,7 +423,6 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
 /// MLV uses the same configuration file format for it's on-disk metadata,
 /// as well as for lvmetad, and the lvm.conf configuration file.
 pub fn buf_to_textmap(buf: &[u8]) -> Result<LvmTextMap> {
-
     let mut tokens: Vec<Token> = Vec::new();
 
     // MLV vsn1 is implicitly a map at the top level, so add
@@ -436,15 +438,15 @@ pub fn buf_to_textmap(buf: &[u8]) -> Result<LvmTextMap> {
 /// into a list of strings.
 pub fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
     match map.get("status") {
-        Some(&Entry::String(ref x)) => Ok(vec!(x.clone())),
-        Some(&Entry::List(ref x)) =>
-            Ok({x.iter()
+        Some(&Entry::String(ref x)) => Ok(vec![x.clone()]),
+        Some(&Entry::List(ref x)) => Ok({
+            x.iter()
                 .filter_map(|item| match item {
                     &Entry::String(ref x) => Some(x.clone()),
-                    _ => {None}
+                    _ => None,
                 })
                 .collect()
-            }),
+        }),
         _ => Err(Error::new(Other, "status textmap parsing error")),
     }
 }
@@ -460,7 +462,7 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
                 vec.extend(b" = \"");
                 vec.extend(x.as_bytes());
                 vec.extend(b"\"\n");
-            },
+            }
             &Entry::Number(ref x) => {
                 vec.extend(k.as_bytes());
                 vec.extend(b" = ");
@@ -471,12 +473,11 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
                 vec.extend(b" = [");
                 let z: Vec<_> = x
                     .iter()
-                    .map(|x| {
-                        match x {
-                            &Entry::String(ref x) => format!("\"{}\"", x),
-                            &Entry::Number(ref x) => format!("{}", x),
-                            _ => panic!("should not be in lists"),
-                        }})
+                    .map(|x| match x {
+                        &Entry::String(ref x) => format!("\"{}\"", x),
+                        &Entry::Number(ref x) => format!("{}", x),
+                        _ => panic!("should not be in lists"),
+                    })
                     .collect();
                 vec.extend(z.join(", ").as_bytes());
                 vec.extend(b"]\n");
@@ -486,7 +487,6 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
                 vec.extend(b" {\n");
                 vec.extend(textmap_to_buf(x));
                 vec.extend(b"}\n");
-
             }
         };
     }

@@ -4,31 +4,23 @@
 
 //! Physical Volumes
 
-use std::io::Result;
 use std::io::Error;
 use std::io::ErrorKind::Other;
+use std::io::Result;
 
-use parser::{
-    LvmTextMap,
-    TextMapOps,
-    Entry,
-    status_from_textmap,
-};
+use parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
 
 pub mod dev {
-    use std::str::FromStr;
-    use std::io::Result;
+    use std::fs::File;
     use std::io::Error;
     use std::io::ErrorKind::Other;
-    use std::io::{BufReader, BufRead};
-    use std::path::{Path, PathBuf};
-    use std::fs::{File, PathExt};
+    use std::io::Result;
+    use std::io::{BufRead, BufReader};
     use std::os::unix::fs::MetadataExt;
+    use std::path::{Path, PathBuf};
+    use std::str::FromStr;
 
-    use parser::{
-        LvmTextMap,
-        Entry,
-    };
+    use parser::{Entry, LvmTextMap};
 
     /// A struct containing the device's major and minor numbers
     ///
@@ -45,7 +37,8 @@ pub mod dev {
         /// Returns the path in `/dev` that corresponds with the device number
         pub fn path(&self) -> Option<PathBuf> {
             let f = File::open("/proc/partitions")
-                .ok().expect("Could not open /proc/partitions");
+                .ok()
+                .expect("Could not open /proc/partitions");
 
             let reader = BufReader::new(f);
 
@@ -54,9 +47,10 @@ pub mod dev {
                     let spl: Vec<_> = line.split_whitespace().collect();
 
                     if spl[0].parse::<u32>().unwrap() == self.major
-                        && spl[1].parse::<u8>().unwrap() == self.minor {
-                            return Some(PathBuf::from(format!("/dev/{}", spl[3])));
-                        }
+                        && spl[1].parse::<u8>().unwrap() == self.minor
+                    {
+                        return Some(PathBuf::from(format!("/dev/{}", spl[3])));
+                    }
                 }
             }
             None
@@ -68,19 +62,20 @@ pub mod dev {
         fn from_str(s: &str) -> Result<Device> {
             match s.parse::<i64>() {
                 Ok(x) => Ok(Device::from(x as u64)),
-                Err(_) => {
-                    match Path::new(s).metadata() {
-                        Ok(x) => Ok(Device::from(x.rdev())),
-                        Err(x) => Err(x)
-                    }
-                }
+                Err(_) => match Path::new(s).metadata() {
+                    Ok(x) => Ok(Device::from(x.rdev())),
+                    Err(x) => Err(x),
+                },
             }
         }
     }
 
     impl From<u64> for Device {
         fn from(val: u64) -> Device {
-            Device { major: (val >> 8) as u32, minor: (val & 0xff) as u8 }
+            Device {
+                major: (val >> 8) as u32,
+                minor: (val & 0xff) as u8,
+            }
         }
     }
 
@@ -93,11 +88,9 @@ pub mod dev {
     /// Device may be a number or a path. Convert either into a Device.
     pub fn from_textmap(map: &LvmTextMap) -> Result<Device> {
         match map.get("device") {
-            Some(&Entry::String(ref x)) => {
-                match Device::from_str(x) {
-                    Ok(x) => Ok(x),
-                    Err(_) => Err(Error::new(Other, "could not parse string"))
-                }
+            Some(&Entry::String(ref x)) => match Device::from_str(x) {
+                Ok(x) => Ok(x),
+                Err(_) => Err(Error::new(Other, "could not parse string")),
             },
             Some(&Entry::Number(x)) => Ok(Device::from(x as u64)),
             _ => Err(Error::new(Other, "device textmap parsing error")),
@@ -128,19 +121,21 @@ pub struct PV {
 pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
     let err = || Error::new(Other, "pv textmap parsing error");
 
-    let id = try!(map.string_from_textmap("id").ok_or(err()));
-    let device = try!(dev::from_textmap(map));
-    let dev_size = try!(map.i64_from_textmap("dev_size").ok_or(err()));
-    let pe_start = try!(map.i64_from_textmap("pe_start").ok_or(err()));
-    let pe_count = try!(map.i64_from_textmap("pe_count").ok_or(err()));
+    let id = map.string_from_textmap("id").ok_or(err())?;
+    let device = dev::from_textmap(map)?;
+    let dev_size = map.i64_from_textmap("dev_size").ok_or(err())?;
+    let pe_start = map.i64_from_textmap("pe_start").ok_or(err())?;
+    let pe_count = map.i64_from_textmap("pe_count").ok_or(err())?;
 
-    let status = try!(status_from_textmap(map));
+    let status = status_from_textmap(map)?;
 
-    let flags: Vec<_> = try!(map.list_from_textmap("flags").ok_or(err()))
+    let flags: Vec<_> = map
+        .list_from_textmap("flags")
+        .ok_or(err())?
         .iter()
         .filter_map(|item| match item {
             &Entry::String(ref x) => Some(x.clone()),
-            _ => {None},
+            _ => None,
         })
         .collect();
 
@@ -167,21 +162,19 @@ pub fn to_textmap(pv: &PV) -> LvmTextMap {
     let tmp: u64 = pv.device.into();
     map.insert("device".to_string(), Entry::Number(tmp as i64));
 
-    map.insert("status".to_string(),
-               Entry::List(
-                   Box::new(
-                       pv.status
-                           .iter()
-                           .map(|x| Entry::String(x.clone()))
-                           .collect())));
+    map.insert(
+        "status".to_string(),
+        Entry::List(Box::new(
+            pv.status.iter().map(|x| Entry::String(x.clone())).collect(),
+        )),
+    );
 
-    map.insert("flags".to_string(),
-               Entry::List(
-                   Box::new(
-                       pv.flags
-                           .iter()
-                           .map(|x| Entry::String(x.clone()))
-                           .collect())));
+    map.insert(
+        "flags".to_string(),
+        Entry::List(Box::new(
+            pv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
+        )),
+    );
 
     map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));
     map.insert("pe_start".to_string(), Entry::Number(pv.pe_start as i64));

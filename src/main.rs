@@ -6,14 +6,13 @@
 
 extern crate melvin;
 
-use std::io::Error;
-use std::io::ErrorKind::Other;
-use std::io::Result;
+use std::io::{self, ErrorKind::Other};
 use std::path;
 use std::path::Path;
 
 use melvin::parser;
 use melvin::{pvheader_scan, PvHeader, VG};
+use melvin::{Error, Result};
 
 fn print_pvheaders() -> Result<()> {
     let dirs = vec![path::Path::new("/dev")];
@@ -42,7 +41,7 @@ fn get_first_vg_meta() -> Result<(String, parser::LvmTextMap)> {
         }
     }
 
-    Err(Error::new(Other, "dude"))
+    Err(Error::Io(io::Error::new(Other, "dude")))
 }
 
 fn get_conf() -> Result<parser::LvmTextMap> {

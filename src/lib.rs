@@ -15,7 +15,7 @@ extern crate time;
 extern crate unix_socket;
 extern crate uuid;
 
-pub mod dm;
+mod error;
 mod lv;
 mod metad;
 pub mod parser;
@@ -24,9 +24,9 @@ mod pvlabel;
 mod util;
 mod vg;
 
+pub use error::{Error, Result};
 pub use lv::LV;
 pub use metad::vg_list;
-pub use pv::dev::Device;
 pub use pv::PV;
 pub use pvlabel::{pvheader_scan, PvHeader};
 pub use vg::VG;

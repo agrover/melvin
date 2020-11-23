@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Reading and writing MLV on-disk labels and metadata.
+//! Reading and writing LVM on-disk labels and metadata.
 
 //
 // label is at start of sectors 0-3, usually 1
@@ -22,18 +22,19 @@
 use std::cmp::min;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::ErrorKind::Other;
-use std::io::{Error, Read, Result, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use byteorder::{ByteOrder, LittleEndian};
+use devicemapper::Device;
 use nix::sys::{ioctl, stat};
 
-use metad;
-use parser::{buf_to_textmap, textmap_to_buf, Entry, LvmTextMap};
-use util::{align_to, crc32_calc, hyphenate_uuid, make_uuid};
-use Device;
+use crate::metad;
+use crate::parser::{buf_to_textmap, textmap_to_buf, Entry, LvmTextMap};
+use crate::util::{align_to, crc32_calc, hyphenate_uuid, make_uuid};
+use crate::{Error, Result};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
@@ -62,12 +63,15 @@ impl LabelHeader {
             if &sec_buf[..8] == b"LABELONE" {
                 let crc = LittleEndian::read_u32(&sec_buf[16..20]);
                 if crc != crc32_calc(&sec_buf[20..SECTOR_SIZE]) {
-                    return Err(Error::new(Other, "Label CRC error"));
+                    return Err(Error::Io(io::Error::new(Other, "Label CRC error")));
                 }
 
                 let sector = LittleEndian::read_u64(&sec_buf[8..16]);
                 if sector != x as u64 {
-                    return Err(Error::new(Other, "Sector field should equal sector count"));
+                    return Err(Error::Io(io::Error::new(
+                        Other,
+                        "Sector field should equal sector count",
+                    )));
                 }
 
                 return Ok(LabelHeader {
@@ -82,7 +86,7 @@ impl LabelHeader {
             }
         }
 
-        Err(Error::new(Other, "Label not found"))
+        Err(Error::Io(io::Error::new(Other, "Label not found")))
     }
 
     /// Initialize a device with a label header.
@@ -90,7 +94,7 @@ impl LabelHeader {
         sec_buf[..8].copy_from_slice(b"LABELONE");
         LittleEndian::write_u64(&mut sec_buf[8..16], LABEL_SECTOR as u64);
         LittleEndian::write_u32(&mut sec_buf[20..24], LABEL_SIZE as u32);
-        sec_buf[24..32].copy_from_slice(b"MLV2 001");
+        sec_buf[24..32].copy_from_slice(b"LVM2 001");
         let crc_val = crc32_calc(&sec_buf[20..]);
         LittleEndian::write_u32(&mut sec_buf[16..20], crc_val);
     }
@@ -173,7 +177,7 @@ impl<'a> Iterator for RawLocnIter<'a> {
     }
 }
 
-/// A block device that has been initialized to be a MLV Physical
+/// A block device that has been initialized to be a LVM Physical
 /// Volume, but that may not be part of a VG yet.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PvHeader {
@@ -268,7 +272,7 @@ impl PvHeader {
         let mut val: u64 = 0;
 
         match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
-            Err(_) => return Err(Error::last_os_error()),
+            Err(_) => return Err(Error::Io(io::Error::last_os_error())),
             Ok(_) => Ok(val),
         }
     }
@@ -286,7 +290,7 @@ impl PvHeader {
         let dev_size = Self::blkdev_size(&f)?;
 
         if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
-            return Err(Error::new(Other, "Device too small"));
+            return Err(Error::Io(io::Error::new(Other, "Device too small")));
         }
 
         let pvh = PvHeader {
@@ -389,44 +393,47 @@ impl PvHeader {
         file.read(&mut hdr)?;
 
         if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
-            return Err(Error::new(Other, "MDA header checksum failure"));
+            return Err(Error::Io(io::Error::new(
+                Other,
+                "MDA header checksum failure",
+            )));
         }
 
         if &hdr[4..20] != MDA_MAGIC {
-            return Err(Error::new(
+            return Err(Error::Io(io::Error::new(
                 Other,
                 format!(
                     "'{}' doesn't match MDA_MAGIC",
                     String::from_utf8_lossy(&hdr[4..20])
                 ),
-            ));
+            )));
         }
 
         let ver = LittleEndian::read_u32(&hdr[20..24]);
         if ver != 1 {
-            return Err(Error::new(Other, "Bad version, expected 1"));
+            return Err(Error::Io(io::Error::new(Other, "Bad version, expected 1")));
         }
 
         let start = LittleEndian::read_u64(&hdr[24..32]);
         if start != area.offset {
-            return Err(Error::new(
+            return Err(Error::Io(io::Error::new(
                 Other,
                 format!(
                     "mdah start {} does not equal pvarea start {}",
                     start, area.offset
                 ),
-            ));
+            )));
         }
 
         let size = LittleEndian::read_u64(&hdr[32..40]);
         if size != area.size {
-            return Err(Error::new(
+            return Err(Error::Io(io::Error::new(
                 Other,
                 format!(
                     "mdah size {} does not equal pvarea size {}",
                     size, area.size
                 ),
-            ));
+            )));
         }
 
         Ok(iter_raw_locn(&hdr[40..]).next())
@@ -455,7 +462,8 @@ impl PvHeader {
         LittleEndian::write_u32(&mut hdr[..4], csum);
 
         file.seek(SeekFrom::Start(area.offset))?;
-        file.write_all(&hdr)
+        file.write_all(&hdr)?;
+        Ok(())
     }
 
     /// Read the metadata contained in the metadata area.
@@ -486,13 +494,16 @@ impl PvHeader {
             }
 
             if rl.checksum != crc32_calc(&text) {
-                return Err(Error::new(Other, "MDA text checksum failure"));
+                return Err(Error::Io(io::Error::new(
+                    Other,
+                    "MDA text checksum failure",
+                )));
             }
 
             return buf_to_textmap(&text);
         }
 
-        return Err(Error::new(Other, "No valid metadata found"));
+        return Err(Error::Io(io::Error::new(Other, "No valid metadata found")));
     }
 
     /// Write the given metadata to all active metadata areas in the PV.
@@ -596,7 +607,7 @@ fn to_textmap(pvh: &PvHeader) -> LvmTextMap {
     pvmeta
 }
 
-/// Scan a list of directories for block devices containing MLV PV labels.
+/// Scan a list of directories for block devices containing LVM PV labels.
 pub fn pvheader_scan(dirs: &[&Path]) -> Result<Vec<PathBuf>> {
     let mut ret_vec = Vec::new();
 

@@ -6,27 +6,28 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::io::Error;
+use std::io;
 use std::io::ErrorKind::Other;
-use std::io::Result;
 use std::path::Path;
 use std::str::FromStr;
 
+use devicemapper::{
+    DevId, Device, DmFlags, DmName, DmOptions, LinearDev, LinearDevTargetParams,
+    LinearTargetParams, Sectors, TargetLine, DM,
+};
 use nix::sys::utsname::uname;
 use time::now;
 
-use dm;
-use dm::DM;
-use lv;
-use lv::segment;
-use lv::LV;
-use metad;
-use parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
-use pv;
-use pv::PV;
-use pvlabel::{PvHeader, SECTOR_SIZE};
-use util::{align_to, make_uuid};
-use Device;
+use crate::lv;
+use crate::lv::segment;
+use crate::lv::LV;
+use crate::metad;
+use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
+use crate::pv;
+use crate::pv::PV;
+use crate::pvlabel::{PvHeader, SECTOR_SIZE};
+use crate::util::{align_to, make_uuid};
+use crate::{Error, Result};
 
 const DEFAULT_EXTENT_SIZE: u64 = 8192; // 4MiB
 const DEFAULT_THINPOOL_CHUNK_SIZE: u64 = 128; // 64KiB
@@ -65,7 +66,10 @@ impl VG {
     /// Create a Volume Group from one or more PVs.
     pub fn create(name: &str, pv_paths: Vec<&Path>) -> Result<VG> {
         if pv_paths.len() == 0 {
-            return Err(Error::new(Other, "One or more paths to PVs required"));
+            return Err(Error::Io(io::Error::new(
+                Other,
+                "One or more paths to PVs required",
+            )));
         }
 
         let pvhs = {
@@ -78,10 +82,10 @@ impl VG {
 
         let metadata_areas = pvhs.iter().map(|x| x.metadata_areas.len()).sum::<usize>();
         if metadata_areas == 0 {
-            return Err(Error::new(
+            return Err(Error::Io(io::Error::new(
                 Other,
                 "PVs must have at least one metadata area",
-            ));
+            )));
         }
 
         let mut vg = VG {
@@ -116,15 +120,15 @@ impl VG {
 
         // Check pv is not on an LV from the vg:
         // 1) is pv's major a devicemapper major?
-        // 2) Walk dm deps (equiv. of MLV2 dev_manager_device_uses_vg)
-        let dm_majors = dm::dev_majors();
+        // 2) Walk dm deps (equiv. of LVM2 dev_manager_device_uses_vg)
         let dev = Device::from_str(&path.to_string_lossy())?;
-        if dm_majors.contains(&dev.major) {
-            let dm = DM::new()?;
-            if dm.depends_on(dev, &dm_majors) {
-                return Err(Error::new(Other, "Dependency loops prohibited"));
-            }
-        }
+        // let dm_majors = dm::dev_majors();
+        // if dm_majors.contains(&dev.major) {
+        //     let dm = DM::new()?;
+        //     if dm.depends_on(dev, &dm_majors) {
+        //         return Err(Error::new(Other, "Dependency loops prohibited"));
+        //     }
+        // }
 
         // check pv is not already in the VG or another VG
         // Does it have text metadata??
@@ -142,13 +146,16 @@ impl VG {
                 }
             }
 
-            return Err(Error::new(Other, format!("PV already in VG {}", vg_name)));
+            return Err(Error::Io(io::Error::new(
+                Other,
+                format!("PV already in VG {}", vg_name),
+            )));
         }
 
-        let da = pvh
-            .data_areas
-            .get(0)
-            .ok_or(Error::new(Other, "Could not find data area in PV"))?;
+        let da = pvh.data_areas.get(0).ok_or(Error::Io(io::Error::new(
+            Other,
+            "Could not find data area in PV",
+        )))?;
 
         // figure out how many extents fit in the PV's data area
         // pe_start aligned to extent size
@@ -166,7 +173,7 @@ impl VG {
 
         // if added PV had no MDAs then we could get this far and then fail
         if self.pvs.contains_key(&dev) {
-            Err(Error::new(Other, "PV already in VG"))
+            Err(Error::Io(io::Error::new(Other, "PV already in VG")))
         } else {
             self.pvs.insert(
                 dev,
@@ -193,7 +200,10 @@ impl VG {
             for seg in &lv.segments {
                 for seg_dev in seg.pv_dependencies() {
                     if seg_dev == dev {
-                        return Err(Error::new(Other, format!("PV in use by LV {}", lvname)));
+                        return Err(Error::Io(io::Error::new(
+                            Other,
+                            format!("PV in use by LV {}", lvname),
+                        )));
                     }
                 }
             }
@@ -201,7 +211,7 @@ impl VG {
 
         self.pvs
             .remove(&dev)
-            .ok_or(Error::new(Other, "Could not remove PV"))?;
+            .ok_or(Error::Io(io::Error::new(Other, "Could not remove PV")))?;
 
         self.commit()
     }
@@ -209,23 +219,27 @@ impl VG {
     /// Create a new linear logical volume in the volume group.
     pub fn lv_create_linear(&mut self, name: &str, extent_size: u64) -> Result<()> {
         if self.lvs.contains_key(name) {
-            return Err(Error::new(Other, "LV already exists"));
+            return Err(Error::Io(io::Error::new(Other, "LV already exists")));
         }
 
-        let mut contig_area = None;
-        for (dev, areas) in self.free_areas() {
-            for (start, len) in areas {
-                if len >= extent_size {
-                    contig_area = Some((dev, start));
-                    break;
+        let (dev, area_start, len) = {
+            let mut contig_area = None;
+            for (dev, areas) in self.free_areas() {
+                for (start, len) in areas {
+                    if len >= extent_size {
+                        contig_area = Some((dev, start, len));
+                        break;
+                    }
                 }
             }
-        }
-
-        // we don't support multiple segments yet
-        let (dev, area_start) = match contig_area {
-            None => return Err(Error::new(Other, "no contiguous area for new LV")),
-            Some(x) => x,
+            if contig_area.is_none() {
+                return Err(Error::Io(io::Error::new(
+                    Other,
+                    "no contiguous area for new LV",
+                )));
+            } else {
+                contig_area.unwrap()
+            }
         };
 
         let segment = Box::new(segment::StripedSegment {
@@ -234,6 +248,13 @@ impl VG {
             stripes: vec![(dev, area_start)],
             stripe_size: None,
         });
+
+        let params = LinearTargetParams::new(Device::from(u64::from(dev)), Sectors(area_start));
+        let table = vec![TargetLine::new(
+            Sectors(0),
+            Sectors(len),
+            LinearDevTargetParams::Linear(params),
+        )];
 
         let mut lv = LV {
             name: name.to_string(),
@@ -250,9 +271,23 @@ impl VG {
             device: None,
         };
 
+        let lv_name = format!(
+            "{}-{}",
+            self.name.replace("-", "--"),
+            lv.name.replace("-", "--")
+        );
+
         // poke dm and tell it about a new device
         let dm = DM::new()?;
-        dm.activate_device(self, &mut lv)?;
+        let new_linear = {
+            LinearDev::setup(
+                &dm,
+                DmName::new(&lv_name).expect("valid format"),
+                None,
+                table,
+            )
+            .unwrap()
+        };
 
         self.lvs.insert(name.to_string(), lv);
 
@@ -279,10 +314,10 @@ impl VG {
             let meta_lv = self
                 .lvs
                 .get_mut(thin_meta)
-                .ok_or(Error::new(Other, "Meta LV not found"))?;
+                .ok_or(Error::Io(io::Error::new(Other, "Meta LV not found")))?;
             let new_name = format!("{}_tmeta", name);
 
-            dm.rename_device(&self.name, &meta_lv, &new_name)?;
+            dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
             meta_lv.name = new_name;
             meta_lv.used_extents()
         };
@@ -290,9 +325,9 @@ impl VG {
             let data_lv = self
                 .lvs
                 .get(thin_data)
-                .ok_or(Error::new(Other, "Data LV not found"))?;
+                .ok_or(Error::Io(io::Error::new(Other, "Data LV not found")))?;
             let new_name = format!("{}_tdata", name);
-            dm.rename_device(&self.name, &data_lv, &new_name)?;
+            dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
         }
         // TODO: create spare metadata volume
 
@@ -324,7 +359,8 @@ impl VG {
 
         // poke dm and tell it about a new device
         let dm = DM::new()?;
-        dm.activate_device(self, &mut lv)?;
+        // TODO: This is broken!!!!!!!!
+        dm.device_suspend(&DevId::Name(DmName::new(name)?), &DmOptions::new())?;
 
         self.lvs.insert(name.to_string(), lv);
 
@@ -334,10 +370,15 @@ impl VG {
     /// Destroy a logical volume.
     pub fn lv_remove(&mut self, name: &str) -> Result<()> {
         match self.lvs.remove(name) {
-            None => Err(Error::new(Other, "LV not found in VG")),
-            Some(mut lv) => {
+            None => Err(Error::Io(io::Error::new(Other, "LV not found in VG"))),
+            Some(lv) => {
                 let dm = DM::new()?;
-                dm.deactivate_device(self, &mut lv)?;
+                let name = DmName::new(&lv.name)?;
+                dm.device_suspend(
+                    &DevId::Name(name),
+                    &DmOptions::new().set_flags(DmFlags::DM_SUSPEND),
+                )?;
+                dm.device_remove(&DevId::Name(name), &DmOptions::new())?;
 
                 self.commit()
             }
@@ -383,7 +424,7 @@ impl VG {
 
         // TODO: atomicity of updating pvs, metad, dm
         for pv in self.pvs.values() {
-            if let Some(path) = pv.device.path() {
+            if let Some(path) = pv.path() {
                 let mut pvheader = PvHeader::find_in_dev(&path).expect("could not find pvheader");
 
                 pvheader.write_metadata(&disk_map)?;
@@ -575,7 +616,7 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
 
 /// Construct a `VG` from its name and an `LvmTextMap`.
 pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
-    let err = || Error::new(Other, "vg textmap parsing error");
+    let err = || Error::Io(io::Error::new(Other, "vg textmap parsing error"));
 
     let id = map.string_from_textmap("id").ok_or(err())?;
     let seqno = map.i64_from_textmap("seqno").ok_or(err())?;
@@ -619,7 +660,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
                     &Entry::TextMap(ref pv_dict) => {
                         ret_map.insert(key.to_string(), pv::from_textmap(pv_dict)?);
                     }
-                    _ => return Err(Error::new(Other, "expected PV textmap")),
+                    _ => return Err(Error::Io(io::Error::new(Other, "expected PV textmap"))),
                 };
             }
 
@@ -637,7 +678,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
                         ret_map
                             .insert(key.to_string(), lv::from_textmap(key, lv_dict, &str_to_pv)?);
                     }
-                    _ => return Err(Error::new(Other, "expected LV textmap")),
+                    _ => return Err(Error::Io(io::Error::new(Other, "expected LV textmap"))),
                 }
             }
 
@@ -666,12 +707,17 @@ pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
         lvs: lvs,
     };
 
+    // let dm_devices = {
+    //     let dm = DM::new()?;
+    //     dm.list_devices(&vg)?
+    // };
     let dm_devices = {
         let dm = DM::new()?;
-        dm.list_devices(&vg)?
+        dm.list_devices()?
     };
 
-    for (lvname, dev) in dm_devices {
+    for (lvname, dev, _) in dm_devices {
+        let lvname = String::from_utf8_lossy(lvname.as_bytes()).into_owned();
         if let Some(lv) = vg.lvs.get_mut(&lvname) {
             lv.device = Some(dev.into());
         }

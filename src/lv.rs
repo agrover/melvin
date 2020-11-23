@@ -5,13 +5,14 @@
 //! Logical Volumes
 
 use std::collections::BTreeMap;
-use std::io::Error;
+use std::io;
 use std::io::ErrorKind::Other;
-use std::io::Result;
 
-use parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
-use Device;
-use PV;
+use devicemapper::Device;
+
+use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
+use crate::PV;
+use crate::{Error, Result};
 
 /// A Logical Volume that is created from a Volume Group.
 #[derive(Debug)]
@@ -57,7 +58,7 @@ pub fn used_areas(lv: &LV) -> Vec<(Device, u64, u64)> {
 
 /// Construct an LV from an LvmTextMap.
 pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<LV> {
-    let err = || Error::new(Other, "lv textmap parsing error");
+    let err = || Error::Io(io::Error::new(Other, "lv textmap parsing error"));
 
     let id = map.string_from_textmap("id").ok_or(err())?;
     let creation_host = map.string_from_textmap("creation_host").ok_or(err())?;
@@ -65,10 +66,10 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
     let segment_count = map.i64_from_textmap("segment_count").ok_or(err())?;
 
     let segments: Vec<_> = (0..segment_count)
-        .map(|num| {
+        .filter_map(|num| {
             let name = format!("segment{}", num + 1);
-            let seg_dict = map.textmap_from_textmap(&name).ok_or(err())?;
-            segment::from_textmap(seg_dict, pvs)
+            map.textmap_from_textmap(&name)
+                .map(|seg_dict| segment::from_textmap(seg_dict, pvs))
         })
         .filter_map(|seg| seg.ok())
         .collect();
@@ -147,10 +148,11 @@ pub mod segment {
     use std::io::ErrorKind::Other;
     use std::io::Result;
 
-    use parser::{Entry, LvmTextMap, TextMapOps};
-    use Device;
-    use PV;
-    use VG;
+    use devicemapper::Device;
+
+    use crate::parser::{Entry, LvmTextMap, TextMapOps};
+    use crate::PV;
+    use crate::VG;
 
     /// Used to treat segment types polymorphically
     pub trait Segment: fmt::Debug {
@@ -201,9 +203,9 @@ pub mod segment {
 
             let stripe_list = map.list_from_textmap("stripes").ok_or(err())?;
 
-            let mut stripes: Vec<_> = Vec::new();
+            let mut stripes = Vec::new();
             for slc in stripe_list.chunks(2) {
-                let name = match &slc[0] {
+                let dev = match &slc[0] {
                     &Entry::String(ref x) => {
                         let pv = pvs.get(x).ok_or(err())?;
                         pv.device
@@ -214,7 +216,7 @@ pub mod segment {
                     Entry::Number(x) => x,
                     _ => return Err(err()),
                 };
-                stripes.push((name, val as u64));
+                stripes.push((dev, val as u64));
             }
 
             Ok(Box::new(StripedSegment {

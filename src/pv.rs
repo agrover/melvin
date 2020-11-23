@@ -4,98 +4,36 @@
 
 //! Physical Volumes
 
-use std::io::Error;
+use std::fs::File;
+use std::io;
 use std::io::ErrorKind::Other;
-use std::io::Result;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
-use parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
+use devicemapper::Device;
 
-pub mod dev {
-    use std::fs::File;
-    use std::io::Error;
-    use std::io::ErrorKind::Other;
-    use std::io::Result;
-    use std::io::{BufRead, BufReader};
-    use std::os::unix::fs::MetadataExt;
-    use std::path::{Path, PathBuf};
-    use std::str::FromStr;
+use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
+use crate::{Error, Result};
 
-    use parser::{Entry, LvmTextMap};
+pub fn dev_from_textmap(map: &LvmTextMap) -> Result<Device> {
+    let entry = map
+        .get("device")
+        .ok_or_else(|| Error::Io(io::Error::new(Other, "device textmap parsing error")))?;
 
-    /// A struct containing the device's major and minor numbers
-    ///
-    /// Also allows conversion to/from a single 64bit value.
-    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-    pub struct Device {
-        /// Device major number
-        pub major: u32,
-        /// Device minor number
-        pub minor: u8,
-    }
-
-    impl Device {
-        /// Returns the path in `/dev` that corresponds with the device number
-        pub fn path(&self) -> Option<PathBuf> {
-            let f = File::open("/proc/partitions")
-                .ok()
-                .expect("Could not open /proc/partitions");
-
-            let reader = BufReader::new(f);
-
-            for line in reader.lines().skip(2) {
-                if let Ok(line) = line {
-                    let spl: Vec<_> = line.split_whitespace().collect();
-
-                    if spl[0].parse::<u32>().unwrap() == self.major
-                        && spl[1].parse::<u8>().unwrap() == self.minor
-                    {
-                        return Some(PathBuf::from(format!("/dev/{}", spl[3])));
-                    }
-                }
-            }
-            None
+    let val = match entry {
+        &Entry::String(ref s) => s
+            .parse::<i64>()
+            .map_err(|_| Error::Io(io::Error::new(Other, "device textmap parsing error")))?,
+        &Entry::Number(x) => x,
+        _ => {
+            return Err(Error::Io(io::Error::new(
+                Other,
+                "device textmap parsing error",
+            )))
         }
-    }
+    };
 
-    impl FromStr for Device {
-        type Err = Error;
-        fn from_str(s: &str) -> Result<Device> {
-            match s.parse::<i64>() {
-                Ok(x) => Ok(Device::from(x as u64)),
-                Err(_) => match Path::new(s).metadata() {
-                    Ok(x) => Ok(Device::from(x.rdev())),
-                    Err(x) => Err(x),
-                },
-            }
-        }
-    }
-
-    impl From<u64> for Device {
-        fn from(val: u64) -> Device {
-            Device {
-                major: (val >> 8) as u32,
-                minor: (val & 0xff) as u8,
-            }
-        }
-    }
-
-    impl From<Device> for u64 {
-        fn from(dev: Device) -> u64 {
-            ((dev.major << 8) ^ (dev.minor as u32 & 0xff)) as u64
-        }
-    }
-
-    /// Device may be a number or a path. Convert either into a Device.
-    pub fn from_textmap(map: &LvmTextMap) -> Result<Device> {
-        match map.get("device") {
-            Some(&Entry::String(ref x)) => match Device::from_str(x) {
-                Ok(x) => Ok(x),
-                Err(_) => Err(Error::new(Other, "could not parse string")),
-            },
-            Some(&Entry::Number(x)) => Ok(Device::from(x as u64)),
-            _ => Err(Error::new(Other, "device textmap parsing error")),
-        }
-    }
+    Ok(Device::from(val as u64))
 }
 
 /// A Physical Volume that is part of a Volume Group.
@@ -104,7 +42,7 @@ pub struct PV {
     /// Its UUID
     pub id: String,
     /// Device number for the block device the PV is on
-    pub device: dev::Device,
+    pub device: Device,
     /// Status
     pub status: Vec<String>,
     /// Flags
@@ -117,12 +55,35 @@ pub struct PV {
     pub pe_count: u64,
 }
 
+impl PV {
+    pub fn path(&self) -> Option<PathBuf> {
+        let f = File::open("/proc/partitions")
+            .ok()
+            .expect("Could not open /proc/partitions");
+
+        let reader = BufReader::new(f);
+
+        for line in reader.lines().skip(2) {
+            if let Ok(line) = line {
+                let spl: Vec<_> = line.split_whitespace().collect();
+
+                if spl[0].parse::<u32>().unwrap() == self.device.major
+                    && spl[1].parse::<u32>().unwrap() == self.device.minor
+                {
+                    return Some(PathBuf::from(format!("/dev/{}", spl[3])));
+                }
+            }
+        }
+        None
+    }
+}
+
 /// Construct a PV from an LvmTextMap.
 pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
-    let err = || Error::new(Other, "pv textmap parsing error");
+    let err = || Error::Io(io::Error::new(Other, "pv textmap parsing error"));
 
     let id = map.string_from_textmap("id").ok_or(err())?;
-    let device = dev::from_textmap(map)?;
+    let device = dev_from_textmap(map)?;
     let dev_size = map.i64_from_textmap("dev_size").ok_or(err())?;
     let pe_start = map.i64_from_textmap("pe_start").ok_or(err())?;
     let pe_count = map.i64_from_textmap("pe_count").ok_or(err())?;

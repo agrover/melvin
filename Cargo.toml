@@ -9,6 +9,7 @@ repository = "https://github.com/agrover/melvin"
 readme = "README.md"
 keywords = ["Linux", "volume", "management", "storage"]
 license = "MPL-2.0"
+edition = "2018"
 
 [[bin]]
 name = "mlv"

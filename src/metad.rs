@@ -6,15 +6,16 @@
 
 use unix_socket::UnixStream;
 
-use std::io::Error;
+use std::io;
 use std::io::ErrorKind::Other;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
-use parser::{buf_to_textmap, textmap_to_buf, LvmTextMap, TextMapOps};
-use vg;
+use crate::parser::{buf_to_textmap, textmap_to_buf, LvmTextMap, TextMapOps};
+use crate::vg;
+use crate::{Error, Result};
 use vg::VG;
 
-const MLVMETAD_PATH: &'static str = "/run/lvm/mlvmetad.socket";
+const LVMETAD_PATH: &'static str = "/run/lvm/lvmetad.socket";
 
 fn collect_response(stream: &mut UnixStream) -> Result<Vec<u8>> {
     let mut response = [0; 32];
@@ -66,10 +67,10 @@ fn _request(
 
 /// Make a request to the running lvmetad daemon.
 pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
-    let err = || Error::new(Other, "response parsing error");
+    let err = || Error::Io(io::Error::new(Other, "response parsing error"));
     let token = b"0";
 
-    let mut stream = UnixStream::connect(MLVMETAD_PATH)?;
+    let mut stream = UnixStream::connect(LVMETAD_PATH)?;
 
     let txt = _request(req, Some(token), &mut stream, &args)?;
     let mut response = buf_to_textmap(&txt)?;
@@ -81,7 +82,10 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
     }
 
     if response.get("global_invalid").is_some() || response.get("vg_invalid").is_some() {
-        return Err(Error::new(Other, "cached metadata flagged as invalid"));
+        return Err(Error::Io(io::Error::new(
+            Other,
+            "cached metadata flagged as invalid",
+        )));
     }
 
     if response.string_from_textmap("response").ok_or(err())? != "OK" {
@@ -89,7 +93,7 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
             Some(x) => x,
             None => "no reason given",
         };
-        return Err(Error::new(Other, reason));
+        return Err(Error::Io(io::Error::new(Other, reason)));
     }
 
     response.remove("response");
@@ -107,7 +111,7 @@ pub fn request(req: &[u8], args: Option<Vec<&[u8]>>) -> Result<LvmTextMap> {
 ///    let vgs = vg_list();
 /// ```
 pub fn vg_list() -> Result<Vec<VG>> {
-    let err = || Error::new(Other, "response parsing error");
+    let err = || Error::Io(io::Error::new(Other, "response parsing error"));
     let mut v = Vec::new();
 
     let vg_list = request(b"vg_list", None)?;

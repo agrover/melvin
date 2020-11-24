@@ -8,10 +8,10 @@ extern crate melvin;
 
 use std::io::{self, ErrorKind::Other};
 use std::path;
-use std::path::Path;
+//use std::path::Path;
 
 use melvin::parser;
-use melvin::{pvheader_scan, PvHeader, VG};
+use melvin::{pvheader_scan, PvHeader};
 use melvin::{Error, Result};
 
 fn print_pvheaders() -> Result<()> {
@@ -19,6 +19,7 @@ fn print_pvheaders() -> Result<()> {
 
     for pvheader in pvheader_scan(&dirs)? {
         println!("pvheader {:#?}", pvheader);
+        println!("Hdr {:#?}", PvHeader::find_in_dev(&pvheader)?);
     }
 
     Ok(())
@@ -56,25 +57,21 @@ fn get_conf() -> Result<parser::LvmTextMap> {
     parser::buf_to_textmap(&buf)
 }
 
-fn main() {
+fn main() -> Result<()> {
     // println!("{:?}", PvHeader::initialize(Path::new("/dev/vdc1")));
-    // print_pvheaders();
-    // let (name, map) = get_first_vg_meta().unwrap();
-    // let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
-    // let mut vgs = lvmetad::vg_list().expect("could not get vgs from lvmetad");
-    // let mut vg = vgs.pop().expect("no vgs in vgs");
+    print_pvheaders()?;
+    let (name, map) = get_first_vg_meta().unwrap();
+    println!("name {} map {:#?}", name, map);
+    //    let vg = parser::vg_from_textmap(&name, &map).expect("didn't get vg!");
 
-    let path1 = Path::new("/dev/vdc1");
-    let path2 = Path::new("/dev/vdc2");
+    // let path1 = Path::new("/dev/vdc1");
+    // let path2 = Path::new("/dev/vdc2");
 
     //    let pvh1 = PvHeader::find_in_dev(Path::new("/dev/vdc1")).expect("pvheader not found");
 
-    let _vg = VG::create("vg-dopey", vec![path1, path2]).expect("vgcreate failed yo");
+    // let _vg = VG::create("vg-dopey", vec![path1, path2]).expect("vgcreate failed yo");
     // vg.add_pv(&pvh1).unwrap();
     // vg.add_pv(&pvh2).unwrap();
-
-    // let mut vgs = lvmetad::vgs_from_lvmetad().expect("could not get vgs from lvmetad");
-    // let mut vg = vgs.pop().expect("no vgs in vgs");
 
     // match vg.new_linear_lv("grover125", 2021) {
     //     Ok(_) => {},
@@ -104,4 +101,5 @@ fn main() {
 
     // let vgtm = vg.into();
     // let s = parser::textmap_to_buf(&vgtm);
+    Ok(())
 }

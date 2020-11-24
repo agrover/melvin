@@ -113,6 +113,120 @@ impl VG {
         Ok(vg)
     }
 
+    /// Construct a `VG` from its name and an `LvmTextMap`.
+    pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
+        let err = || Error::Io(io::Error::new(Other, "vg textmap parsing error"));
+
+        let id = map.string_from_textmap("id").ok_or(err())?;
+        let seqno = map.i64_from_textmap("seqno").ok_or(err())?;
+        let format = map.string_from_textmap("format").ok_or(err())?;
+        let extent_size = map.i64_from_textmap("extent_size").ok_or(err())?;
+        let max_lv = map.i64_from_textmap("max_lv").ok_or(err())?;
+        let max_pv = map.i64_from_textmap("max_pv").ok_or(err())?;
+        let metadata_copies = map.i64_from_textmap("metadata_copies").ok_or(err())?;
+
+        let status = status_from_textmap(map)?;
+
+        let flags: Vec<_> = map
+            .list_from_textmap("flags")
+            .ok_or(err())?
+            .iter()
+            .filter_map(|item| match item {
+                &Entry::String(ref x) => Some(x.clone()),
+                _ => None,
+            })
+            .collect();
+
+        // While the textmap uses "pv0"-style names to link physical
+        // volume definitions with LV segment stripes, we do not want to
+        // use these internally, because what if "pv0" is unused and is
+        // removed from the VG? When writing out metadata, the remaining
+        // PV should then be labeled "pv0".
+        //
+        // Instead, we index PVs by Device, but only after letting
+        // segment::from_textmap() (via lv::from_textmap) use the
+        // str_to_pv map to translate its "pv0" references to Devices as
+        // well.
+        //
+        let str_to_pv = map
+            .textmap_from_textmap("physical_volumes")
+            .ok_or(err())
+            .and_then(|tm| {
+                let mut ret_map = BTreeMap::new();
+
+                for (key, value) in tm {
+                    match value {
+                        &Entry::TextMap(ref pv_dict) => {
+                            ret_map.insert(key.to_string(), pv::from_textmap(pv_dict)?);
+                        }
+                        _ => return Err(Error::Io(io::Error::new(Other, "expected PV textmap"))),
+                    };
+                }
+
+                Ok(ret_map)
+            })?;
+
+        // "logical_volumes" may be absent
+        let lvs = match map.textmap_from_textmap("logical_volumes") {
+            Some(tm) => {
+                let mut ret_map = BTreeMap::new();
+
+                for (key, value) in tm {
+                    match value {
+                        &Entry::TextMap(ref lv_dict) => {
+                            ret_map.insert(
+                                key.to_string(),
+                                lv::from_textmap(key, lv_dict, &str_to_pv)?,
+                            );
+                        }
+                        _ => return Err(Error::Io(io::Error::new(Other, "expected LV textmap"))),
+                    }
+                }
+
+                ret_map
+            }
+            None => BTreeMap::new(),
+        };
+
+        let pvs = str_to_pv
+            .into_iter()
+            .map(|(_, pv)| (pv.device, pv))
+            .collect();
+
+        let mut vg = VG {
+            name: name.to_string(),
+            id: id.to_string(),
+            seqno: seqno as u64,
+            format: format.to_string(),
+            status: status,
+            flags: flags,
+            extent_size: extent_size as u64,
+            max_lv: max_lv as u64,
+            max_pv: max_pv as u64,
+            metadata_copies: metadata_copies as u64,
+            pvs: pvs,
+            lvs: lvs,
+        };
+
+        // let dm_devices = {
+        //     let dm = DM::new()?;
+        //     dm.list_devices(&vg)?
+        // };
+        let dm_devices = {
+            let dm = DM::new()?;
+            dm.list_devices()?
+        };
+
+        for (lvname, dev, _) in dm_devices {
+            let lvname = String::from_utf8_lossy(lvname.as_bytes()).into_owned();
+            if let Some(lv) = vg.lvs.get_mut(&lvname) {
+                lv.device = Some(dev.into());
+            }
+        }
+
+        Ok(vg)
+    }
+
     /// Add a non-affiliated PV to this VG.
     pub fn pv_add(&mut self, path: &Path) -> Result<()> {
         let pvh = PvHeader::find_in_dev(path)?;
@@ -255,7 +369,7 @@ impl VG {
             LinearDevTargetParams::Linear(params),
         )];
 
-        let mut lv = LV {
+        let lv = LV {
             name: name.to_string(),
             id: make_uuid(),
             status: vec![
@@ -278,7 +392,7 @@ impl VG {
 
         // poke dm and tell it about a new device
         let dm = DM::new()?;
-        let new_linear = {
+        let _new_linear = {
             LinearDev::setup(
                 &dm,
                 DmName::new(&lv_name).expect("valid format"),
@@ -321,7 +435,7 @@ impl VG {
             meta_lv.used_extents()
         };
         {
-            let data_lv = self
+            let _data_lv = self
                 .lvs
                 .get(thin_data)
                 .ok_or(Error::Io(io::Error::new(Other, "Data LV not found")))?;
@@ -341,7 +455,7 @@ impl VG {
             zero_new_blocks: true,
         });
 
-        let mut lv = LV {
+        let lv = LV {
             name: name.to_string(),
             id: make_uuid(),
             status: vec![
@@ -611,116 +725,4 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
     }
 
     map
-}
-
-/// Construct a `VG` from its name and an `LvmTextMap`.
-pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
-    let err = || Error::Io(io::Error::new(Other, "vg textmap parsing error"));
-
-    let id = map.string_from_textmap("id").ok_or(err())?;
-    let seqno = map.i64_from_textmap("seqno").ok_or(err())?;
-    let format = map.string_from_textmap("format").ok_or(err())?;
-    let extent_size = map.i64_from_textmap("extent_size").ok_or(err())?;
-    let max_lv = map.i64_from_textmap("max_lv").ok_or(err())?;
-    let max_pv = map.i64_from_textmap("max_pv").ok_or(err())?;
-    let metadata_copies = map.i64_from_textmap("metadata_copies").ok_or(err())?;
-
-    let status = status_from_textmap(map)?;
-
-    let flags: Vec<_> = map
-        .list_from_textmap("flags")
-        .ok_or(err())?
-        .iter()
-        .filter_map(|item| match item {
-            &Entry::String(ref x) => Some(x.clone()),
-            _ => None,
-        })
-        .collect();
-
-    // While the textmap uses "pv0"-style names to link physical
-    // volume definitions with LV segment stripes, we do not want to
-    // use these internally, because what if "pv0" is unused and is
-    // removed from the VG? When writing out metadata, the remaining
-    // PV should then be labeled "pv0".
-    //
-    // Instead, we index PVs by Device, but only after letting
-    // segment::from_textmap() (via lv::from_textmap) use the
-    // str_to_pv map to translate its "pv0" references to Devices as
-    // well.
-    //
-    let str_to_pv = map
-        .textmap_from_textmap("physical_volumes")
-        .ok_or(err())
-        .and_then(|tm| {
-            let mut ret_map = BTreeMap::new();
-
-            for (key, value) in tm {
-                match value {
-                    &Entry::TextMap(ref pv_dict) => {
-                        ret_map.insert(key.to_string(), pv::from_textmap(pv_dict)?);
-                    }
-                    _ => return Err(Error::Io(io::Error::new(Other, "expected PV textmap"))),
-                };
-            }
-
-            Ok(ret_map)
-        })?;
-
-    // "logical_volumes" may be absent
-    let lvs = match map.textmap_from_textmap("logical_volumes") {
-        Some(tm) => {
-            let mut ret_map = BTreeMap::new();
-
-            for (key, value) in tm {
-                match value {
-                    &Entry::TextMap(ref lv_dict) => {
-                        ret_map
-                            .insert(key.to_string(), lv::from_textmap(key, lv_dict, &str_to_pv)?);
-                    }
-                    _ => return Err(Error::Io(io::Error::new(Other, "expected LV textmap"))),
-                }
-            }
-
-            ret_map
-        }
-        None => BTreeMap::new(),
-    };
-
-    let pvs = str_to_pv
-        .into_iter()
-        .map(|(_, pv)| (pv.device, pv))
-        .collect();
-
-    let mut vg = VG {
-        name: name.to_string(),
-        id: id.to_string(),
-        seqno: seqno as u64,
-        format: format.to_string(),
-        status: status,
-        flags: flags,
-        extent_size: extent_size as u64,
-        max_lv: max_lv as u64,
-        max_pv: max_pv as u64,
-        metadata_copies: metadata_copies as u64,
-        pvs: pvs,
-        lvs: lvs,
-    };
-
-    // let dm_devices = {
-    //     let dm = DM::new()?;
-    //     dm.list_devices(&vg)?
-    // };
-    let dm_devices = {
-        let dm = DM::new()?;
-        dm.list_devices()?
-    };
-
-    for (lvname, dev, _) in dm_devices {
-        let lvname = String::from_utf8_lossy(lvname.as_bytes()).into_owned();
-        if let Some(lv) = vg.lvs.get_mut(&lvname) {
-            lv.device = Some(dev.into());
-        }
-    }
-
-    Ok(vg)
 }

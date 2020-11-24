@@ -25,13 +25,11 @@ use std::io::ErrorKind::Other;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use byteorder::{ByteOrder, LittleEndian};
-use devicemapper::Device;
 use nix::sys::{ioctl, stat};
 
-use crate::parser::{buf_to_textmap, textmap_to_buf, Entry, LvmTextMap};
+use crate::parser::{buf_to_textmap, textmap_to_buf, LvmTextMap};
 use crate::util::{align_to, crc32_calc, hyphenate_uuid, make_uuid};
 use crate::{Error, Result};
 
@@ -565,43 +563,6 @@ impl PvHeader {
 
         Ok(())
     }
-}
-
-fn to_textmap(pvh: &PvHeader) -> LvmTextMap {
-    let dev = Device::from_str(&pvh.dev_path.to_string_lossy()).unwrap();
-    let devno: u64 = dev.into();
-
-    let mut pvmeta = LvmTextMap::new();
-    pvmeta.insert("device".to_string(), Entry::Number(devno as i64));
-    pvmeta.insert("dev_size".to_string(), Entry::Number(pvh.size as i64));
-    pvmeta.insert("format".to_string(), Entry::String("lvm2".to_string()));
-    pvmeta.insert(
-        "label_sector".to_string(),
-        Entry::Number(LABEL_SECTOR as i64),
-    );
-    pvmeta.insert("id".to_string(), Entry::String(pvh.uuid.clone()));
-
-    let mut da0 = Box::new(LvmTextMap::new());
-    da0.insert(
-        "offset".to_string(),
-        Entry::Number(pvh.data_areas[0].offset as i64),
-    );
-    da0.insert(
-        "size".to_string(),
-        Entry::Number(pvh.data_areas[0].size as i64),
-    );
-    pvmeta.insert("da0".to_string(), Entry::TextMap(da0));
-
-    for (num, pvarea) in pvh.metadata_areas.iter().enumerate() {
-        let mut mda = Box::new(LvmTextMap::new());
-        mda.insert("offset".to_string(), Entry::Number(pvarea.offset as i64));
-        mda.insert("size".to_string(), Entry::Number(pvarea.size as i64));
-        mda.insert("ignore".to_string(), Entry::Number(0i64));
-        mda.insert("free_sectors".to_string(), Entry::Number(0i64));
-        pvmeta.insert(format!("mda{}", num), Entry::TextMap(mda));
-    }
-
-    pvmeta
 }
 
 /// Scan a list of directories for block devices containing LVM PV labels.

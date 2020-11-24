@@ -427,7 +427,7 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
 /// Generate an `LvmTextMap` from a textual LVM configuration string.
 ///
 /// LVM uses the same configuration file format for it's on-disk metadata,
-/// as well as for lvmetad, and the lvm.conf configuration file.
+/// as well as for the lvm.conf configuration file.
 pub fn buf_to_textmap(buf: &[u8]) -> Result<LvmTextMap> {
     let mut tokens: Vec<Token> = Vec::new();
 

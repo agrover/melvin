@@ -100,11 +100,6 @@ pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
         })
         .collect();
 
-    // If textmap came from lvmetad, it may also include sections
-    // for data area (da0) and metadata area (mda0). These are not
-    // in the on-disk text metadata, but in the binary PV header.
-    // Don't know if we need them, omitting for now.
-
     Ok(PV {
         id: id.to_string(),
         device: device,

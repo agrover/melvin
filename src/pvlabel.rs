@@ -31,7 +31,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use devicemapper::Device;
 use nix::sys::{ioctl, stat};
 
-use crate::metad;
 use crate::parser::{buf_to_textmap, textmap_to_buf, Entry, LvmTextMap};
 use crate::util::{align_to, crc32_calc, hyphenate_uuid, make_uuid};
 use crate::{Error, Result};
@@ -377,8 +376,6 @@ impl PvHeader {
             };
             Self::write_mda_header(area, &mut f, &new_rl)?;
         }
-
-        metad::pv_found(&to_textmap(&pvh))?;
 
         Ok(pvh)
     }

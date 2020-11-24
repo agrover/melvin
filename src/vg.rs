@@ -21,7 +21,6 @@ use time::now;
 use crate::lv;
 use crate::lv::segment;
 use crate::lv::LV;
-use crate::metad;
 use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
 use crate::pv;
 use crate::pv::PV;
@@ -431,7 +430,7 @@ impl VG {
             }
         }
 
-        metad::vg_update(&self.name, &map)
+        Ok(())
     }
 
     // Returns used areas in the format: {Device: {start: len} }

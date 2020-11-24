@@ -17,7 +17,6 @@ extern crate uuid;
 
 mod error;
 mod lv;
-mod metad;
 pub mod parser;
 mod pv;
 mod pvlabel;
@@ -26,7 +25,6 @@ mod vg;
 
 pub use error::{Error, Result};
 pub use lv::LV;
-pub use metad::vg_list;
 pub use pv::PV;
 pub use pvlabel::{pvheader_scan, PvHeader};
 pub use vg::VG;

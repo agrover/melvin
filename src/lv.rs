@@ -8,7 +8,9 @@ use std::collections::BTreeMap;
 use std::io;
 use std::io::ErrorKind::Other;
 
-use devicemapper::Device;
+use devicemapper::{
+    Device, DmName, LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, DM,
+};
 
 use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
 use crate::PV;
@@ -32,7 +34,7 @@ pub struct LV {
     /// A list of the segments comprising the LV.
     pub segments: Vec<Box<dyn segment::Segment>>,
     /// The major/minor number of the LV.
-    pub device: Option<Device>,
+    pub device: LinearDev,
 }
 
 impl LV {
@@ -57,7 +59,12 @@ pub fn used_areas(lv: &LV) -> Vec<(Device, u64, u64)> {
 }
 
 /// Construct an LV from an LvmTextMap.
-pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<LV> {
+pub fn from_textmap(
+    name: &str,
+    vg_name: &str,
+    map: &LvmTextMap,
+    pvs: &BTreeMap<String, PV>,
+) -> Result<LV> {
     let err = || Error::Io(io::Error::new(Other, "lv textmap parsing error"));
 
     let id = map.string_from_textmap("id").ok_or_else(err)?;
@@ -86,6 +93,25 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
         })
         .collect();
 
+    let dev_name = format!("{}-{}", vg_name.replace("-", "--"), name.replace("-", "--"));
+
+    let dm = DM::new()?;
+    let mut logical_start_offset = Sectors(0);
+
+    let mut lines = Vec::new();
+    for segment in &segments {
+        // TODO: sketchy [0]
+        let (dev, off, len) = segment.used_areas()[0];
+        // TODO: need to convert from extents to segments???
+        lines.push(TargetLine::new(
+            logical_start_offset,
+            len.into(),
+            LinearDevTargetParams::Linear(LinearTargetParams::new(dev, off.into())),
+        ));
+        logical_start_offset += len.into();
+    }
+    let linear_dev = LinearDev::setup(&dm, DmName::new(&dev_name)?, None, lines)?;
+
     Ok(LV {
         name: name.to_string(),
         id: id.to_string(),
@@ -94,7 +120,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
         creation_host: creation_host.to_string(),
         creation_time,
         segments,
-        device: None,
+        device: linear_dev,
     })
 }
 
@@ -171,8 +197,6 @@ pub mod segment {
     pub fn from_textmap(map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<Box<dyn Segment>> {
         match map.string_from_textmap("type") {
             Some("striped") => StripedSegment::from_textmap(map, pvs),
-            Some("thin-pool") => ThinpoolSegment::from_textmap(map),
-            Some("thin") => ThinSegment::from_textmap(map),
             _ => unimplemented!(),
         }
     }
@@ -322,243 +346,6 @@ pub mod segment {
                     stripes.join(" ")
                 )
             }
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub enum DiscardPolicy {
-        Passdown,
-        NoPassdown,
-        Ignore,
-    }
-
-    /// A Thinpool Logical Volume Segment, tying together data and metadata LVs
-    #[derive(Debug, PartialEq)]
-    pub struct ThinpoolSegment {
-        /// The first extent within the LV this segment comprises.
-        pub start_extent: u64,
-        /// How many extents this segment comprises
-        pub extent_count: u64,
-        /// The name of the metadata LV
-        pub metadata_lv: String,
-        /// The name of the data LV
-        pub data_lv: String,
-        /// The transaction ID
-        pub transaction_id: u64,
-        /// The chunk size.
-        pub chunk_size: u64,
-        /// The discard policy.
-        pub discards: DiscardPolicy,
-        /// Whether to zero new blocks.
-        pub zero_new_blocks: bool,
-    }
-
-    impl ThinpoolSegment {
-        pub fn from_textmap(map: &LvmTextMap) -> Result<Box<dyn Segment>> {
-            let err = || Error::new(Other, "thinpool segment textmap parsing error");
-
-            let discards = match map.string_from_textmap("discards") {
-                Some("passdown") => DiscardPolicy::Passdown,
-                Some("nopassdown") => DiscardPolicy::NoPassdown,
-                Some("ignore") => DiscardPolicy::Ignore,
-                _ => {
-                    return Err(Error::new(
-                        Other,
-                        "Invalid text for \"discards\" in thinpool segment",
-                    ))
-                }
-            };
-
-            Ok(Box::new(ThinpoolSegment {
-                start_extent: map.i64_from_textmap("start_extent").ok_or_else(err)? as u64,
-                extent_count: map.i64_from_textmap("extent_count").ok_or_else(err)? as u64,
-                metadata_lv: map
-                    .string_from_textmap("metadata")
-                    .ok_or_else(err)?
-                    .to_string(),
-                data_lv: map.string_from_textmap("pool").ok_or_else(err)?.to_string(),
-                transaction_id: map.i64_from_textmap("transaction_id").ok_or_else(err)? as u64,
-                chunk_size: map.i64_from_textmap("chunk_size").ok_or_else(err)? as u64,
-                discards,
-                zero_new_blocks: map.i64_from_textmap("start_extent").ok_or_else(err)? != 0,
-            }))
-        }
-    }
-
-    impl Segment for ThinpoolSegment {
-        fn to_textmap(&self, _dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
-            let mut map = LvmTextMap::new();
-
-            let discards = match self.discards {
-                DiscardPolicy::Passdown => "passdown".to_string(),
-                DiscardPolicy::NoPassdown => "nopassdown".to_string(),
-                DiscardPolicy::Ignore => "ignore".to_string(),
-            };
-
-            map.insert(
-                "start_extent".to_string(),
-                Entry::Number(self.start_extent as i64),
-            );
-            map.insert(
-                "extent_count".to_string(),
-                Entry::Number(self.extent_count as i64),
-            );
-            map.insert("type".to_string(), Entry::String("thin-pool".to_string()));
-            map.insert(
-                "metadata".to_string(),
-                Entry::String(self.metadata_lv.clone()),
-            );
-            map.insert("pool".to_string(), Entry::String(self.data_lv.clone()));
-            map.insert(
-                "transaction_id".to_string(),
-                Entry::Number(self.transaction_id as i64),
-            );
-            map.insert(
-                "chunk_size".to_string(),
-                Entry::Number(self.chunk_size as i64),
-            );
-            map.insert("discards".to_string(), Entry::String(discards));
-            map.insert(
-                "zero_new_blocks".to_string(),
-                Entry::Number(self.zero_new_blocks as i64),
-            );
-
-            map
-        }
-
-        fn start_extent(&self) -> u64 {
-            self.start_extent
-        }
-
-        fn extent_count(&self) -> u64 {
-            self.extent_count
-        }
-
-        // None, they're all on subordinate devs
-        fn pv_dependencies(&self) -> Vec<Device> {
-            Vec::new()
-        }
-
-        // None, they're all on subordinate devs
-        fn used_areas(&self) -> Vec<(Device, u64, u64)> {
-            Vec::new()
-        }
-
-        fn dm_type(&self) -> &'static str {
-            "thin-pool"
-        }
-
-        fn dm_params(&self, vg: &VG) -> String {
-            let chunks = (self.extent_count * vg.extent_size()) / self.chunk_size;
-            let mut ctor = format!(
-                "{} {} {} {}",
-                self.metadata_lv,
-                self.data_lv,
-                self.chunk_size,
-                chunks / 5
-            ); // 80% low water mark
-
-            if !self.zero_new_blocks {
-                ctor.push_str(" skip_block_zeroing");
-            }
-
-            match self.discards {
-                DiscardPolicy::Passdown => {}
-                DiscardPolicy::NoPassdown => ctor.push_str(" no_discard_passdown"),
-                DiscardPolicy::Ignore => ctor.push_str(" ignore_discard"),
-            };
-
-            ctor
-        }
-    }
-
-    /// A Thin Logical Volume Segment, a copy-on-write segment
-    /// allocated from a thinpool.
-    #[derive(Debug, PartialEq)]
-    pub struct ThinSegment {
-        /// The first extent within the LV this segment comprises.
-        pub start_extent: u64,
-        /// How many extents this segment comprises
-        pub extent_count: u64,
-        /// The name of the thinpool allocated from
-        pub thin_pool: String,
-        /// The transaction ID
-        pub transaction_id: u64,
-        /// Device ID within the thinpool
-        pub device_id: u64,
-    }
-
-    impl ThinSegment {
-        pub fn from_textmap(map: &LvmTextMap) -> Result<Box<dyn Segment>> {
-            let err = || Error::new(Other, "thin segment textmap parsing error");
-
-            Ok(Box::new(ThinSegment {
-                start_extent: map.i64_from_textmap("start_extent").ok_or_else(err)? as u64,
-                extent_count: map.i64_from_textmap("extent_count").ok_or_else(err)? as u64,
-                thin_pool: map
-                    .string_from_textmap("thin_pool")
-                    .ok_or_else(err)?
-                    .to_string(),
-                transaction_id: map.i64_from_textmap("transaction_id").ok_or_else(err)? as u64,
-                device_id: map.i64_from_textmap("device_id").ok_or_else(err)? as u64,
-            }))
-        }
-    }
-
-    impl Segment for ThinSegment {
-        fn to_textmap(&self, _dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
-            let mut map = LvmTextMap::new();
-
-            map.insert(
-                "start_extent".to_string(),
-                Entry::Number(self.start_extent as i64),
-            );
-            map.insert(
-                "extent_count".to_string(),
-                Entry::Number(self.extent_count as i64),
-            );
-            map.insert("type".to_string(), Entry::String("thin".to_string()));
-            map.insert(
-                "thin_pool".to_string(),
-                Entry::String(self.thin_pool.clone()),
-            );
-            map.insert(
-                "transaction_id".to_string(),
-                Entry::Number(self.transaction_id as i64),
-            );
-            map.insert(
-                "device_id".to_string(),
-                Entry::Number(self.device_id as i64),
-            );
-
-            map
-        }
-
-        fn start_extent(&self) -> u64 {
-            self.start_extent
-        }
-
-        fn extent_count(&self) -> u64 {
-            self.extent_count
-        }
-
-        fn pv_dependencies(&self) -> Vec<Device> {
-            Vec::new()
-        }
-
-        fn used_areas(&self) -> Vec<(Device, u64, u64)> {
-            Vec::new()
-        }
-
-        fn dm_type(&self) -> &'static str {
-            "thin"
-        }
-
-        // External origin dev param not supported
-        fn dm_params(&self, vg: &VG) -> String {
-            let pool_lv = vg.lv_get(&self.thin_pool).unwrap();
-            let pool_dev = pool_lv.device.unwrap();
-            format!("{}:{} {}", pool_dev.major, pool_dev.minor, self.device_id)
         }
     }
 }

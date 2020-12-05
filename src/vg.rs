@@ -29,7 +29,6 @@ use crate::util::{align_to, make_uuid};
 use crate::{Error, Result};
 
 const DEFAULT_EXTENT_SIZE: u64 = 8192; // 4MiB
-const DEFAULT_THINPOOL_CHUNK_SIZE: u64 = 128; // 64KiB
 
 /// A Volume Group allows multiple Physical Volumes to be treated as a
 /// storage pool that can then be used to allocate Logical Volumes.
@@ -176,7 +175,7 @@ impl VG {
                         Entry::TextMap(ref lv_dict) => {
                             ret_map.insert(
                                 key.to_string(),
-                                lv::from_textmap(key, lv_dict, &str_to_pv)?,
+                                lv::from_textmap(key, name, lv_dict, &str_to_pv)?,
                             );
                         }
                         _ => return Err(Error::Io(io::Error::new(Other, "expected LV textmap"))),
@@ -193,7 +192,7 @@ impl VG {
             .map(|(_, pv)| (pv.device, pv))
             .collect();
 
-        let mut vg = VG {
+        Ok(VG {
             name: name.to_string(),
             id: id.to_string(),
             seqno: seqno as u64,
@@ -206,25 +205,7 @@ impl VG {
             metadata_copies: metadata_copies as u64,
             pvs,
             lvs,
-        };
-
-        // let dm_devices = {
-        //     let dm = DM::new()?;
-        //     dm.list_devices(&vg)?
-        // };
-        let dm_devices = {
-            let dm = DM::new()?;
-            dm.list_devices()?
-        };
-
-        for (lvname, dev, _) in dm_devices {
-            let lvname = String::from_utf8_lossy(lvname.as_bytes()).into_owned();
-            if let Some(lv) = vg.lvs.get_mut(&lvname) {
-                lv.device = Some(dev);
-            }
-        }
-
-        Ok(vg)
+        })
     }
 
     /// Add a non-affiliated PV to this VG.
@@ -361,6 +342,12 @@ impl VG {
             stripe_size: None,
         });
 
+        let lv_name = format!(
+            "{}-{}",
+            self.name.replace("-", "--"),
+            name.replace("-", "--")
+        );
+
         let params = LinearTargetParams::new(Device::from(u64::from(dev)), Sectors(area_start));
         let table = vec![TargetLine::new(
             Sectors(0),
@@ -368,91 +355,14 @@ impl VG {
             LinearDevTargetParams::Linear(params),
         )];
 
-        let lv = LV {
-            name: name.to_string(),
-            id: make_uuid(),
-            status: vec![
-                "READ".to_string(),
-                "WRITE".to_string(),
-                "VISIBLE".to_string(),
-            ],
-            flags: Vec::new(),
-            creation_host: uname().nodename().to_string(),
-            creation_time: now().to_timespec().sec,
-            segments: vec![segment],
-            device: None,
-        };
-
-        let lv_name = format!(
-            "{}-{}",
-            self.name.replace("-", "--"),
-            lv.name.replace("-", "--")
-        );
-
         // poke dm and tell it about a new device
         let dm = DM::new()?;
-        let _new_linear = {
-            LinearDev::setup(
-                &dm,
-                DmName::new(&lv_name).expect("valid format"),
-                None,
-                table,
-            )
-            .unwrap()
-        };
-
-        self.lvs.insert(name.to_string(), lv);
-
-        self.commit()
-    }
-
-    /// Create a thin pool from existing metadata and data volumes.
-    /// These will be renamed to "<name>_tmeta" and "<name>_tdata".
-    /// In addition, a spare metadata volume will be created if one
-    /// does not already exist.
-    ///
-    /// See the kernel's thin-provisioning.txt for the exact calculation, but a
-    /// reasonable size for the metadata volume (assuming default thinpool chunk
-    /// size of 64KiB) is 1/1000 the data volume, minimum 2MiB.
-    pub fn lv_create_thinpool(
-        &mut self,
-        name: &str,
-        thin_meta: &str,
-        thin_data: &str,
-    ) -> Result<()> {
-        let dm = DM::new()?;
-
-        let extent_count = {
-            let meta_lv = self
-                .lvs
-                .get_mut(thin_meta)
-                .ok_or_else(|| Error::Io(io::Error::new(Other, "Meta LV not found")))?;
-            let new_name = format!("{}_tmeta", name);
-
-            dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
-            meta_lv.name = new_name;
-            meta_lv.used_extents()
-        };
-        {
-            let _data_lv = self
-                .lvs
-                .get(thin_data)
-                .ok_or_else(|| Error::Io(io::Error::new(Other, "Data LV not found")))?;
-            let new_name = format!("{}_tdata", name);
-            dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
-        }
-        // TODO: create spare metadata volume
-
-        let segment = Box::new(segment::ThinpoolSegment {
-            start_extent: 0,
-            extent_count,
-            metadata_lv: thin_meta.to_string(),
-            data_lv: thin_data.to_string(),
-            transaction_id: 1,
-            chunk_size: DEFAULT_THINPOOL_CHUNK_SIZE,
-            discards: segment::DiscardPolicy::Passdown,
-            zero_new_blocks: true,
-        });
+        let new_linear = LinearDev::setup(
+            &dm,
+            DmName::new(&lv_name).expect("valid format"),
+            None,
+            table,
+        )?;
 
         let lv = LV {
             name: name.to_string(),
@@ -466,13 +376,8 @@ impl VG {
             creation_host: uname().nodename().to_string(),
             creation_time: now().to_timespec().sec,
             segments: vec![segment],
-            device: None,
+            device: new_linear,
         };
-
-        // poke dm and tell it about a new device
-        let dm = DM::new()?;
-        // TODO: This is broken!!!!!!!!
-        dm.device_suspend(&DevId::Name(DmName::new(name)?), &DmOptions::new())?;
 
         self.lvs.insert(name.to_string(), lv);
 

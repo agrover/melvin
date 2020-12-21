@@ -259,7 +259,7 @@ pub mod segment {
                             let name = format!("pv{}", dev_to_idx.get(&k).unwrap());
                             vec![Entry::String(name), Entry::Number(v as i64)].into_iter()
                         })
-                        .flat_map(|x| x)
+                        .flatten()
                         .collect(),
                 ),
             );

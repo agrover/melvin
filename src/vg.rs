@@ -268,8 +268,10 @@ impl VG {
             )));
         }
 
-        let da = pvh.data_areas.get(0).ok_or_else(|| Error::Io(io::Error::new(
-                    Other, "Could not find data area in PV", )))?;
+        let da = pvh
+            .data_areas
+            .get(0)
+            .ok_or_else(|| Error::Io(io::Error::new(Other, "Could not find data area in PV")))?;
 
         // figure out how many extents fit in the PV's data area
         // pe_start aligned to extent size
@@ -658,16 +660,12 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(
-            vg.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(vg.status.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(
-            vg.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(vg.flags.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(

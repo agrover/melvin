@@ -57,8 +57,7 @@ pub struct PV {
 
 impl PV {
     pub fn path(&self) -> Option<PathBuf> {
-        let f = File::open("/proc/partitions")
-            .expect("Could not open /proc/partitions");
+        let f = File::open("/proc/partitions").expect("Could not open /proc/partitions");
 
         let reader = BufReader::new(f);
 
@@ -119,16 +118,12 @@ pub fn to_textmap(pv: &PV) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(
-            pv.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(pv.status.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(
-            pv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(pv.flags.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));

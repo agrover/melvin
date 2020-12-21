@@ -105,16 +105,12 @@ pub fn to_textmap(lv: &LV, dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(
-            lv.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(lv.status.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(
-            lv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        ),
+        Entry::List(lv.flags.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(

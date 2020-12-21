@@ -64,7 +64,7 @@ pub struct VG {
 impl VG {
     /// Create a Volume Group from one or more PVs.
     pub fn create(name: &str, pv_paths: Vec<&Path>) -> Result<VG> {
-        if pv_paths.len() == 0 {
+        if pv_paths.is_empty() {
             return Err(Error::Io(io::Error::new(
                 Other,
                 "One or more paths to PVs required",

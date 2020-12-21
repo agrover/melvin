@@ -260,7 +260,7 @@ impl PvHeader {
         let label_header = LabelHeader::from_buf(&buf)?;
         let pvheader = Self::from_buf(&buf[label_header.offset as usize..], path)?;
 
-        return Ok(pvheader);
+        Ok(pvheader)
     }
 
     fn blkdev_size(file: &File) -> Result<u64> {
@@ -269,7 +269,7 @@ impl PvHeader {
         let mut val: u64 = 0;
 
         match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
-            Err(_) => return Err(Error::Io(io::Error::last_os_error())),
+            Err(_) => Err(Error::Io(io::Error::last_os_error())),
             Ok(_) => Ok(val),
         }
     }
@@ -498,7 +498,7 @@ impl PvHeader {
             return buf_to_textmap(&text);
         }
 
-        return Err(Error::Io(io::Error::new(Other, "No valid metadata found")));
+        Err(Error::Io(io::Error::new(Other, "No valid metadata found")))
     }
 
     /// Write the given metadata to all active metadata areas in the PV.

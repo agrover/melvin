@@ -341,13 +341,14 @@ impl VG {
                     }
                 }
             }
-            if contig_area.is_none() {
+
+            if let Some(contig) = contig_area {
+                contig
+            } else {
                 return Err(Error::Io(io::Error::new(
                     Other,
                     "no contiguous area for new LV",
                 )));
-            } else {
-                contig_area.unwrap()
             }
         };
 

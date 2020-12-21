@@ -448,7 +448,7 @@ pub fn status_from_textmap(map: &LvmTextMap) -> Result<Vec<String>> {
         Some(&Entry::List(ref x)) => Ok({
             x.iter()
                 .filter_map(|item| match item {
-                    &Entry::String(ref x) => Some(x.clone()),
+                    Entry::String(ref x) => Some(x.clone()),
                     _ => None,
                 })
                 .collect()
@@ -466,7 +466,7 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
 
     for (k, v) in tm {
         match v {
-            &Entry::String(ref x) => {
+            Entry::String(ref x) => {
                 vec.extend(k.as_bytes());
                 vec.extend(b" = \"");
                 vec.extend(x.as_bytes());
@@ -483,8 +483,8 @@ pub fn textmap_to_buf(tm: &LvmTextMap) -> Vec<u8> {
                 let z: Vec<_> = x
                     .iter()
                     .map(|x| match x {
-                        &Entry::String(ref x) => format!("\"{}\"", x),
-                        &Entry::Number(ref x) => format!("{}", x),
+                        Entry::String(ref x) => format!("\"{}\"", x),
+                        Entry::Number(ref x) => format!("{}", x),
                         _ => panic!("should not be in lists"),
                     })
                     .collect();

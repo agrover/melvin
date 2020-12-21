@@ -132,7 +132,7 @@ impl VG {
             .ok_or_else(err)?
             .iter()
             .filter_map(|item| match item {
-                &Entry::String(ref x) => Some(x.clone()),
+                Entry::String(ref x) => Some(x.clone()),
                 _ => None,
             })
             .collect();
@@ -156,7 +156,7 @@ impl VG {
 
                 for (key, value) in tm {
                     match value {
-                        &Entry::TextMap(ref pv_dict) => {
+                        Entry::TextMap(ref pv_dict) => {
                             ret_map.insert(key.to_string(), pv::from_textmap(pv_dict)?);
                         }
                         _ => return Err(Error::Io(io::Error::new(Other, "expected PV textmap"))),
@@ -173,7 +173,7 @@ impl VG {
 
                 for (key, value) in tm {
                     match value {
-                        &Entry::TextMap(ref lv_dict) => {
+                        Entry::TextMap(ref lv_dict) => {
                             ret_map.insert(
                                 key.to_string(),
                                 lv::from_textmap(key, lv_dict, &str_to_pv)?,

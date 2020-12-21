@@ -21,7 +21,7 @@ pub fn dev_from_textmap(map: &LvmTextMap) -> Result<Device> {
         .ok_or_else(|| Error::Io(io::Error::new(Other, "device textmap parsing error")))?;
 
     let val = match entry {
-        &Entry::String(ref s) => s
+        Entry::String(ref s) => s
             .parse::<i64>()
             .map_err(|_| Error::Io(io::Error::new(Other, "device textmap parsing error")))?,
         &Entry::Number(x) => x,

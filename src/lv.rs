@@ -81,7 +81,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
         .ok_or_else(err)?
         .iter()
         .filter_map(|item| match item {
-            &Entry::String(ref x) => Some(x.clone()),
+            Entry::String(ref x) => Some(x.clone()),
             _ => None,
         })
         .collect();

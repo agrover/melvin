@@ -87,7 +87,7 @@ impl LabelHeader {
     }
 
     /// Initialize a device with a label header.
-    fn initialize(sec_buf: &mut [u8; SECTOR_SIZE]) -> () {
+    fn initialize(sec_buf: &mut [u8; SECTOR_SIZE]) {
         sec_buf[..8].copy_from_slice(b"LABELONE");
         LittleEndian::write_u64(&mut sec_buf[8..16], LABEL_SECTOR as u64);
         LittleEndian::write_u32(&mut sec_buf[20..24], LABEL_SIZE as u32);

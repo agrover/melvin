@@ -268,10 +268,8 @@ impl VG {
             )));
         }
 
-        let da = pvh.data_areas.get(0).ok_or(Error::Io(io::Error::new(
-            Other,
-            "Could not find data area in PV",
-        )))?;
+        let da = pvh.data_areas.get(0).ok_or_else(|| Error::Io(io::Error::new(
+                    Other, "Could not find data area in PV", )))?;
 
         // figure out how many extents fit in the PV's data area
         // pe_start aligned to extent size
@@ -562,7 +560,7 @@ impl VG {
             for (device, start, len) in lv::used_areas(lv) {
                 used_map
                     .entry(device)
-                    .or_insert(BTreeMap::new())
+                    .or_insert_with(BTreeMap::new)
                     .insert(start, len);
             }
         }
@@ -592,7 +590,7 @@ impl VG {
                 if prev_end < *start {
                     free_map
                         .entry(dev)
-                        .or_insert(BTreeMap::new())
+                        .or_insert_with(BTreeMap::new)
                         .insert(prev_end, start - prev_end);
                 }
                 start + len

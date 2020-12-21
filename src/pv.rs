@@ -58,7 +58,6 @@ pub struct PV {
 impl PV {
     pub fn path(&self) -> Option<PathBuf> {
         let f = File::open("/proc/partitions")
-            .ok()
             .expect("Could not open /proc/partitions");
 
         let reader = BufReader::new(f);

@@ -255,7 +255,7 @@ impl PvHeader {
 
         let mut buf = [0u8; LABEL_SCAN_SECTORS * SECTOR_SIZE];
 
-        f.read(&mut buf)?;
+        f.read_exact(&mut buf)?;
 
         let label_header = LabelHeader::from_buf(&buf)?;
         let pvheader = Self::from_buf(&buf[label_header.offset as usize..], path)?;
@@ -363,7 +363,7 @@ impl PvHeader {
         LabelHeader::initialize(&mut sec_buf);
 
         f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64))?;
-        f.write_all(&mut sec_buf)?;
+        f.write_all(&sec_buf)?;
 
         for area in &pvh.metadata_areas {
             let new_rl = RawLocn {
@@ -385,7 +385,7 @@ impl PvHeader {
         assert!(area.size as usize > MDA_HEADER_SIZE);
         file.seek(SeekFrom::Start(area.offset))?;
         let mut hdr = [0u8; MDA_HEADER_SIZE];
-        file.read(&mut hdr)?;
+        file.read_exact(&mut hdr)?;
 
         if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
             return Err(Error::Io(io::Error::new(
@@ -481,11 +481,11 @@ impl PvHeader {
             let first_read = min(pvarea.size - rl.offset, rl.size) as usize;
 
             f.seek(SeekFrom::Start(pvarea.offset + rl.offset))?;
-            f.read(&mut text[..first_read])?;
+            f.read_exact(&mut text[..first_read])?;
 
             if first_read != rl.size as usize {
                 f.seek(SeekFrom::Start(pvarea.offset + MDA_HEADER_SIZE as u64))?;
-                f.read(&mut text[rl.size as usize - first_read..])?;
+                f.read_exact(&mut text[rl.size as usize - first_read..])?;
             }
 
             if rl.checksum != crc32_calc(&text) {

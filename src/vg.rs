@@ -220,7 +220,7 @@ impl VG {
         for (lvname, dev, _) in dm_devices {
             let lvname = String::from_utf8_lossy(lvname.as_bytes()).into_owned();
             if let Some(lv) = vg.lvs.get_mut(&lvname) {
-                lv.device = Some(dev.into());
+                lv.device = Some(dev);
             }
         }
 
@@ -613,7 +613,7 @@ impl VG {
 
     /// Returns a list of PV Devices that make up the VG.
     pub fn pv_list(&self) -> Vec<Device> {
-        self.pvs.keys().map(|key| *key).collect()
+        self.pvs.keys().copied().collect()
     }
 
     /// Returns a reference to the PV matching the Device.
@@ -623,7 +623,7 @@ impl VG {
 
     /// Returns a list of the names of LVs in the VG.
     pub fn lv_list(&self) -> Vec<String> {
-        self.lvs.keys().map(|key| key.clone()).collect()
+        self.lvs.keys().cloned().collect()
     }
 
     /// Returns a reference to the LV matching the name.

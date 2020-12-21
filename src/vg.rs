@@ -256,12 +256,9 @@ impl VG {
             // (It's the only textmap.)
             let mut vg_name = Cow::Borrowed("<unknown>");
             for (key, value) in metadata {
-                match value {
-                    Entry::TextMap(_) => {
-                        vg_name = Cow::Owned(key);
-                        break;
-                    }
-                    _ => {}
+                if let Entry::TextMap(_) = value {
+                    vg_name = Cow::Owned(key);
+                    break;
                 }
             }
 

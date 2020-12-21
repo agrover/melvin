@@ -531,7 +531,7 @@ impl VG {
             "creation_time".to_string(),
             Entry::Number(now().to_timespec().sec),
         );
-        disk_map.insert(self.name.clone(), Entry::TextMap(Box::new(map.clone())));
+        disk_map.insert(self.name.clone(), Entry::TextMap(Box::new(map)));
 
         // TODO: atomicity of updating pvs, metad, dm
         for pv in self.pvs.values() {

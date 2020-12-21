@@ -60,10 +60,10 @@ pub fn used_areas(lv: &LV) -> Vec<(Device, u64, u64)> {
 pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) -> Result<LV> {
     let err = || Error::Io(io::Error::new(Other, "lv textmap parsing error"));
 
-    let id = map.string_from_textmap("id").ok_or(err())?;
-    let creation_host = map.string_from_textmap("creation_host").ok_or(err())?;
-    let creation_time = map.i64_from_textmap("creation_time").ok_or(err())?;
-    let segment_count = map.i64_from_textmap("segment_count").ok_or(err())?;
+    let id = map.string_from_textmap("id").ok_or_else(err)?;
+    let creation_host = map.string_from_textmap("creation_host").ok_or_else(err)?;
+    let creation_time = map.i64_from_textmap("creation_time").ok_or_else(err)?;
+    let segment_count = map.i64_from_textmap("segment_count").ok_or_else(err)?;
 
     let segments: Vec<_> = (0..segment_count)
         .filter_map(|num| {
@@ -78,7 +78,7 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
 
     let flags: Vec<_> = map
         .list_from_textmap("flags")
-        .ok_or(err())?
+        .ok_or_else(err)?
         .iter()
         .filter_map(|item| match item {
             &Entry::String(ref x) => Some(x.clone()),
@@ -201,13 +201,13 @@ pub mod segment {
         ) -> Result<Box<dyn Segment>> {
             let err = || Error::new(Other, "striped segment textmap parsing error");
 
-            let stripe_list = map.list_from_textmap("stripes").ok_or(err())?;
+            let stripe_list = map.list_from_textmap("stripes").ok_or_else(err)?;
 
             let mut stripes = Vec::new();
             for slc in stripe_list.chunks(2) {
                 let dev = match &slc[0] {
-                    &Entry::String(ref x) => {
-                        let pv = pvs.get(x).ok_or(err())?;
+                    Entry::String(ref x) => {
+                        let pv = pvs.get(x).ok_or_else(err)?;
                         pv.device
                     }
                     _ => return Err(err()),
@@ -220,9 +220,9 @@ pub mod segment {
             }
 
             Ok(Box::new(StripedSegment {
-                start_extent: map.i64_from_textmap("start_extent").ok_or(err())? as u64,
-                extent_count: map.i64_from_textmap("extent_count").ok_or(err())? as u64,
-                stripes: stripes,
+                start_extent: map.i64_from_textmap("start_extent").ok_or_else(err)? as u64,
+                extent_count: map.i64_from_textmap("extent_count").ok_or_else(err)? as u64,
+                stripes,
                 // optional
                 stripe_size: map.i64_from_textmap("start_extent").map(|x| x as u64),
             }))
@@ -374,17 +374,17 @@ pub mod segment {
             };
 
             Ok(Box::new(ThinpoolSegment {
-                start_extent: map.i64_from_textmap("start_extent").ok_or(err())? as u64,
-                extent_count: map.i64_from_textmap("extent_count").ok_or(err())? as u64,
+                start_extent: map.i64_from_textmap("start_extent").ok_or_else(err)? as u64,
+                extent_count: map.i64_from_textmap("extent_count").ok_or_else(err)? as u64,
                 metadata_lv: map
                     .string_from_textmap("metadata")
-                    .ok_or(err())?
+                    .ok_or_else(err)?
                     .to_string(),
-                data_lv: map.string_from_textmap("pool").ok_or(err())?.to_string(),
-                transaction_id: map.i64_from_textmap("transaction_id").ok_or(err())? as u64,
-                chunk_size: map.i64_from_textmap("chunk_size").ok_or(err())? as u64,
-                discards: discards,
-                zero_new_blocks: map.i64_from_textmap("start_extent").ok_or(err())? != 0,
+                data_lv: map.string_from_textmap("pool").ok_or_else(err)?.to_string(),
+                transaction_id: map.i64_from_textmap("transaction_id").ok_or_else(err)? as u64,
+                chunk_size: map.i64_from_textmap("chunk_size").ok_or_else(err)? as u64,
+                discards,
+                zero_new_blocks: map.i64_from_textmap("start_extent").ok_or_else(err)? != 0,
             }))
         }
     }
@@ -497,14 +497,14 @@ pub mod segment {
             let err = || Error::new(Other, "thin segment textmap parsing error");
 
             Ok(Box::new(ThinSegment {
-                start_extent: map.i64_from_textmap("start_extent").ok_or(err())? as u64,
-                extent_count: map.i64_from_textmap("extent_count").ok_or(err())? as u64,
+                start_extent: map.i64_from_textmap("start_extent").ok_or_else(err)? as u64,
+                extent_count: map.i64_from_textmap("extent_count").ok_or_else(err)? as u64,
                 thin_pool: map
                     .string_from_textmap("thin_pool")
-                    .ok_or(err())?
+                    .ok_or_else(err)?
                     .to_string(),
-                transaction_id: map.i64_from_textmap("transaction_id").ok_or(err())? as u64,
-                device_id: map.i64_from_textmap("device_id").ok_or(err())? as u64,
+                transaction_id: map.i64_from_textmap("transaction_id").ok_or_else(err)? as u64,
+                device_id: map.i64_from_textmap("device_id").ok_or_else(err)? as u64,
             }))
         }
     }

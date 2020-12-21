@@ -117,19 +117,19 @@ impl VG {
     pub fn from_textmap(name: &str, map: &LvmTextMap) -> Result<VG> {
         let err = || Error::Io(io::Error::new(Other, "vg textmap parsing error"));
 
-        let id = map.string_from_textmap("id").ok_or(err())?;
-        let seqno = map.i64_from_textmap("seqno").ok_or(err())?;
-        let format = map.string_from_textmap("format").ok_or(err())?;
-        let extent_size = map.i64_from_textmap("extent_size").ok_or(err())?;
-        let max_lv = map.i64_from_textmap("max_lv").ok_or(err())?;
-        let max_pv = map.i64_from_textmap("max_pv").ok_or(err())?;
-        let metadata_copies = map.i64_from_textmap("metadata_copies").ok_or(err())?;
+        let id = map.string_from_textmap("id").ok_or_else(err)?;
+        let seqno = map.i64_from_textmap("seqno").ok_or_else(err)?;
+        let format = map.string_from_textmap("format").ok_or_else(err)?;
+        let extent_size = map.i64_from_textmap("extent_size").ok_or_else(err)?;
+        let max_lv = map.i64_from_textmap("max_lv").ok_or_else(err)?;
+        let max_pv = map.i64_from_textmap("max_pv").ok_or_else(err)?;
+        let metadata_copies = map.i64_from_textmap("metadata_copies").ok_or_else(err)?;
 
         let status = status_from_textmap(map)?;
 
         let flags: Vec<_> = map
             .list_from_textmap("flags")
-            .ok_or(err())?
+            .ok_or_else(err)?
             .iter()
             .filter_map(|item| match item {
                 &Entry::String(ref x) => Some(x.clone()),
@@ -150,7 +150,7 @@ impl VG {
         //
         let str_to_pv = map
             .textmap_from_textmap("physical_volumes")
-            .ok_or(err())
+            .ok_or_else(err)
             .and_then(|tm| {
                 let mut ret_map = BTreeMap::new();
 
@@ -325,7 +325,7 @@ impl VG {
 
         self.pvs
             .remove(&dev)
-            .ok_or(Error::Io(io::Error::new(Other, "Could not remove PV")))?;
+            .ok_or_else(|| Error::Io(io::Error::new(Other, "Could not remove PV")))?;
 
         self.commit()
     }
@@ -428,7 +428,7 @@ impl VG {
             let meta_lv = self
                 .lvs
                 .get_mut(thin_meta)
-                .ok_or(Error::Io(io::Error::new(Other, "Meta LV not found")))?;
+                .ok_or_else(|| Error::Io(io::Error::new(Other, "Meta LV not found")))?;
             let new_name = format!("{}_tmeta", name);
 
             dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
@@ -439,7 +439,7 @@ impl VG {
             let _data_lv = self
                 .lvs
                 .get(thin_data)
-                .ok_or(Error::Io(io::Error::new(Other, "Data LV not found")))?;
+                .ok_or_else(|| Error::Io(io::Error::new(Other, "Data LV not found")))?;
             let new_name = format!("{}_tdata", name);
             dm.device_rename(&DmName::new(name)?, &DevId::Name(DmName::new(&new_name)?))?;
         }

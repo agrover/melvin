@@ -82,20 +82,20 @@ impl PV {
 pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
     let err = || Error::Io(io::Error::new(Other, "pv textmap parsing error"));
 
-    let id = map.string_from_textmap("id").ok_or(err())?;
+    let id = map.string_from_textmap("id").ok_or_else(err)?;
     let device = dev_from_textmap(map)?;
-    let dev_size = map.i64_from_textmap("dev_size").ok_or(err())?;
-    let pe_start = map.i64_from_textmap("pe_start").ok_or(err())?;
-    let pe_count = map.i64_from_textmap("pe_count").ok_or(err())?;
+    let dev_size = map.i64_from_textmap("dev_size").ok_or_else(err)?;
+    let pe_start = map.i64_from_textmap("pe_start").ok_or_else(err)?;
+    let pe_count = map.i64_from_textmap("pe_count").ok_or_else(err)?;
 
     let status = status_from_textmap(map)?;
 
     let flags: Vec<_> = map
         .list_from_textmap("flags")
-        .ok_or(err())?
+        .ok_or_else(err)?
         .iter()
         .filter_map(|item| match item {
-            &Entry::String(ref x) => Some(x.clone()),
+            Entry::String(ref x) => Some(x.clone()),
             _ => None,
         })
         .collect();

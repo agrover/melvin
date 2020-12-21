@@ -35,7 +35,7 @@ use crate::{Error, Result};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
-const MDA_MAGIC: &'static [u8] =
+const MDA_MAGIC: &[u8] =
     b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
 const LABEL_SIZE: usize = 32;
 const LABEL_SECTOR: usize = 1;

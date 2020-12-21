@@ -111,7 +111,7 @@ struct PvAreaIter<'a> {
     area: &'a [u8],
 }
 
-fn iter_pv_area<'a>(buf: &'a [u8]) -> PvAreaIter<'a> {
+fn iter_pv_area(buf: &[u8]) -> PvAreaIter {
     PvAreaIter { area: buf }
 }
 
@@ -147,7 +147,7 @@ struct RawLocnIter<'a> {
     area: &'a [u8],
 }
 
-fn iter_raw_locn<'a>(buf: &'a [u8]) -> RawLocnIter<'a> {
+fn iter_raw_locn(buf: &[u8]) -> RawLocnIter {
     RawLocnIter { area: buf }
 }
 

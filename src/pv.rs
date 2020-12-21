@@ -120,16 +120,16 @@ pub fn to_textmap(pv: &PV) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             pv.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             pv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));

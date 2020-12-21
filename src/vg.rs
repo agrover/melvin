@@ -662,16 +662,16 @@ fn to_textmap(vg: &VG) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             vg.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             vg.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert(

@@ -251,7 +251,7 @@ pub enum Entry {
     /// A text string
     String(String),
     /// An ordered list of strings and numbers, possibly both
-    List(Box<Vec<Entry>>),
+    List(Vec<Entry>),
     /// A nested LvmTextMap
     TextMap(Box<LvmTextMap>),
 }
@@ -395,7 +395,7 @@ fn get_textmap<'a>(tokens: &[Token<'a>]) -> Result<LvmTextMap> {
                             &Token::BracketOpen,
                             &Token::BracketClose,
                         )?;
-                        ret.insert(ident, Entry::List(Box::new(get_list(&slc)?)));
+                        ret.insert(ident, Entry::List(get_list(&slc)?));
                         cur += slc.len();
                     }
                     _ => {

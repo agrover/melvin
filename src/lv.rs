@@ -105,16 +105,16 @@ pub fn to_textmap(lv: &LV, dev_to_idx: &BTreeMap<Device, usize>) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             lv.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(Box::new(
+        Entry::List(
             lv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        ),
     );
 
     map.insert(
@@ -252,7 +252,7 @@ pub mod segment {
 
             map.insert(
                 "stripes".to_string(),
-                Entry::List(Box::new(
+                Entry::List(
                     self.stripes
                         .iter()
                         .map(|&(k, v)| {
@@ -261,7 +261,7 @@ pub mod segment {
                         })
                         .flat_map(|x| x)
                         .collect(),
-                )),
+                ),
             );
             map
         }

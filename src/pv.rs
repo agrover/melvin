@@ -102,9 +102,9 @@ pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
 
     Ok(PV {
         id: id.to_string(),
-        device: device,
-        status: status,
-        flags: flags,
+        device,
+        status,
+        flags,
         dev_size: dev_size as u64,
         pe_start: pe_start as u64,
         pe_count: pe_count as u64,

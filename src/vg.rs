@@ -198,14 +198,14 @@ impl VG {
             id: id.to_string(),
             seqno: seqno as u64,
             format: format.to_string(),
-            status: status,
-            flags: flags,
+            status,
+            flags,
             extent_size: extent_size as u64,
             max_lv: max_lv as u64,
             max_pv: max_pv as u64,
             metadata_copies: metadata_copies as u64,
-            pvs: pvs,
-            lvs: lvs,
+            pvs,
+            lvs,
         };
 
         // let dm_devices = {
@@ -447,7 +447,7 @@ impl VG {
 
         let segment = Box::new(segment::ThinpoolSegment {
             start_extent: 0,
-            extent_count: extent_count,
+            extent_count,
             metadata_lv: thin_meta.to_string(),
             data_lv: thin_data.to_string(),
             transaction_id: 1,

@@ -73,8 +73,8 @@ impl LabelHeader {
 
                 return Ok(LabelHeader {
                     id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
-                    sector: sector,
-                    crc: crc,
+                    sector,
+                    crc,
                     // switch from "offset from label" to "offset from start", more convenient.
                     offset: LittleEndian::read_u32(&sec_buf[20..24])
                         + (x * SECTOR_SIZE as usize) as u32,
@@ -128,7 +128,7 @@ impl<'a> Iterator for PvAreaIter<'a> {
             self.area = &self.area[16..];
             Some(PvArea {
                 offset: off,
-                size: size,
+                size,
             })
         }
     }
@@ -166,8 +166,8 @@ impl<'a> Iterator for RawLocnIter<'a> {
             self.area = &self.area[24..];
             Some(RawLocn {
                 offset: off,
-                size: size,
-                checksum: checksum,
+                size,
+                checksum,
                 ignored: (flags & 1) > 0,
             })
         }
@@ -240,8 +240,8 @@ impl PvHeader {
         Ok(PvHeader {
             uuid: hyphenate_uuid(&buf[..ID_LEN]),
             size: LittleEndian::read_u64(&buf[ID_LEN..ID_LEN + 8]),
-            ext_version: ext_version,
-            ext_flags: ext_flags,
+            ext_version,
+            ext_flags,
             data_areas: da_vec,
             metadata_areas: md_vec,
             bootloader_areas: ba_vec,

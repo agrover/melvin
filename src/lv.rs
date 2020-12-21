@@ -89,11 +89,11 @@ pub fn from_textmap(name: &str, map: &LvmTextMap, pvs: &BTreeMap<String, PV>) ->
     Ok(LV {
         name: name.to_string(),
         id: id.to_string(),
-        status: status,
-        flags: flags,
+        status,
+        flags,
         creation_host: creation_host.to_string(),
-        creation_time: creation_time,
-        segments: segments,
+        creation_time,
+        segments,
         device: None,
     })
 }

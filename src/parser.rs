@@ -94,7 +94,7 @@ impl<'a> Lexer<'a> {
     /// Returns a new Lexer from a given byte iterator.
     fn new(chars: &'a [u8]) -> Lexer<'a> {
         Lexer {
-            chars: chars,
+            chars,
             next_byte: None,
             cursor: 0,
             next_is_ident: false,

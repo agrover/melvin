@@ -243,6 +243,12 @@ impl VG {
         //     }
         // }
 
+        // Check to ensure device is not already in VG as this could happen
+        // if PV has no MDAs
+        if self.pvs.contains_key(&dev) {
+            return Err(Error::Io(io::Error::new(Other, "PV already in VG")));
+        }
+
         // check pv is not already in the VG or another VG
         // Does it have text metadata??
         if let Ok(metadata) = pvh.read_metadata() {
@@ -284,25 +290,20 @@ impl VG {
         let area_size_sectors = dev_size_sectors - pe_start_sectors - mda1_size_sectors;
         let pe_count = area_size_sectors / self.extent_size;
 
-        // if added PV had no MDAs then we could get this far and then fail
-        if self.pvs.contains_key(&dev) {
-            Err(Error::Io(io::Error::new(Other, "PV already in VG")))
-        } else {
-            self.pvs.insert(
-                dev,
-                PV {
-                    id: pvh.uuid.clone(),
-                    device: dev,
-                    status: vec!["ALLOCATABLE".to_string()],
-                    flags: Vec::new(),
-                    dev_size: dev_size_sectors,
-                    pe_start: pe_start_sectors,
-                    pe_count: pe_count,
-                },
-            );
+        self.pvs.insert(
+            dev,
+            PV {
+                id: pvh.uuid.clone(),
+                device: dev,
+                status: vec!["ALLOCATABLE".to_string()],
+                flags: Vec::new(),
+                dev_size: dev_size_sectors,
+                pe_start: pe_start_sectors,
+                pe_count,
+            },
+        );
 
-            self.commit()
-        }
+        self.commit()
     }
 
     /// Remove a PV. It must be unused by any LVs.

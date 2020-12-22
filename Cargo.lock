@@ -99,6 +99,7 @@ checksum = "0f5d8e3d14cabcb2a8a59d7147289173c6ada77a0bc526f6b85078f941c0cf12"
 [[package]]
 name = "devicemapper"
 version = "0.28.1"
+source = "git+https://github.com/tasleson/devicemapper-rs?branch=melvin#88264ef437bc33b799ab1c0db4f43fef994d9ebe"
 dependencies = [
  "bitflags 1.2.1",
  "error-chain",

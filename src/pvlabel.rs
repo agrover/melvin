@@ -35,8 +35,7 @@ use crate::{Error, Result};
 
 const LABEL_SCAN_SECTORS: usize = 4;
 const ID_LEN: usize = 32;
-const MDA_MAGIC: &'static [u8] =
-    b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
+const MDA_MAGIC: &[u8] = b"\x20\x4c\x56\x4d\x32\x20\x78\x5b\x35\x41\x25\x72\x30\x4e\x2a\x3e";
 const LABEL_SIZE: usize = 32;
 const LABEL_SECTOR: usize = 1;
 pub const SECTOR_SIZE: usize = 512;
@@ -73,8 +72,8 @@ impl LabelHeader {
 
                 return Ok(LabelHeader {
                     id: String::from_utf8_lossy(&sec_buf[..8]).into_owned(),
-                    sector: sector,
-                    crc: crc,
+                    sector,
+                    crc,
                     // switch from "offset from label" to "offset from start", more convenient.
                     offset: LittleEndian::read_u32(&sec_buf[20..24])
                         + (x * SECTOR_SIZE as usize) as u32,
@@ -87,7 +86,7 @@ impl LabelHeader {
     }
 
     /// Initialize a device with a label header.
-    fn initialize(sec_buf: &mut [u8; SECTOR_SIZE]) -> () {
+    fn initialize(sec_buf: &mut [u8; SECTOR_SIZE]) {
         sec_buf[..8].copy_from_slice(b"LABELONE");
         LittleEndian::write_u64(&mut sec_buf[8..16], LABEL_SECTOR as u64);
         LittleEndian::write_u32(&mut sec_buf[20..24], LABEL_SIZE as u32);
@@ -111,7 +110,7 @@ struct PvAreaIter<'a> {
     area: &'a [u8],
 }
 
-fn iter_pv_area<'a>(buf: &'a [u8]) -> PvAreaIter<'a> {
+fn iter_pv_area(buf: &[u8]) -> PvAreaIter {
     PvAreaIter { area: buf }
 }
 
@@ -126,10 +125,7 @@ impl<'a> Iterator for PvAreaIter<'a> {
             None
         } else {
             self.area = &self.area[16..];
-            Some(PvArea {
-                offset: off,
-                size: size,
-            })
+            Some(PvArea { offset: off, size })
         }
     }
 }
@@ -147,7 +143,7 @@ struct RawLocnIter<'a> {
     area: &'a [u8],
 }
 
-fn iter_raw_locn<'a>(buf: &'a [u8]) -> RawLocnIter<'a> {
+fn iter_raw_locn(buf: &[u8]) -> RawLocnIter {
     RawLocnIter { area: buf }
 }
 
@@ -166,8 +162,8 @@ impl<'a> Iterator for RawLocnIter<'a> {
             self.area = &self.area[24..];
             Some(RawLocn {
                 offset: off,
-                size: size,
-                checksum: checksum,
+                size,
+                checksum,
                 ignored: (flags & 1) > 0,
             })
         }
@@ -240,8 +236,8 @@ impl PvHeader {
         Ok(PvHeader {
             uuid: hyphenate_uuid(&buf[..ID_LEN]),
             size: LittleEndian::read_u64(&buf[ID_LEN..ID_LEN + 8]),
-            ext_version: ext_version,
-            ext_flags: ext_flags,
+            ext_version,
+            ext_flags,
             data_areas: da_vec,
             metadata_areas: md_vec,
             bootloader_areas: ba_vec,
@@ -255,12 +251,12 @@ impl PvHeader {
 
         let mut buf = [0u8; LABEL_SCAN_SECTORS * SECTOR_SIZE];
 
-        f.read(&mut buf)?;
+        f.read_exact(&mut buf)?;
 
         let label_header = LabelHeader::from_buf(&buf)?;
         let pvheader = Self::from_buf(&buf[label_header.offset as usize..], path)?;
 
-        return Ok(pvheader);
+        Ok(pvheader)
     }
 
     fn blkdev_size(file: &File) -> Result<u64> {
@@ -269,7 +265,7 @@ impl PvHeader {
         let mut val: u64 = 0;
 
         match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
-            Err(_) => return Err(Error::Io(io::Error::last_os_error())),
+            Err(_) => Err(Error::Io(io::Error::last_os_error())),
             Ok(_) => Ok(val),
         }
     }
@@ -363,7 +359,7 @@ impl PvHeader {
         LabelHeader::initialize(&mut sec_buf);
 
         f.seek(SeekFrom::Start(LABEL_SECTOR as u64 * SECTOR_SIZE as u64))?;
-        f.write_all(&mut sec_buf)?;
+        f.write_all(&sec_buf)?;
 
         for area in &pvh.metadata_areas {
             let new_rl = RawLocn {
@@ -385,7 +381,7 @@ impl PvHeader {
         assert!(area.size as usize > MDA_HEADER_SIZE);
         file.seek(SeekFrom::Start(area.offset))?;
         let mut hdr = [0u8; MDA_HEADER_SIZE];
-        file.read(&mut hdr)?;
+        file.read_exact(&mut hdr)?;
 
         if LittleEndian::read_u32(&hdr[..4]) != crc32_calc(&hdr[4..MDA_HEADER_SIZE]) {
             return Err(Error::Io(io::Error::new(
@@ -481,11 +477,11 @@ impl PvHeader {
             let first_read = min(pvarea.size - rl.offset, rl.size) as usize;
 
             f.seek(SeekFrom::Start(pvarea.offset + rl.offset))?;
-            f.read(&mut text[..first_read])?;
+            f.read_exact(&mut text[..first_read])?;
 
             if first_read != rl.size as usize {
                 f.seek(SeekFrom::Start(pvarea.offset + MDA_HEADER_SIZE as u64))?;
-                f.read(&mut text[rl.size as usize - first_read..])?;
+                f.read_exact(&mut text[rl.size as usize - first_read..])?;
             }
 
             if rl.checksum != crc32_calc(&text) {
@@ -498,7 +494,7 @@ impl PvHeader {
             return buf_to_textmap(&text);
         }
 
-        return Err(Error::Io(io::Error::new(Other, "No valid metadata found")));
+        Err(Error::Io(io::Error::new(Other, "No valid metadata found")))
     }
 
     /// Write the given metadata to all active metadata areas in the PV.

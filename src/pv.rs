@@ -21,7 +21,7 @@ pub fn dev_from_textmap(map: &LvmTextMap) -> Result<Device> {
         .ok_or_else(|| Error::Io(io::Error::new(Other, "device textmap parsing error")))?;
 
     let val = match entry {
-        &Entry::String(ref s) => s
+        Entry::String(ref s) => s
             .parse::<i64>()
             .map_err(|_| Error::Io(io::Error::new(Other, "device textmap parsing error")))?,
         &Entry::Number(x) => x,
@@ -57,9 +57,7 @@ pub struct PV {
 
 impl PV {
     pub fn path(&self) -> Option<PathBuf> {
-        let f = File::open("/proc/partitions")
-            .ok()
-            .expect("Could not open /proc/partitions");
+        let f = File::open("/proc/partitions").expect("Could not open /proc/partitions");
 
         let reader = BufReader::new(f);
 
@@ -82,29 +80,29 @@ impl PV {
 pub fn from_textmap(map: &LvmTextMap) -> Result<PV> {
     let err = || Error::Io(io::Error::new(Other, "pv textmap parsing error"));
 
-    let id = map.string_from_textmap("id").ok_or(err())?;
+    let id = map.string_from_textmap("id").ok_or_else(err)?;
     let device = dev_from_textmap(map)?;
-    let dev_size = map.i64_from_textmap("dev_size").ok_or(err())?;
-    let pe_start = map.i64_from_textmap("pe_start").ok_or(err())?;
-    let pe_count = map.i64_from_textmap("pe_count").ok_or(err())?;
+    let dev_size = map.i64_from_textmap("dev_size").ok_or_else(err)?;
+    let pe_start = map.i64_from_textmap("pe_start").ok_or_else(err)?;
+    let pe_count = map.i64_from_textmap("pe_count").ok_or_else(err)?;
 
     let status = status_from_textmap(map)?;
 
     let flags: Vec<_> = map
         .list_from_textmap("flags")
-        .ok_or(err())?
+        .ok_or_else(err)?
         .iter()
         .filter_map(|item| match item {
-            &Entry::String(ref x) => Some(x.clone()),
+            Entry::String(ref x) => Some(x.clone()),
             _ => None,
         })
         .collect();
 
     Ok(PV {
         id: id.to_string(),
-        device: device,
-        status: status,
-        flags: flags,
+        device,
+        status,
+        flags,
         dev_size: dev_size as u64,
         pe_start: pe_start as u64,
         pe_count: pe_count as u64,
@@ -120,16 +118,12 @@ pub fn to_textmap(pv: &PV) -> LvmTextMap {
 
     map.insert(
         "status".to_string(),
-        Entry::List(Box::new(
-            pv.status.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        Entry::List(pv.status.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert(
         "flags".to_string(),
-        Entry::List(Box::new(
-            pv.flags.iter().map(|x| Entry::String(x.clone())).collect(),
-        )),
+        Entry::List(pv.flags.iter().map(|x| Entry::String(x.clone())).collect()),
     );
 
     map.insert("dev_size".to_string(), Entry::Number(pv.dev_size as i64));

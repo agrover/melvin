@@ -20,6 +20,7 @@ name = "melvin"
 path = "src/lib.rs"
 
 [dependencies]
+devicemapper = { git = "https://github.com/tasleson/devicemapper-rs", branch = "melvin" }
 libc = "*"
 byteorder = "0.3.10"
 crc = "^0.3.1"

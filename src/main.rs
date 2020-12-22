@@ -35,9 +35,8 @@ fn get_first_vg_meta() -> Result<(String, parser::LvmTextMap)> {
         // Find the textmap for the vg, among all the other stuff.
         // (It's the only textmap.)
         for (key, value) in map {
-            match value {
-                parser::Entry::TextMap(x) => return Ok((key, *x)),
-                _ => {}
+            if let parser::Entry::TextMap(x) = value {
+                return Ok((key, *x));
             }
         }
     }

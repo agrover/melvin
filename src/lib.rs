@@ -16,6 +16,7 @@ extern crate unix_socket;
 extern crate uuid;
 
 mod error;
+mod flock;
 mod lv;
 pub mod parser;
 mod pv;
@@ -24,6 +25,7 @@ mod util;
 mod vg;
 
 pub use error::{Error, Result};
+pub use flock::{Flock, LockScope};
 pub use lv::LV;
 pub use pv::PV;
 pub use pvlabel::{pvheader_scan, PvHeader};

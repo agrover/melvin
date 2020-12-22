@@ -4,8 +4,6 @@
 
 #![allow(dead_code)]
 
-extern crate melvin;
-
 use std::io::{self, ErrorKind::Other};
 use std::path;
 //use std::path::Path;
@@ -13,6 +11,7 @@ use std::path;
 use melvin::parser;
 use melvin::{pvheader_scan, PvHeader};
 use melvin::{Error, Result};
+use melvin::{Flock, LockScope};
 
 fn print_pvheaders() -> Result<()> {
     let dirs = vec![path::Path::new("/dev")];
@@ -27,6 +26,8 @@ fn print_pvheaders() -> Result<()> {
 
 fn get_first_vg_meta() -> Result<(String, parser::LvmTextMap)> {
     let dirs = vec![path::Path::new("/dev")];
+
+    let _lock = Flock::lock_exclusive(LockScope::Global)?;
 
     for pv_path in pvheader_scan(&dirs)? {
         let pvheader = PvHeader::find_in_dev(&pv_path)?;

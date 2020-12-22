@@ -7,14 +7,6 @@
 //! Melvin is a library for configuring logical volumes in the style of
 //! [LVM](https://www.sourceware.org/lvm2/)
 
-extern crate byteorder;
-extern crate crc;
-extern crate libc;
-extern crate nix;
-extern crate time;
-extern crate unix_socket;
-extern crate uuid;
-
 mod error;
 mod flock;
 mod lv;

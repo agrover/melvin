@@ -8,6 +8,7 @@ use std::io;
 pub enum Error {
     Io(io::Error),
     Dm(devicemapper::DmError),
+    Nix(nix::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -21,5 +22,11 @@ impl From<io::Error> for Error {
 impl From<devicemapper::DmError> for Error {
     fn from(err: devicemapper::DmError) -> Error {
         Error::Dm(err)
+    }
+}
+
+impl From<nix::Error> for Error {
+    fn from(err: nix::Error) -> Error {
+        Error::Nix(err)
     }
 }

@@ -27,7 +27,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 use byteorder::{ByteOrder, LittleEndian};
-use nix::sys::{ioctl, stat};
+use nix::ioctl_read;
+use nix::sys::stat;
 
 use crate::parser::{buf_to_textmap, textmap_to_buf, LvmTextMap};
 use crate::util::{align_to, crc32_calc, hyphenate_uuid, make_uuid};
@@ -259,17 +260,6 @@ impl PvHeader {
         Ok(pvheader)
     }
 
-    fn blkdev_size(file: &File) -> Result<u64> {
-        // BLKGETSIZE64
-        let op = ioctl::op_read(0x12, 114, 8);
-        let mut val: u64 = 0;
-
-        match unsafe { ioctl::read_into(file.as_raw_fd(), op, &mut val) } {
-            Err(_) => Err(Error::Io(io::Error::last_os_error())),
-            Ok(_) => Ok(val),
-        }
-    }
-
     /// Initialize a device as a PV with reasonable defaults: two metadata
     /// areas, no bootsector area, and size based on the device's size.
     pub fn initialize(path: &Path) -> Result<PvHeader> {
@@ -280,7 +270,7 @@ impl PvHeader {
         // mda0's length is reduced a little by the header length,
         // maybe to keep the data area aligned to 1MB?
         let mda0_length = DEFAULT_MDA_SIZE - mda0_offset;
-        let dev_size = Self::blkdev_size(&f)?;
+        let dev_size = blkdev_size(&f)?;
 
         if dev_size < ((DEFAULT_MDA_SIZE * 2) + mda0_offset) {
             return Err(Error::Io(io::Error::new(Other, "Device too small")));
@@ -558,6 +548,17 @@ impl PvHeader {
         }
 
         Ok(())
+    }
+}
+
+ioctl_read!(blkgetsize64, 0x12, 114, u64);
+
+pub fn blkdev_size(file: &File) -> Result<u64> {
+    let mut val: u64 = 0;
+
+    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
+        Err(x) => Err(Error::Nix(x)),
+        Ok(_) => Ok(val),
     }
 }
 

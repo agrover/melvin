@@ -11,6 +11,7 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 use devicemapper::Device;
+use nix::sys::stat;
 
 use crate::parser::{status_from_textmap, Entry, LvmTextMap, TextMapOps};
 use crate::{Error, Result};
@@ -21,9 +22,7 @@ pub fn dev_from_textmap(map: &LvmTextMap) -> Result<Device> {
         .ok_or_else(|| Error::Io(io::Error::new(Other, "device textmap parsing error")))?;
 
     let val = match entry {
-        Entry::String(ref s) => s
-            .parse::<i64>()
-            .map_err(|_| Error::Io(io::Error::new(Other, "device textmap parsing error")))?,
+        Entry::String(s) => stat::stat(&**s)?.st_rdev as i64,
         &Entry::Number(x) => x,
         _ => {
             return Err(Error::Io(io::Error::new(
